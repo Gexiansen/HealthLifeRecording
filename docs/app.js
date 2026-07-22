@@ -9,6 +9,14 @@ import {
   saveRecord,
 } from "./data.js";
 import { loadData, saveData } from "./storage.js";
+import {
+  calculateRecordingStreak,
+  getCalendarLabel,
+  getDailyStatus,
+  getMonthGrid,
+  getWeekDates,
+  shiftCalendarAnchor,
+} from "./calendar.js";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -41,6 +49,8 @@ const MEAL_LABELS = Object.freeze({
 const loadResult = loadData();
 let data = loadResult.data;
 let selectedDate = localDateString(new Date());
+let calendarAnchor = selectedDate;
+let calendarMode = "week";
 let editing = null;
 let undoState = null;
 let toastTimer = null;
@@ -52,8 +62,12 @@ const elements = {
   downloadRaw: document.querySelector("#download-raw"),
   selectedDate: document.querySelector("#selected-date"),
   returnToday: document.querySelector("#return-today"),
-  previousDay: document.querySelector("#previous-day"),
-  nextDay: document.querySelector("#next-day"),
+  previousPeriod: document.querySelector("#previous-period"),
+  nextPeriod: document.querySelector("#next-period"),
+  calendarLabel: document.querySelector("#calendar-label"),
+  calendarGrid: document.querySelector("#calendar-grid"),
+  toggleCalendar: document.querySelector("#toggle-calendar"),
+  streakDays: document.querySelector("#streak-days"),
   dailyProgress: document.querySelector("#daily-progress"),
   workoutSummary: document.querySelector("#workout-summary"),
   mealSummary: document.querySelector("#meal-summary"),
@@ -98,8 +112,9 @@ function bindEvents() {
   document.querySelectorAll("[data-record-form]").forEach((form) => {
     form.addEventListener("submit", handleFormSubmit);
   });
-  elements.previousDay.addEventListener("click", () => changeSelectedDate(-1));
-  elements.nextDay.addEventListener("click", () => changeSelectedDate(1));
+  elements.previousPeriod.addEventListener("click", () => changeCalendarPeriod(-1));
+  elements.nextPeriod.addEventListener("click", () => changeCalendarPeriod(1));
+  elements.toggleCalendar.addEventListener("click", toggleCalendarMode);
   elements.returnToday.addEventListener("click", () => setSelectedDate(localDateString(new Date())));
   elements.selectedDate.addEventListener("change", () => setSelectedDate(elements.selectedDate.value));
   elements.closeDialog.addEventListener("click", () => elements.dialog.close());
@@ -138,8 +153,8 @@ function renderAll() {
 
 function renderToday() {
   elements.selectedDate.value = selectedDate;
-  elements.nextDay.disabled = selectedDate >= localDateString(new Date());
   elements.returnToday.hidden = selectedDate === localDateString(new Date());
+  renderCalendar();
 
   if (!data) {
     for (const element of [
@@ -149,6 +164,7 @@ function renderToday() {
       elements.weightSummary,
       elements.hydrationSummary,
     ]) element.textContent = "数据不可用";
+    elements.streakDays.textContent = "—";
     elements.dailyProgress.textContent = "写入已锁定";
     return;
   }
@@ -175,6 +191,44 @@ function renderToday() {
   elements.weightAction.textContent = weight ? "编辑体重" : "记录体重";
   elements.hydrationAction.textContent = hydration ? "编辑饮水" : "记录饮水";
   elements.dailyProgress.textContent = `${formatDisplayDate(selectedDate)} · 已完成 ${completed}/5 类记录`;
+  const streak = calculateRecordingStreak(data, localDateString(new Date()));
+  elements.streakDays.textContent = `${streak.days} 天`;
+  elements.streakDays.title = streak.todayRecorded ? "今天已有记录" : "今天尚未记录，连续天数截至昨天";
+}
+
+function renderCalendar() {
+  const today = localDateString(new Date());
+  const entries = calendarMode === "week"
+    ? getWeekDates(calendarAnchor).map((date) => ({ date, inCurrentMonth: true }))
+    : getMonthGrid(calendarAnchor);
+  elements.calendarLabel.textContent = getCalendarLabel(calendarAnchor, calendarMode);
+  elements.calendarGrid.replaceChildren();
+  elements.toggleCalendar.textContent = calendarMode === "week" ? "展开整月" : "收起到本周";
+  elements.toggleCalendar.setAttribute("aria-expanded", String(calendarMode === "month"));
+  elements.previousPeriod.setAttribute("aria-label", calendarMode === "week" ? "上一周" : "上个月");
+  elements.nextPeriod.setAttribute("aria-label", calendarMode === "week" ? "下一周" : "下个月");
+  elements.nextPeriod.disabled = entries.some((entry) => entry.date === today);
+
+  for (const entry of entries) {
+    const status = data ? getDailyStatus(data, entry.date) : { completedCount: 0, hasRecord: false };
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "calendar-day";
+    if (!entry.inCurrentMonth) button.classList.add("outside-month");
+    if (entry.date === selectedDate) button.classList.add("selected");
+    if (status.hasRecord) button.classList.add("has-record");
+    button.disabled = entry.date > today || !data;
+    button.setAttribute("aria-label", `${formatDisplayDate(entry.date)}，已完成 ${status.completedCount}/5 类记录`);
+    const dayNumber = document.createElement("span");
+    dayNumber.className = "day-number";
+    dayNumber.textContent = String(Number(entry.date.slice(-2)));
+    const dayStatus = document.createElement("span");
+    dayStatus.className = "day-status";
+    dayStatus.textContent = status.hasRecord ? `${status.completedCount}/5` : "—";
+    button.append(dayNumber, dayStatus);
+    button.addEventListener("click", () => setSelectedDate(entry.date));
+    elements.calendarGrid.append(button);
+  }
 }
 
 function renderRecords() {
@@ -285,14 +339,22 @@ function switchView(viewName) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function changeSelectedDate(offset) {
-  const next = shiftDate(selectedDate, offset);
-  if (next <= localDateString(new Date())) setSelectedDate(next);
+function changeCalendarPeriod(direction) {
+  if (direction === 1 && elements.nextPeriod.disabled) return;
+  calendarAnchor = shiftCalendarAnchor(calendarAnchor, calendarMode, direction);
+  renderCalendar();
+}
+
+function toggleCalendarMode() {
+  calendarMode = calendarMode === "week" ? "month" : "week";
+  calendarAnchor = selectedDate;
+  renderCalendar();
 }
 
 function setSelectedDate(value) {
   if (!value) return;
   selectedDate = value;
+  calendarAnchor = value;
   renderToday();
 }
 
@@ -499,11 +561,4 @@ function localDateString(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function shiftDate(value, offset) {
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(year, month - 1, day, 12);
-  date.setDate(date.getDate() + offset);
-  return localDateString(date);
 }

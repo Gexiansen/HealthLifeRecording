@@ -29,11 +29,21 @@
             <p class="eyebrow">正在查看</p>
             <h2 id="today-title">今日</h2>
           </div>
-          <button id="return-today" class="text-button" type="button">回到今天</button>
-          <div class="date-switcher">
-            <button id="previous-day" class="icon-button" type="button" aria-label="前一天">‹</button>
-            <input id="selected-date" type="date" aria-label="选择记录日期">
-            <button id="next-day" class="icon-button" type="button" aria-label="后一天">›</button>
+          <div class="streak-badge">
+            <strong id="streak-days">0 天</strong>
+            <span>连续记录</span>
+          </div>
+          <div class="calendar-toolbar">
+            <button id="previous-period" class="icon-button" type="button" aria-label="上一周">‹</button>
+            <strong id="calendar-label"></strong>
+            <button id="next-period" class="icon-button" type="button" aria-label="下一周">›</button>
+          </div>
+          <div class="weekday-row" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+          <div id="calendar-grid" class="calendar-grid" aria-label="健康记录日历"></div>
+          <div class="calendar-actions">
+            <label class="date-input-label"><span>精确选择</span><input id="selected-date" type="date" aria-label="选择记录日期"></label>
+            <button id="toggle-calendar" class="text-button" type="button" aria-expanded="false">展开整月</button>
+            <button id="return-today" class="text-button" type="button">回到今天</button>
           </div>
           <p id="daily-progress" class="daily-progress"></p>
         </div>

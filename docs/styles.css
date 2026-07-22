@@ -74,15 +74,21 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
   box-shadow: var(--shadow);
 }
 
-.date-panel { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: end; }
+.date-panel { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
 .date-panel .eyebrow, .section-heading .eyebrow { color: var(--muted); }
 .text-button { min-height: 44px; border: 0; background: transparent; color: var(--primary); font-weight: 700; }
 
-.date-switcher {
+.streak-badge { display: grid; justify-items: end; }
+.streak-badge strong { color: var(--primary); font-size: 19px; }
+.streak-badge span { color: var(--muted); font-size: 11px; }
+
+.calendar-toolbar {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: 44px 1fr 44px;
   gap: 8px;
+  align-items: center;
+  text-align: center;
 }
 
 .icon-button {
@@ -115,6 +121,20 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px s
   color: var(--muted);
   font-size: 14px;
 }
+
+.weekday-row, .calendar-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.weekday-row span { color: var(--muted); font-size: 11px; font-weight: 800; text-align: center; }
+.calendar-day { min-width: 0; min-height: 54px; border: 1px solid transparent; border-radius: 12px; background: #f3f6f2; color: var(--ink); padding: 5px 2px; }
+.calendar-day .day-number { display: block; font-size: 14px; font-weight: 800; }
+.calendar-day .day-status { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+.calendar-day.has-record { background: #e7f1eb; color: var(--primary-dark); }
+.calendar-day.selected { border-color: var(--primary); background: var(--primary); color: white; }
+.calendar-day.selected .day-status { color: rgba(255,255,255,.8); }
+.calendar-day.outside-month { opacity: .42; }
+.calendar-day:disabled { cursor: default; opacity: .32; }
+.calendar-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto auto; align-items: end; gap: 6px; }
+.date-input-label { display: grid; gap: 3px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.date-input-label input { min-height: 44px; padding: 8px 10px; }
 
 .summary-grid { display: grid; gap: 12px; margin-top: 14px; }
 .summary-card { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); padding: 16px; }
