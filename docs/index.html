@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#163a32">
+    <title>HealthLife</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">个人健康记录</p>
+        <h1>HealthLife</h1>
+      </div>
+      <span class="local-badge">仅存本机</span>
+    </header>
+
+    <aside id="storage-alert" class="storage-alert" hidden>
+      <strong id="storage-alert-title">本地数据暂不可用</strong>
+      <p id="storage-alert-message"></p>
+      <button id="download-raw" class="secondary-button" type="button" hidden>下载原始内容</button>
+    </aside>
+
+    <main>
+      <section id="view-today" class="view" aria-labelledby="today-title">
+        <div class="date-panel">
+          <div>
+            <p class="eyebrow">正在查看</p>
+            <h2 id="today-title">今日</h2>
+          </div>
+          <button id="return-today" class="text-button" type="button">回到今天</button>
+          <div class="date-switcher">
+            <button id="previous-day" class="icon-button" type="button" aria-label="前一天">‹</button>
+            <input id="selected-date" type="date" aria-label="选择记录日期">
+            <button id="next-day" class="icon-button" type="button" aria-label="后一天">›</button>
+          </div>
+          <p id="daily-progress" class="daily-progress"></p>
+        </div>
+
+        <div class="summary-grid">
+          <article class="summary-card workout-card">
+            <div class="card-heading"><span class="card-icon">动</span><h3>运动</h3></div>
+            <p id="workout-summary" class="card-value">尚未记录</p>
+            <button type="button" data-open-form="workout">记录运动</button>
+          </article>
+          <article class="summary-card meal-card">
+            <div class="card-heading"><span class="card-icon">食</span><h3>饮食</h3></div>
+            <p id="meal-summary" class="card-value">尚未记录</p>
+            <button type="button" data-open-form="meal">记录饮食</button>
+          </article>
+          <article class="summary-card sleep-card">
+            <div class="card-heading"><span class="card-icon">眠</span><h3>睡眠</h3></div>
+            <p id="sleep-summary" class="card-value">尚未记录</p>
+            <button id="sleep-action" type="button" data-open-form="sleep">记录睡眠</button>
+          </article>
+          <article class="summary-card weight-card">
+            <div class="card-heading"><span class="card-icon">重</span><h3>体重</h3></div>
+            <p id="weight-summary" class="card-value">尚未记录</p>
+            <button id="weight-action" type="button" data-open-form="weight">记录体重</button>
+          </article>
+          <article class="summary-card water-card">
+            <div class="card-heading"><span class="card-icon">水</span><h3>饮水</h3></div>
+            <p id="hydration-summary" class="card-value">尚未记录</p>
+            <button id="hydration-action" type="button" data-open-form="hydration">记录饮水</button>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-trends" class="view" aria-labelledby="trends-title" hidden>
+        <div class="section-heading">
+          <p class="eyebrow">阶段三之后</p>
+          <h2 id="trends-title">趋势</h2>
+        </div>
+        <div class="empty-state">
+          <span>↗</span>
+          <h3>趋势功能正在准备</h3>
+          <p>有了更多记录后，这里将展示体重、睡眠、运动和饮食的周／月变化。</p>
+        </div>
+      </section>
+
+      <section id="view-records" class="view" aria-labelledby="records-title" hidden>
+        <div class="section-heading records-heading">
+          <div>
+            <p class="eyebrow">全部明细</p>
+            <h2 id="records-title">记录</h2>
+          </div>
+          <span id="record-count" class="count-badge">0 条</span>
+        </div>
+        <div id="records-list" class="records-list"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="一级导航">
+      <button type="button" data-view="today" aria-current="page"><span>●</span>今日</button>
+      <button type="button" data-view="trends"><span>↗</span>趋势</button>
+      <button type="button" data-view="records"><span>≡</span>记录</button>
+    </nav>
+
+    <dialog id="record-dialog" aria-labelledby="dialog-title">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">健康记录</p>
+          <h2 id="dialog-title">新增记录</h2>
+        </div>
+        <button id="close-dialog" class="icon-button" type="button" aria-label="关闭">×</button>
+      </div>
+      <label class="field">
+        <span>记录日期</span>
+        <input id="record-date" type="date" required>
+      </label>
+      <p id="form-error" class="form-error" role="alert" hidden></p>
+
+      <form id="workout-form" data-record-form="workout" hidden>
+        <label class="field"><span>运动类型</span><select name="type" required><option value="strength">力量</option><option value="cardio">有氧</option><option value="walking">步行</option><option value="stretching">拉伸</option><option value="ballSports">球类</option><option value="other">其他</option></select></label>
+        <div class="field-row">
+          <label class="field"><span>时长（分钟）</span><input name="durationMinutes" type="number" min="1" max="1440" inputmode="numeric" required></label>
+          <label class="field"><span>强度</span><select name="intensity" required><option value="1">低</option><option value="2" selected>中</option><option value="3">高</option></select></label>
+        </div>
+        <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
+        <button class="primary-button" type="submit">保存运动</button>
+      </form>
+
+      <form id="meal-form" data-record-form="meal" hidden>
+        <label class="field"><span>餐次</span><select name="mealType" required><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select></label>
+        <label class="field"><span>吃了什么</span><input name="description" type="text" minlength="1" maxlength="200" required></label>
+        <div class="field-row">
+          <label class="field"><span>健康程度</span><select name="healthScore" required><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
+          <label class="field"><span>饱腹感</span><select name="fullnessScore" required><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
+        </div>
+        <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
+        <button class="primary-button" type="submit">保存饮食</button>
+      </form>
+
+      <form id="sleep-form" data-record-form="sleep" hidden>
+        <div class="field-row">
+          <label class="field"><span>入睡时间</span><input name="sleepTime" type="time" required></label>
+          <label class="field"><span>起床时间</span><input name="wakeTime" type="time" required></label>
+        </div>
+        <div class="field-row">
+          <label class="field"><span>睡眠质量</span><select name="qualityScore" required><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
+          <label class="field"><span>夜醒次数</span><input name="awakeCount" type="number" min="0" max="50" value="0" inputmode="numeric" required></label>
+        </div>
+        <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
+        <button class="primary-button" type="submit">保存睡眠</button>
+      </form>
+
+      <form id="weight-form" data-record-form="weight" hidden>
+        <div class="field-row">
+          <label class="field"><span>体重（kg）</span><input name="weightKg" type="number" min="20" max="500" step="0.001" inputmode="decimal" required></label>
+          <label class="field"><span>体脂率（％）</span><input name="bodyFatPercent" type="number" min="1" max="75" step="0.01" inputmode="decimal"></label>
+        </div>
+        <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
+        <button class="primary-button" type="submit">保存体重</button>
+      </form>
+
+      <form id="hydration-form" data-record-form="hydration" hidden>
+        <label class="field"><span>今日饮水（ml）</span><input name="milliliters" type="number" min="1" max="20000" step="1" inputmode="numeric" required></label>
+        <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
+        <button class="primary-button" type="submit">保存饮水</button>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" hidden>
+      <span id="toast-message"></span>
+      <button id="undo-button" type="button" hidden>撤销</button>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
