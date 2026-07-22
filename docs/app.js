@@ -17,6 +17,7 @@ import {
   getWeekDates,
   shiftCalendarAnchor,
 } from "./calendar.js";
+import { calculateTrendSummary } from "./stats.js";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -77,6 +78,24 @@ const elements = {
   sleepAction: document.querySelector("#sleep-action"),
   weightAction: document.querySelector("#weight-action"),
   hydrationAction: document.querySelector("#hydration-action"),
+  trendPeriod: document.querySelector("#trend-period"),
+  trendPeriodLabel: document.querySelector("#trend-period-label"),
+  weightTrendSamples: document.querySelector("#weight-trend-samples"),
+  weightTrendValue: document.querySelector("#weight-trend-value"),
+  weightTrendMeta: document.querySelector("#weight-trend-meta"),
+  weightChart: document.querySelector("#weight-chart"),
+  sleepTrendSamples: document.querySelector("#sleep-trend-samples"),
+  sleepTrendValue: document.querySelector("#sleep-trend-value"),
+  sleepTrendMeta: document.querySelector("#sleep-trend-meta"),
+  workoutTrendSamples: document.querySelector("#workout-trend-samples"),
+  workoutTrendValue: document.querySelector("#workout-trend-value"),
+  workoutTrendMeta: document.querySelector("#workout-trend-meta"),
+  mealTrendSamples: document.querySelector("#meal-trend-samples"),
+  mealTrendValue: document.querySelector("#meal-trend-value"),
+  mealTrendMeta: document.querySelector("#meal-trend-meta"),
+  hydrationTrendSamples: document.querySelector("#hydration-trend-samples"),
+  hydrationTrendValue: document.querySelector("#hydration-trend-value"),
+  hydrationTrendMeta: document.querySelector("#hydration-trend-meta"),
   recordsList: document.querySelector("#records-list"),
   recordCount: document.querySelector("#record-count"),
   dialog: document.querySelector("#record-dialog"),
@@ -117,6 +136,7 @@ function bindEvents() {
   elements.toggleCalendar.addEventListener("click", toggleCalendarMode);
   elements.returnToday.addEventListener("click", () => setSelectedDate(localDateString(new Date())));
   elements.selectedDate.addEventListener("change", () => setSelectedDate(elements.selectedDate.value));
+  elements.trendPeriod.addEventListener("change", renderTrends);
   elements.closeDialog.addEventListener("click", () => elements.dialog.close());
   elements.dialog.addEventListener("click", (event) => {
     if (event.target === elements.dialog) elements.dialog.close();
@@ -148,6 +168,7 @@ function renderStorageState() {
 
 function renderAll() {
   renderToday();
+  renderTrends();
   renderRecords();
 }
 
@@ -262,6 +283,108 @@ function renderRecords() {
   }
 }
 
+function renderTrends() {
+  const days = Number(elements.trendPeriod.value);
+  const endDate = localDateString(new Date());
+  if (!data) {
+    elements.trendPeriodLabel.textContent = "数据不可用";
+    return;
+  }
+
+  const summary = calculateTrendSummary(data, endDate, days);
+  elements.trendPeriodLabel.textContent = `${summary.period.startDate} 至 ${summary.period.endDate} · 共 ${days} 个自然日`;
+
+  elements.weightTrendSamples.textContent = `${summary.weight.sampleCount} 个样本`;
+  if (summary.weight.sampleCount) {
+    elements.weightTrendValue.textContent = `${formatWeight(summary.weight.latestGrams)} kg`;
+    elements.weightTrendMeta.textContent = summary.weight.changeGrams === null
+      ? "至少需要 2 次称重才能显示区间变化"
+      : `区间变化 ${formatSignedWeight(summary.weight.changeGrams)} kg · 细线为 7 日均重`;
+  } else {
+    elements.weightTrendValue.textContent = "暂无足够数据";
+    elements.weightTrendMeta.textContent = "记录体重后显示原始值和 7 日均重";
+  }
+  renderWeightChart(summary.weight.points);
+
+  elements.sleepTrendSamples.textContent = `${summary.sleep.sampleCount} 晚`;
+  elements.sleepTrendValue.textContent = summary.sleep.sampleCount
+    ? `平均 ${formatMinutes(summary.sleep.averageMinutes)}`
+    : "暂无足够数据";
+  elements.sleepTrendMeta.textContent = summary.sleep.sampleCount
+    ? `平均质量 ${summary.sleep.averageQuality}/5`
+    : "记录睡眠后显示时长和主观质量";
+
+  elements.workoutTrendSamples.textContent = `${summary.workout.count} 次`;
+  elements.workoutTrendValue.textContent = summary.workout.count
+    ? `共 ${summary.workout.totalMinutes} 分钟`
+    : "暂无足够数据";
+  elements.workoutTrendMeta.textContent = summary.workout.count
+    ? Object.entries(summary.workout.byType).map(([type, minutes]) => `${WORKOUT_LABELS[type]} ${minutes} 分`).join(" · ")
+    : "记录运动后显示次数、时长和类型分布";
+
+  elements.mealTrendSamples.textContent = `${summary.meal.count} 餐`;
+  elements.mealTrendValue.textContent = summary.meal.count
+    ? `记录覆盖 ${summary.meal.completionPercent}％`
+    : "暂无足够数据";
+  elements.mealTrendMeta.textContent = summary.meal.count
+    ? `${summary.meal.recordedDays}/${days} 天有饮食记录 · 健康 ${summary.meal.averageHealth}/5 · 饱腹 ${summary.meal.averageFullness}/5`
+    : "记录饮食后显示覆盖天数和主观评分";
+
+  elements.hydrationTrendSamples.textContent = `${summary.hydration.sampleCount} 天`;
+  elements.hydrationTrendValue.textContent = summary.hydration.sampleCount
+    ? `日均 ${summary.hydration.averageMilliliters} ml`
+    : "暂无足够数据";
+  elements.hydrationTrendMeta.textContent = summary.hydration.sampleCount
+    ? "仅使用有饮水记录的日期计算"
+    : "记录饮水后显示有记录日期的平均值";
+}
+
+function renderWeightChart(points) {
+  elements.weightChart.replaceChildren();
+  if (!points.length) {
+    const empty = document.createElement("div");
+    empty.className = "chart-empty";
+    empty.textContent = "暂无体重样本";
+    elements.weightChart.append(empty);
+    return;
+  }
+
+  const width = 320;
+  const height = 132;
+  const padding = 18;
+  const values = points.flatMap((point) => [point.weightGrams, point.movingAverageGrams]);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(max - min, 500);
+  const x = (index) => points.length === 1
+    ? width / 2
+    : padding + index / (points.length - 1) * (width - padding * 2);
+  const y = (value) => padding + (max - value + (range - (max - min)) / 2) / range * (height - padding * 2);
+  const namespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(namespace, "svg");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `${points.length} 个体重样本及七日均重`);
+
+  if (points.length > 1) {
+    const averageLine = document.createElementNS(namespace, "polyline");
+    averageLine.setAttribute("points", points.map((point, index) => `${x(index)},${y(point.movingAverageGrams)}`).join(" "));
+    averageLine.setAttribute("fill", "none");
+    averageLine.setAttribute("stroke", "#7ca698");
+    averageLine.setAttribute("stroke-width", "2");
+    svg.append(averageLine);
+  }
+  points.forEach((point, index) => {
+    const circle = document.createElementNS(namespace, "circle");
+    circle.setAttribute("cx", x(index));
+    circle.setAttribute("cy", y(point.weightGrams));
+    circle.setAttribute("r", "4");
+    circle.setAttribute("fill", "#1f6252");
+    svg.append(circle);
+  });
+  elements.weightChart.append(svg);
+}
+
 function createEmptyRecordsState() {
   const container = document.createElement("div");
   container.className = "empty-state";
@@ -336,6 +459,7 @@ function switchView(viewName) {
     else button.removeAttribute("aria-current");
   });
   if (viewName === "records") renderRecords();
+  if (viewName === "trends") renderTrends();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -540,6 +664,11 @@ function formatWeight(grams) {
 
 function formatBodyFat(basisPoints) {
   return formatDecimal(basisPoints / 100, 2);
+}
+
+function formatSignedWeight(grams) {
+  const value = grams / 1_000;
+  return `${value > 0 ? "+" : ""}${formatDecimal(value, 3)}`;
 }
 
 function formatDecimal(value, digits) {

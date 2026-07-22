@@ -78,15 +78,43 @@
       </section>
 
       <section id="view-trends" class="view" aria-labelledby="trends-title" hidden>
-        <div class="section-heading">
-          <p class="eyebrow">阶段三之后</p>
-          <h2 id="trends-title">趋势</h2>
+        <div class="section-heading trends-heading">
+          <div>
+            <p class="eyebrow">习惯变化</p>
+            <h2 id="trends-title">趋势</h2>
+          </div>
+          <label class="period-select"><span>统计周期</span><select id="trend-period"><option value="7">最近 7 天</option><option value="30">最近 30 天</option></select></label>
         </div>
-        <div class="empty-state">
-          <span>↗</span>
-          <h3>趋势功能正在准备</h3>
-          <p>有了更多记录后，这里将展示体重、睡眠、运动和饮食的周／月变化。</p>
+        <p id="trend-period-label" class="trend-period-label"></p>
+        <div class="trend-grid">
+          <article class="trend-card weight-trend-card">
+            <div class="trend-card-heading"><h3>体重</h3><span id="weight-trend-samples"></span></div>
+            <strong id="weight-trend-value" class="trend-value">暂无数据</strong>
+            <p id="weight-trend-meta" class="trend-meta"></p>
+            <div id="weight-chart" class="weight-chart" aria-label="体重和七日均重趋势"></div>
+          </article>
+          <article class="trend-card">
+            <div class="trend-card-heading"><h3>睡眠</h3><span id="sleep-trend-samples"></span></div>
+            <strong id="sleep-trend-value" class="trend-value">暂无数据</strong>
+            <p id="sleep-trend-meta" class="trend-meta"></p>
+          </article>
+          <article class="trend-card">
+            <div class="trend-card-heading"><h3>运动</h3><span id="workout-trend-samples"></span></div>
+            <strong id="workout-trend-value" class="trend-value">暂无数据</strong>
+            <p id="workout-trend-meta" class="trend-meta"></p>
+          </article>
+          <article class="trend-card">
+            <div class="trend-card-heading"><h3>饮食</h3><span id="meal-trend-samples"></span></div>
+            <strong id="meal-trend-value" class="trend-value">暂无数据</strong>
+            <p id="meal-trend-meta" class="trend-meta"></p>
+          </article>
+          <article class="trend-card">
+            <div class="trend-card-heading"><h3>饮水</h3><span id="hydration-trend-samples"></span></div>
+            <strong id="hydration-trend-value" class="trend-value">暂无数据</strong>
+            <p id="hydration-trend-meta" class="trend-meta"></p>
+          </article>
         </div>
+        <p class="trend-boundary">趋势只基于当前浏览器中的已有记录和样本量，不构成健康诊断。</p>
       </section>
 
       <section id="view-records" class="view" aria-labelledby="records-title" hidden>
