@@ -1,0 +1,28 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and generated output
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+
+# Local health data and backups
+backups/
+healthlife-backup-*.json
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Editors, AI tools, and operating systems
+.DS_Store
+.idea/
+.vscode/
+.codex/
+.claude/
+.agents/
+
