@@ -1,0 +1,26 @@
+{
+  "name": "HealthLife 健康记录",
+  "short_name": "HealthLife",
+  "description": "本地优先的个人运动、饮食、睡眠、体重和饮水追踪工具。",
+  "lang": "zh-CN",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f6f2",
+  "theme_color": "#163a32",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
