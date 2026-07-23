@@ -13,13 +13,18 @@
         <p class="eyebrow">个人健康记录</p>
         <h1>HealthLife</h1>
       </div>
-      <span class="local-badge">仅存本机</span>
+      <button id="open-data" class="local-badge" type="button">数据</button>
     </header>
 
     <aside id="storage-alert" class="storage-alert" hidden>
       <strong id="storage-alert-title">本地数据暂不可用</strong>
       <p id="storage-alert-message"></p>
       <button id="download-raw" class="secondary-button" type="button" hidden>下载原始内容</button>
+    </aside>
+
+    <aside id="backup-reminder" class="backup-reminder" hidden>
+      <div><strong>该备份了</strong><p id="backup-reminder-message"></p></div>
+      <button id="open-data-reminder" class="text-button" type="button">数据管理</button>
     </aside>
 
     <main>
@@ -197,6 +202,39 @@
         <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
         <button class="primary-button" type="submit">保存饮水</button>
       </form>
+    </dialog>
+
+    <dialog id="data-dialog" aria-labelledby="data-dialog-title">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">本地数据安全</p>
+          <h2 id="data-dialog-title">数据管理</h2>
+        </div>
+        <button id="close-data-dialog" class="icon-button" type="button" aria-label="关闭数据管理">×</button>
+      </div>
+      <div class="data-dialog-body">
+        <section class="data-section">
+          <h3>完整备份</h3>
+          <p id="backup-status" class="data-help"></p>
+          <button id="export-backup" class="primary-button" type="button">导出完整 JSON 备份</button>
+        </section>
+        <section class="data-section">
+          <h3>恢复备份</h3>
+          <p class="data-help">先选择文件并查看摘要。确认后会完整替换当前数据；已有记录会先自动下载安全备份。</p>
+          <label class="file-field"><span>选择 HealthLife JSON 备份</span><input id="import-file" type="file" accept="application/json,.json"></label>
+          <p id="import-error" class="form-error" role="alert" hidden></p>
+          <div id="import-preview" class="import-preview" hidden>
+            <strong id="import-file-name"></strong>
+            <dl>
+              <div><dt>导出时间</dt><dd id="import-exported-at"></dd></div>
+              <div><dt>日期范围</dt><dd id="import-date-range"></dd></div>
+              <div><dt>记录总数</dt><dd id="import-total"></dd></div>
+              <div><dt>分类明细</dt><dd id="import-counts"></dd></div>
+            </dl>
+            <button id="confirm-import" class="danger-button" type="button">确认完整替换</button>
+          </div>
+        </section>
+      </div>
     </dialog>
 
     <div id="toast" class="toast" role="status" hidden>

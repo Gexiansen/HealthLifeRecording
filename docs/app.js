@@ -8,7 +8,12 @@ import {
   findDailyRecord,
   saveRecord,
 } from "./data.js";
-import { loadData, saveData } from "./storage.js";
+import {
+  loadBackupMetadata,
+  loadData,
+  saveBackupMetadata,
+  saveData,
+} from "./storage.js";
 import {
   calculateRecordingStreak,
   getCalendarLabel,
@@ -18,6 +23,13 @@ import {
   shiftCalendarAnchor,
 } from "./calendar.js";
 import { calculateTrendSummary } from "./stats.js";
+import {
+  createBackupMetadata,
+  getBackupReminder,
+  parseCompleteBackup,
+  serializeCompleteBackup,
+  summarizeData,
+} from "./backup.js";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -47,20 +59,26 @@ const MEAL_LABELS = Object.freeze({
   snack: "加餐",
 });
 
-const loadResult = loadData();
-let data = loadResult.data;
+let storageState = loadData();
+let data = storageState.data;
+let backupMetadata = loadBackupMetadata();
 let selectedDate = localDateString(new Date());
 let calendarAnchor = selectedDate;
 let calendarMode = "week";
 let editing = null;
 let undoState = null;
 let toastTimer = null;
+let pendingImport = null;
 
 const elements = {
   storageAlert: document.querySelector("#storage-alert"),
   storageAlertTitle: document.querySelector("#storage-alert-title"),
   storageAlertMessage: document.querySelector("#storage-alert-message"),
   downloadRaw: document.querySelector("#download-raw"),
+  backupReminder: document.querySelector("#backup-reminder"),
+  backupReminderMessage: document.querySelector("#backup-reminder-message"),
+  openData: document.querySelector("#open-data"),
+  openDataReminder: document.querySelector("#open-data-reminder"),
   selectedDate: document.querySelector("#selected-date"),
   returnToday: document.querySelector("#return-today"),
   previousPeriod: document.querySelector("#previous-period"),
@@ -106,6 +124,19 @@ const elements = {
   toast: document.querySelector("#toast"),
   toastMessage: document.querySelector("#toast-message"),
   undoButton: document.querySelector("#undo-button"),
+  dataDialog: document.querySelector("#data-dialog"),
+  closeDataDialog: document.querySelector("#close-data-dialog"),
+  backupStatus: document.querySelector("#backup-status"),
+  exportBackup: document.querySelector("#export-backup"),
+  importFile: document.querySelector("#import-file"),
+  importError: document.querySelector("#import-error"),
+  importPreview: document.querySelector("#import-preview"),
+  importFileName: document.querySelector("#import-file-name"),
+  importExportedAt: document.querySelector("#import-exported-at"),
+  importDateRange: document.querySelector("#import-date-range"),
+  importTotal: document.querySelector("#import-total"),
+  importCounts: document.querySelector("#import-counts"),
+  confirmImport: document.querySelector("#confirm-import"),
 };
 
 initialize();
@@ -147,13 +178,25 @@ function bindEvents() {
   });
   elements.undoButton.addEventListener("click", undoDelete);
   elements.downloadRaw.addEventListener("click", downloadCorruptData);
+  elements.openData.addEventListener("click", openDataDialog);
+  elements.openDataReminder.addEventListener("click", openDataDialog);
+  elements.closeDataDialog.addEventListener("click", () => elements.dataDialog.close());
+  elements.exportBackup.addEventListener("click", exportCompleteBackup);
+  elements.importFile.addEventListener("change", handleImportFile);
+  elements.confirmImport.addEventListener("click", confirmImport);
 }
 
 function renderStorageState() {
-  if (loadResult.status === "ready" || loadResult.status === "empty") return;
+  if (storageState.status === "ready" || storageState.status === "empty") {
+    elements.storageAlert.hidden = true;
+    document.querySelectorAll("[data-open-form]").forEach((button) => {
+      button.disabled = false;
+    });
+    return;
+  }
 
   elements.storageAlert.hidden = false;
-  if (loadResult.status === "corrupt") {
+  if (storageState.status === "corrupt") {
     elements.storageAlertTitle.textContent = "检测到异常本地数据，已停止写入";
     elements.storageAlertMessage.textContent = "原始内容仍保留在浏览器中。请先下载保存，再处理或恢复数据。";
     elements.downloadRaw.hidden = false;
@@ -170,6 +213,29 @@ function renderAll() {
   renderToday();
   renderTrends();
   renderRecords();
+  renderBackupState();
+}
+
+function renderBackupState() {
+  if (!data) {
+    elements.backupReminder.hidden = true;
+    elements.backupStatus.textContent = "当前数据不可用，可以选择有效完整备份进行恢复。";
+    elements.exportBackup.disabled = true;
+    return;
+  }
+  elements.exportBackup.disabled = false;
+  const summary = summarizeData(data);
+  const reminder = getBackupReminder(data, backupMetadata);
+  elements.backupReminder.hidden = !reminder.needed;
+  const messages = {
+    never: "当前记录从未导出完整备份。",
+    stale: "上次备份已超过 14 天。",
+    manyChanges: "上次备份后已新增至少 10 条记录。",
+  };
+  elements.backupReminderMessage.textContent = messages[reminder.reason] ?? "";
+  elements.backupStatus.textContent = backupMetadata
+    ? `上次备份：${formatTimestamp(backupMetadata.lastBackupAt)} · 当时 ${backupMetadata.recordCount} 条；当前 ${summary.totalRecords} 条。`
+    : `尚未备份 · 当前 ${summary.totalRecords} 条记录。`;
 }
 
 function renderToday() {
@@ -641,14 +707,128 @@ function setFormError(message) {
 }
 
 function downloadCorruptData() {
-  if (!loadResult.raw) return;
-  const blob = new Blob([loadResult.raw], { type: "application/json" });
+  if (!storageState.raw) return;
+  downloadText(storageState.raw, `healthlife-corrupt-${localDateString(new Date())}.json`);
+}
+
+function openDataDialog() {
+  pendingImport = null;
+  elements.importFile.value = "";
+  elements.importPreview.hidden = true;
+  setImportError("");
+  renderBackupState();
+  elements.dataDialog.showModal();
+  elements.closeDataDialog.focus();
+}
+
+function exportCompleteBackup() {
+  if (!data) return;
+  const now = new Date().toISOString();
+  const summary = summarizeData(data);
+  try {
+    downloadText(
+      serializeCompleteBackup(data, now),
+      `healthlife-backup-${localDateString(new Date())}.json`,
+    );
+    backupMetadata = createBackupMetadata(now, summary.totalRecords);
+    try {
+      saveBackupMetadata(backupMetadata);
+    } catch {
+      backupMetadata = null;
+      renderBackupState();
+      showToast("备份已导出，但提醒状态保存失败");
+      return;
+    }
+    renderBackupState();
+    showToast("完整备份已导出");
+  } catch (error) {
+    showToast(error.message || "备份导出失败");
+  }
+}
+
+async function handleImportFile() {
+  pendingImport = null;
+  elements.importPreview.hidden = true;
+  setImportError("");
+  const file = elements.importFile.files[0];
+  if (!file) return;
+  try {
+    const result = parseCompleteBackup(await file.text());
+    pendingImport = { ...result, fileName: file.name };
+    renderImportPreview();
+  } catch (error) {
+    setImportError(error.message || "无法读取备份文件");
+  }
+}
+
+function renderImportPreview() {
+  const { backup, summary, fileName } = pendingImport;
+  elements.importFileName.textContent = fileName;
+  elements.importExportedAt.textContent = formatTimestamp(backup.exportedAt);
+  elements.importDateRange.textContent = summary.firstDate
+    ? `${summary.firstDate} 至 ${summary.lastDate}`
+    : "空账本";
+  elements.importTotal.textContent = `${summary.totalRecords} 条`;
+  elements.importCounts.textContent = `运动 ${summary.counts.workouts}、饮食 ${summary.counts.meals}、睡眠 ${summary.counts.sleepRecords}、体重 ${summary.counts.weights}、饮水 ${summary.counts.hydration}`;
+  elements.importPreview.hidden = false;
+}
+
+function confirmImport() {
+  if (!pendingImport) return;
+  const now = new Date().toISOString();
+  try {
+    if (data && summarizeData(data).totalRecords > 0) {
+      downloadText(
+        serializeCompleteBackup(data, now),
+        `healthlife-before-restore-${localDateString(new Date())}.json`,
+      );
+    } else if (storageState.status === "corrupt" && storageState.raw) {
+      downloadText(storageState.raw, `healthlife-corrupt-before-restore-${localDateString(new Date())}.json`);
+    }
+    saveData(pendingImport.backup.data);
+    data = pendingImport.backup.data;
+    storageState = { status: "ready", data, raw: null, error: null };
+    backupMetadata = createBackupMetadata(now, pendingImport.summary.totalRecords);
+    try {
+      saveBackupMetadata(backupMetadata);
+    } catch {
+      backupMetadata = null;
+    }
+    elements.dataDialog.close();
+    renderStorageState();
+    renderAll();
+    showToast(`已恢复 ${pendingImport.summary.totalRecords} 条记录`);
+    pendingImport = null;
+  } catch (error) {
+    setImportError(error.message || "恢复失败，当前数据未改变");
+  }
+}
+
+function setImportError(message) {
+  elements.importError.textContent = message;
+  elements.importError.hidden = !message;
+}
+
+function downloadText(text, fileName) {
+  const blob = new Blob([text], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `healthlife-corrupt-${localDateString(new Date())}.json`;
+  link.download = fileName;
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function formatTimestamp(value) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function formatMinutes(minutes) {

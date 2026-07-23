@@ -1,6 +1,8 @@
 import { createEmptyData, parseData, serializeData } from "./model.js";
+import { parseBackupMetadata } from "./backup.js";
 
 export const STORAGE_KEY = "healthlife:data:v1";
+export const BACKUP_META_KEY = "healthlife:backup-meta:v1";
 
 export class StorageWriteError extends Error {
   constructor(cause) {
@@ -57,4 +59,20 @@ export function saveData(data, storage = globalThis.localStorage) {
     throw new StorageWriteError(error);
   }
   return serialized;
+}
+
+export function loadBackupMetadata(storage = globalThis.localStorage) {
+  try {
+    return parseBackupMetadata(storage.getItem(BACKUP_META_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function saveBackupMetadata(metadata, storage = globalThis.localStorage) {
+  try {
+    storage.setItem(BACKUP_META_KEY, JSON.stringify(metadata));
+  } catch (error) {
+    throw new StorageWriteError(error);
+  }
 }

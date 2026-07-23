@@ -2,11 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  BACKUP_META_KEY,
+  loadBackupMetadata,
   loadData,
+  saveBackupMetadata,
   saveData,
   STORAGE_KEY,
   StorageWriteError,
 } from "../docs/storage.js";
+import { createBackupMetadata } from "../docs/backup.js";
 import { createEmptyData } from "../docs/model.js";
 
 function memoryStorage(initial = null) {
@@ -72,4 +76,18 @@ test("读取不可用和保存失败返回明确错误", () => {
       }),
     StorageWriteError,
   );
+});
+
+test("备份提醒元数据使用独立版本化键并容忍损坏内容", () => {
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, value); },
+  };
+  const metadata = createBackupMetadata("2026-07-23T09:00:00.000Z", 8);
+  saveBackupMetadata(metadata, storage);
+  assert.equal(values.has(BACKUP_META_KEY), true);
+  assert.deepEqual(loadBackupMetadata(storage), metadata);
+  values.set(BACKUP_META_KEY, "{broken");
+  assert.equal(loadBackupMetadata(storage), null);
 });

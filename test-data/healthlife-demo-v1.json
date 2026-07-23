@@ -1,0 +1,99 @@
+{
+  "format": "healthlife-complete-backup",
+  "backupVersion": 1,
+  "exportedAt": "2026-01-10T08:00:00.000Z",
+  "data": {
+    "schemaVersion": 1,
+    "settings": {
+      "weightUnit": "kg",
+      "goalWeightGrams": null
+    },
+    "workouts": [
+      {
+        "id": "11000000-0000-4000-8000-000000000001",
+        "date": "2026-01-08",
+        "type": "walking",
+        "durationMinutes": 35,
+        "intensity": 1,
+        "note": "虚构公园散步",
+        "createdAt": "2026-01-08T08:00:00.000Z",
+        "updatedAt": "2026-01-08T08:00:00.000Z"
+      }
+    ],
+    "meals": [
+      {
+        "id": "12000000-0000-4000-8000-000000000001",
+        "date": "2026-01-08",
+        "mealType": "lunch",
+        "description": "虚构蔬菜午餐",
+        "healthScore": 4,
+        "fullnessScore": 3,
+        "note": "公开演示数据",
+        "createdAt": "2026-01-08T08:00:00.000Z",
+        "updatedAt": "2026-01-08T08:00:00.000Z"
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000002",
+        "date": "2026-01-09",
+        "mealType": "dinner",
+        "description": "虚构家常晚餐",
+        "healthScore": 3,
+        "fullnessScore": 4,
+        "note": "",
+        "createdAt": "2026-01-09T08:00:00.000Z",
+        "updatedAt": "2026-01-09T08:00:00.000Z"
+      }
+    ],
+    "sleepRecords": [
+      {
+        "id": "13000000-0000-4000-8000-000000000001",
+        "date": "2026-01-09",
+        "sleepTime": "23:10",
+        "wakeTime": "07:00",
+        "qualityScore": 4,
+        "awakeCount": 1,
+        "note": "虚构睡眠记录",
+        "createdAt": "2026-01-09T08:00:00.000Z",
+        "updatedAt": "2026-01-09T08:00:00.000Z"
+      }
+    ],
+    "weights": [
+      {
+        "id": "14000000-0000-4000-8000-000000000001",
+        "date": "2026-01-08",
+        "weightGrams": 70000,
+        "bodyFatBasisPoints": null,
+        "note": "虚构体重",
+        "createdAt": "2026-01-08T08:00:00.000Z",
+        "updatedAt": "2026-01-08T08:00:00.000Z"
+      },
+      {
+        "id": "14000000-0000-4000-8000-000000000002",
+        "date": "2026-01-09",
+        "weightGrams": 69800,
+        "bodyFatBasisPoints": 1850,
+        "note": "",
+        "createdAt": "2026-01-09T08:00:00.000Z",
+        "updatedAt": "2026-01-09T08:00:00.000Z"
+      }
+    ],
+    "hydration": [
+      {
+        "id": "15000000-0000-4000-8000-000000000001",
+        "date": "2026-01-08",
+        "milliliters": 1800,
+        "note": "虚构饮水",
+        "createdAt": "2026-01-08T08:00:00.000Z",
+        "updatedAt": "2026-01-08T08:00:00.000Z"
+      },
+      {
+        "id": "15000000-0000-4000-8000-000000000002",
+        "date": "2026-01-09",
+        "milliliters": 2000,
+        "note": "",
+        "createdAt": "2026-01-09T08:00:00.000Z",
+        "updatedAt": "2026-01-09T08:00:00.000Z"
+      }
+    ]
+  }
+}
