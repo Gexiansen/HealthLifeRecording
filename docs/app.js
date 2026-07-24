@@ -22,7 +22,7 @@ import {
   getWeekDates,
   shiftCalendarAnchor,
 } from "./calendar.js";
-import { calculateTrendSummary } from "./stats.js";
+import { calculateTrendComparison } from "./stats.js";
 import {
   createBackupMetadata,
   getBackupReminder,
@@ -30,6 +30,13 @@ import {
   serializeCompleteBackup,
   summarizeData,
 } from "./backup.js";
+import {
+  addHydrationAmount,
+  filterRecordItems,
+  getDateContext,
+  getDefaultMealType,
+  getRestoreLabel,
+} from "./interaction.js";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -69,6 +76,10 @@ let editing = null;
 let undoState = null;
 let toastTimer = null;
 let pendingImport = null;
+let trendDays = 7;
+let activeForm = null;
+let formBaseline = null;
+let installPromptEvent = null;
 
 const elements = {
   storageAlert: document.querySelector("#storage-alert"),
@@ -79,6 +90,9 @@ const elements = {
   backupReminderMessage: document.querySelector("#backup-reminder-message"),
   openData: document.querySelector("#open-data"),
   openDataReminder: document.querySelector("#open-data-reminder"),
+  appUpdate: document.querySelector("#app-update"),
+  reloadApp: document.querySelector("#reload-app"),
+  todayTitle: document.querySelector("#today-title"),
   selectedDate: document.querySelector("#selected-date"),
   returnToday: document.querySelector("#return-today"),
   previousPeriod: document.querySelector("#previous-period"),
@@ -96,12 +110,16 @@ const elements = {
   sleepAction: document.querySelector("#sleep-action"),
   weightAction: document.querySelector("#weight-action"),
   hydrationAction: document.querySelector("#hydration-action"),
-  trendPeriod: document.querySelector("#trend-period"),
   trendPeriodLabel: document.querySelector("#trend-period-label"),
+  trendEmpty: document.querySelector("#trend-empty"),
+  trendGrid: document.querySelector(".trend-grid"),
+  trendBoundary: document.querySelector(".trend-boundary"),
   weightTrendSamples: document.querySelector("#weight-trend-samples"),
   weightTrendValue: document.querySelector("#weight-trend-value"),
   weightTrendMeta: document.querySelector("#weight-trend-meta"),
   weightChart: document.querySelector("#weight-chart"),
+  weightChartLegend: document.querySelector("#weight-chart-legend"),
+  weightChartDetail: document.querySelector("#weight-chart-detail"),
   sleepTrendSamples: document.querySelector("#sleep-trend-samples"),
   sleepTrendValue: document.querySelector("#sleep-trend-value"),
   sleepTrendMeta: document.querySelector("#sleep-trend-meta"),
@@ -116,11 +134,19 @@ const elements = {
   hydrationTrendMeta: document.querySelector("#hydration-trend-meta"),
   recordsList: document.querySelector("#records-list"),
   recordCount: document.querySelector("#record-count"),
+  recordTypeFilter: document.querySelector("#record-type-filter"),
+  recordMonthFilter: document.querySelector("#record-month-filter"),
+  clearRecordFilters: document.querySelector("#clear-record-filters"),
   dialog: document.querySelector("#record-dialog"),
   dialogTitle: document.querySelector("#dialog-title"),
   closeDialog: document.querySelector("#close-dialog"),
   recordDate: document.querySelector("#record-date"),
+  hydrationAmountLabel: document.querySelector("#hydration-amount-label"),
+  sleepDurationPreview: document.querySelector("#sleep-duration-preview"),
   formError: document.querySelector("#form-error"),
+  discardDialog: document.querySelector("#discard-dialog"),
+  continueEditing: document.querySelector("#continue-editing"),
+  discardChanges: document.querySelector("#discard-changes"),
   toast: document.querySelector("#toast"),
   toastMessage: document.querySelector("#toast-message"),
   undoButton: document.querySelector("#undo-button"),
@@ -136,7 +162,9 @@ const elements = {
   importDateRange: document.querySelector("#import-date-range"),
   importTotal: document.querySelector("#import-total"),
   importCounts: document.querySelector("#import-counts"),
+  importReplaceSummary: document.querySelector("#import-replace-summary"),
   confirmImport: document.querySelector("#confirm-import"),
+  installApp: document.querySelector("#install-app"),
 };
 
 initialize();
@@ -145,6 +173,7 @@ function initialize() {
   const today = localDateString(new Date());
   elements.selectedDate.max = today;
   elements.recordDate.max = today;
+  elements.recordMonthFilter.max = today.slice(0, 7);
   elements.selectedDate.value = selectedDate;
   elements.recordDate.value = selectedDate;
   bindEvents();
@@ -156,7 +185,13 @@ function initialize() {
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hadController) elements.appUpdate.hidden = false;
+    });
+    navigator.serviceWorker.register("./sw.js").then((registration) => {
+      if (registration.waiting && hadController) elements.appUpdate.hidden = false;
+    }).catch(() => {});
   });
 }
 
@@ -169,21 +204,49 @@ function bindEvents() {
   });
   document.querySelectorAll("[data-record-form]").forEach((form) => {
     form.addEventListener("submit", handleFormSubmit);
+    form.addEventListener("input", handleFormInput);
+    form.addEventListener("change", handleFormInput);
   });
   elements.previousPeriod.addEventListener("click", () => changeCalendarPeriod(-1));
   elements.nextPeriod.addEventListener("click", () => changeCalendarPeriod(1));
   elements.toggleCalendar.addEventListener("click", toggleCalendarMode);
   elements.returnToday.addEventListener("click", () => setSelectedDate(localDateString(new Date())));
   elements.selectedDate.addEventListener("change", () => setSelectedDate(elements.selectedDate.value));
-  elements.trendPeriod.addEventListener("change", renderTrends);
-  elements.closeDialog.addEventListener("click", () => elements.dialog.close());
+  document.querySelectorAll("[data-trend-days]").forEach((button) => {
+    button.addEventListener("click", () => setTrendDays(Number(button.dataset.trendDays)));
+  });
+  document.querySelectorAll("[data-go-today]").forEach((button) => {
+    button.addEventListener("click", goToTodayView);
+  });
+  document.querySelectorAll("[data-quick-duration]").forEach((button) => {
+    button.addEventListener("click", () => setQuickDuration(Number(button.dataset.quickDuration)));
+  });
+  document.querySelectorAll("[data-form-water-add]").forEach((button) => {
+    button.addEventListener("click", () => addWaterInForm(Number(button.dataset.formWaterAdd)));
+  });
+  document.querySelectorAll("[data-quick-water]").forEach((button) => {
+    button.addEventListener("click", () => quickAddHydration(Number(button.dataset.quickWater)));
+  });
+  elements.recordTypeFilter.addEventListener("change", renderRecords);
+  elements.recordMonthFilter.addEventListener("change", renderRecords);
+  elements.clearRecordFilters.addEventListener("click", clearRecordFilters);
+  elements.recordDate.addEventListener("input", handleSharedDateInput);
+  elements.closeDialog.addEventListener("click", requestCloseRecordDialog);
   elements.dialog.addEventListener("click", (event) => {
-    if (event.target === elements.dialog) elements.dialog.close();
+    if (event.target === elements.dialog) requestCloseRecordDialog();
+  });
+  elements.dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    requestCloseRecordDialog();
   });
   elements.dialog.addEventListener("close", () => {
     editing = null;
+    activeForm = null;
+    formBaseline = null;
     setFormError("");
   });
+  elements.continueEditing.addEventListener("click", () => elements.discardDialog.close());
+  elements.discardChanges.addEventListener("click", discardFormChanges);
   elements.undoButton.addEventListener("click", undoDelete);
   elements.downloadRaw.addEventListener("click", downloadCorruptData);
   elements.openData.addEventListener("click", openDataDialog);
@@ -192,6 +255,9 @@ function bindEvents() {
   elements.exportBackup.addEventListener("click", exportCompleteBackup);
   elements.importFile.addEventListener("change", handleImportFile);
   elements.confirmImport.addEventListener("click", confirmImport);
+  elements.installApp.addEventListener("click", installApp);
+  elements.reloadApp.addEventListener("click", () => window.location.reload());
+  window.addEventListener("beforeinstallprompt", handleInstallPrompt);
 }
 
 function renderStorageState() {
@@ -247,8 +313,12 @@ function renderBackupState() {
 }
 
 function renderToday() {
+  const today = localDateString(new Date());
+  const dateContext = getDateContext(selectedDate, today);
+  elements.todayTitle.textContent = dateContext.heading;
+  elements.hydrationAmountLabel.textContent = dateContext.hydrationLabel;
   elements.selectedDate.value = selectedDate;
-  elements.returnToday.hidden = selectedDate === localDateString(new Date());
+  elements.returnToday.hidden = selectedDate === today;
   renderCalendar();
 
   if (!data) {
@@ -286,7 +356,7 @@ function renderToday() {
   elements.weightAction.textContent = weight ? "编辑体重" : "记录体重";
   elements.hydrationAction.textContent = hydration ? "编辑饮水" : "记录饮水";
   elements.dailyProgress.textContent = `${formatDisplayDate(selectedDate)} · 已完成 ${completed}/5 类记录`;
-  const streak = calculateRecordingStreak(data, localDateString(new Date()));
+  const streak = calculateRecordingStreak(data, today);
   elements.streakDays.textContent = `${streak.days} 天`;
   elements.streakDays.title = streak.todayRecorded ? "今天已有记录" : "今天尚未记录，连续天数截至昨天";
 }
@@ -311,6 +381,7 @@ function renderCalendar() {
     button.className = "calendar-day";
     if (!entry.inCurrentMonth) button.classList.add("outside-month");
     if (entry.date === selectedDate) button.classList.add("selected");
+    button.setAttribute("aria-pressed", String(entry.date === selectedDate));
     if (status.hasRecord) button.classList.add("has-record");
     button.disabled = entry.date > today || !data;
     button.setAttribute("aria-label", `${formatDisplayDate(entry.date)}，已完成 ${status.completedCount}/5 类记录`);
@@ -333,10 +404,19 @@ function renderRecords() {
     return;
   }
 
-  const items = allRecordsByDate(data);
-  elements.recordCount.textContent = `${items.length} 条`;
+  const allItems = allRecordsByDate(data);
+  const items = filterRecordItems(
+    allItems,
+    elements.recordTypeFilter.value,
+    elements.recordMonthFilter.value,
+  );
+  const hasFilters = elements.recordTypeFilter.value !== "all" || elements.recordMonthFilter.value !== "";
+  elements.clearRecordFilters.hidden = !hasFilters;
+  elements.recordCount.textContent = hasFilters
+    ? `${items.length}/${allItems.length} 条`
+    : `${allItems.length} 条`;
   if (items.length === 0) {
-    elements.recordsList.append(createEmptyRecordsState());
+    elements.recordsList.append(createEmptyRecordsState(allItems.length > 0));
     return;
   }
 
@@ -358,22 +438,39 @@ function renderRecords() {
 }
 
 function renderTrends() {
-  const days = Number(elements.trendPeriod.value);
   const endDate = localDateString(new Date());
   if (!data) {
     elements.trendPeriodLabel.textContent = "数据不可用";
     return;
   }
 
-  const summary = calculateTrendSummary(data, endDate, days);
-  elements.trendPeriodLabel.textContent = `${summary.period.startDate} 至 ${summary.period.endDate} · 共 ${days} 个自然日`;
+  const comparison = calculateTrendComparison(data, endDate, trendDays);
+  const summary = comparison.current;
+  elements.trendPeriodLabel.textContent = `${summary.period.startDate} 至 ${summary.period.endDate} · 共 ${trendDays} 个自然日`;
+  document.querySelectorAll("[data-trend-days]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(Number(button.dataset.trendDays) === trendDays));
+  });
+  const hasAnySamples = summary.weight.sampleCount
+    + summary.sleep.sampleCount
+    + summary.workout.count
+    + summary.meal.count
+    + summary.hydration.sampleCount > 0;
+  elements.trendEmpty.hidden = hasAnySamples;
+  elements.trendGrid.hidden = !hasAnySamples;
+  elements.trendBoundary.hidden = !hasAnySamples;
+  if (!hasAnySamples) return;
 
   elements.weightTrendSamples.textContent = `${summary.weight.sampleCount} 个样本`;
   if (summary.weight.sampleCount) {
     elements.weightTrendValue.textContent = `${formatWeight(summary.weight.latestGrams)} kg`;
-    elements.weightTrendMeta.textContent = summary.weight.changeGrams === null
+    const ownChange = summary.weight.changeGrams === null
       ? "至少需要 2 次称重才能显示区间变化"
       : `区间变化 ${formatSignedWeight(summary.weight.changeGrams)} kg · 细线为 7 日均重`;
+    elements.weightTrendMeta.textContent = joinComparison(
+      ownChange,
+      comparison.changes.weightGrams,
+      (value) => `${formatSignedWeight(value)} kg`,
+    );
   } else {
     elements.weightTrendValue.textContent = "暂无足够数据";
     elements.weightTrendMeta.textContent = "记录体重后显示原始值和 7 日均重";
@@ -385,7 +482,11 @@ function renderTrends() {
     ? `平均 ${formatMinutes(summary.sleep.averageMinutes)}`
     : "暂无足够数据";
   elements.sleepTrendMeta.textContent = summary.sleep.sampleCount
-    ? `平均质量 ${summary.sleep.averageQuality}/5`
+    ? joinComparison(
+      `平均质量 ${summary.sleep.averageQuality}/5`,
+      comparison.changes.sleepMinutes,
+      (value) => formatSignedUnit(value, "分钟"),
+    )
     : "记录睡眠后显示时长和主观质量";
 
   elements.workoutTrendSamples.textContent = `${summary.workout.count} 次`;
@@ -393,7 +494,11 @@ function renderTrends() {
     ? `共 ${summary.workout.totalMinutes} 分钟`
     : "暂无足够数据";
   elements.workoutTrendMeta.textContent = summary.workout.count
-    ? Object.entries(summary.workout.byType).map(([type, minutes]) => `${WORKOUT_LABELS[type]} ${minutes} 分`).join(" · ")
+    ? joinComparison(
+      Object.entries(summary.workout.byType).map(([type, minutes]) => `${WORKOUT_LABELS[type]} ${minutes} 分`).join(" · "),
+      comparison.changes.workoutMinutes,
+      (value) => formatSignedUnit(value, "分钟"),
+    )
     : "记录运动后显示次数、时长和类型分布";
 
   elements.mealTrendSamples.textContent = `${summary.meal.count} 餐`;
@@ -401,7 +506,11 @@ function renderTrends() {
     ? `记录覆盖 ${summary.meal.completionPercent}％`
     : "暂无足够数据";
   elements.mealTrendMeta.textContent = summary.meal.count
-    ? `${summary.meal.recordedDays}/${days} 天有饮食记录 · 健康 ${summary.meal.averageHealth}/5 · 饱腹 ${summary.meal.averageFullness}/5`
+    ? joinComparison(
+      `${summary.meal.recordedDays}/${trendDays} 天有饮食记录 · 健康 ${summary.meal.averageHealth}/5 · 饱腹 ${summary.meal.averageFullness}/5`,
+      comparison.changes.mealCompletionPoints,
+      (value) => formatSignedUnit(value, "个百分点"),
+    )
     : "记录饮食后显示覆盖天数和主观评分";
 
   elements.hydrationTrendSamples.textContent = `${summary.hydration.sampleCount} 天`;
@@ -409,7 +518,11 @@ function renderTrends() {
     ? `日均 ${summary.hydration.averageMilliliters} ml`
     : "暂无足够数据";
   elements.hydrationTrendMeta.textContent = summary.hydration.sampleCount
-    ? "仅使用有饮水记录的日期计算"
+    ? joinComparison(
+      "仅使用有饮水记录的日期计算",
+      comparison.changes.hydrationMilliliters,
+      (value) => formatSignedUnit(value, "ml"),
+    )
     : "记录饮水后显示有记录日期的平均值";
 }
 
@@ -420,8 +533,12 @@ function renderWeightChart(points) {
     empty.className = "chart-empty";
     empty.textContent = "暂无体重样本";
     elements.weightChart.append(empty);
+    elements.weightChartLegend.hidden = true;
+    elements.weightChartDetail.textContent = "";
     return;
   }
+  elements.weightChartLegend.hidden = false;
+  elements.weightChartDetail.textContent = `${points[0].date} 至 ${points.at(-1).date} · 点击数据点查看详情`;
 
   const width = 320;
   const height = 132;
@@ -437,7 +554,7 @@ function renderWeightChart(points) {
   const namespace = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(namespace, "svg");
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.setAttribute("role", "img");
+  svg.setAttribute("role", "group");
   svg.setAttribute("aria-label", `${points.length} 个体重样本及七日均重`);
 
   if (points.length > 1) {
@@ -454,21 +571,38 @@ function renderWeightChart(points) {
     circle.setAttribute("cy", y(point.weightGrams));
     circle.setAttribute("r", "4");
     circle.setAttribute("fill", "#1f6252");
+    circle.setAttribute("tabindex", "0");
+    circle.setAttribute("role", "button");
+    const label = `${point.date}，${formatWeight(point.weightGrams)} kg，7 日均重 ${formatWeight(point.movingAverageGrams)} kg`;
+    circle.setAttribute("aria-label", label);
+    const showPoint = () => {
+      elements.weightChartDetail.textContent = label;
+    };
+    circle.addEventListener("click", showPoint);
+    circle.addEventListener("focus", showPoint);
+    circle.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") showPoint();
+    });
     svg.append(circle);
   });
   elements.weightChart.append(svg);
 }
 
-function createEmptyRecordsState() {
+function createEmptyRecordsState(isFiltered = false) {
   const container = document.createElement("div");
   container.className = "empty-state";
   const icon = document.createElement("span");
   icon.textContent = "＋";
   const title = document.createElement("h3");
-  title.textContent = "还没有健康记录";
+  title.textContent = isFiltered ? "没有符合筛选的记录" : "还没有健康记录";
   const message = document.createElement("p");
-  message.textContent = "从“今日”选择一类数据开始记录。";
-  container.append(icon, title, message);
+  message.textContent = isFiltered ? "调整类型或月份后再看看。" : "从今日选择一类数据开始记录。";
+  const action = document.createElement("button");
+  action.type = "button";
+  action.className = isFiltered ? "text-button" : "primary-button";
+  action.textContent = isFiltered ? "显示全部记录" : "去记录";
+  action.addEventListener("click", isFiltered ? clearRecordFilters : goToTodayView);
+  container.append(icon, title, message, action);
   return container;
 }
 
@@ -492,13 +626,19 @@ function createRecordCard(collectionName, record) {
   editButton.textContent = "编辑";
   editButton.setAttribute("aria-label", `编辑${labelText.textContent}记录`);
   editButton.addEventListener("click", () => openForm(COLLECTION_TO_TYPE[collectionName], record));
+  const more = document.createElement("details");
+  more.className = "record-more";
+  const summary = document.createElement("summary");
+  summary.textContent = "更多";
+  summary.setAttribute("aria-label", `更多${labelText.textContent}记录操作`);
   const deleteButton = document.createElement("button");
   deleteButton.type = "button";
   deleteButton.className = "delete-action";
   deleteButton.textContent = "删除";
   deleteButton.setAttribute("aria-label", `删除${labelText.textContent}记录`);
   deleteButton.addEventListener("click", () => handleDelete(collectionName, record.id));
-  actions.append(editButton, deleteButton);
+  more.append(summary, deleteButton);
+  actions.append(editButton, more);
   top.append(label, actions);
 
   const detail = document.createElement("p");
@@ -537,6 +677,22 @@ function switchView(viewName) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function goToTodayView() {
+  setSelectedDate(localDateString(new Date()));
+  switchView("today");
+}
+
+function setTrendDays(days) {
+  trendDays = days;
+  renderTrends();
+}
+
+function clearRecordFilters() {
+  elements.recordTypeFilter.value = "all";
+  elements.recordMonthFilter.value = "";
+  renderRecords();
+}
+
 function changeCalendarPeriod(direction) {
   if (direction === 1 && elements.nextPeriod.disabled) return;
   calendarAnchor = shiftCalendarAnchor(calendarAnchor, calendarMode, direction);
@@ -570,12 +726,16 @@ function openForm(type, explicitRecord = null) {
     form.reset();
   });
   const form = document.querySelector(`[data-record-form="${type}"]`);
+  activeForm = form;
   elements.recordDate.value = record?.date ?? selectedDate;
   elements.dialogTitle.textContent = `${record ? "编辑" : "新增"}${config.label}`;
   setFormError("");
   fillForm(type, form, record);
+  updateFormContext();
+  updateSleepDurationPreview();
+  formBaseline = getFormSignature();
   elements.dialog.showModal();
-  elements.closeDialog.focus();
+  form.querySelector("input, select, textarea")?.focus();
 }
 
 function fillForm(type, form, record) {
@@ -583,6 +743,8 @@ function fillForm(type, form, record) {
     if (type === "sleep") {
       form.elements.sleepTime.value = "23:00";
       form.elements.wakeTime.value = "07:00";
+    } else if (type === "meal") {
+      form.elements.mealType.value = getDefaultMealType(new Date().getHours());
     }
     return;
   }
@@ -596,6 +758,98 @@ function fillForm(type, form, record) {
       ? ""
       : formatBodyFat(record.bodyFatBasisPoints);
   }
+}
+
+function handleFormInput() {
+  updateFormContext();
+  updateSleepDurationPreview();
+}
+
+function handleSharedDateInput() {
+  updateFormContext();
+}
+
+function updateFormContext() {
+  const value = elements.recordDate.value || selectedDate;
+  elements.hydrationAmountLabel.textContent = getDateContext(
+    value,
+    localDateString(new Date()),
+  ).hydrationLabel;
+}
+
+function updateSleepDurationPreview() {
+  if (editing?.type !== "sleep" || !activeForm) return;
+  const sleepTime = activeForm.elements.sleepTime.value;
+  const wakeTime = activeForm.elements.wakeTime.value;
+  if (!sleepTime || !wakeTime) {
+    elements.sleepDurationPreview.textContent = "填写完整时间后显示预计睡眠时长";
+    return;
+  }
+  try {
+    elements.sleepDurationPreview.textContent = `预计睡眠：${formatMinutes(calculateSleepMinutes(sleepTime, wakeTime))}`;
+  } catch {
+    elements.sleepDurationPreview.textContent = "入睡和起床时间不能相同";
+  }
+}
+
+function setQuickDuration(minutes) {
+  if (editing?.type !== "workout" || !activeForm) return;
+  activeForm.elements.durationMinutes.value = String(minutes);
+  activeForm.elements.durationMinutes.focus();
+}
+
+function addWaterInForm(amount) {
+  if (editing?.type !== "hydration" || !activeForm) return;
+  try {
+    const current = Number(activeForm.elements.milliliters.value || 0);
+    activeForm.elements.milliliters.value = String(addHydrationAmount(current, amount));
+    activeForm.elements.milliliters.focus();
+    setFormError("");
+  } catch (error) {
+    setFormError(error.message || "无法增加饮水量");
+  }
+}
+
+function quickAddHydration(amount) {
+  if (!data) return;
+  const existing = findDailyRecord(data, "hydration", selectedDate);
+  const now = new Date().toISOString();
+  try {
+    const record = {
+      id: existing?.id ?? createId(),
+      date: selectedDate,
+      milliliters: addHydrationAmount(existing?.milliliters ?? 0, amount),
+      note: existing?.note ?? "",
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    const next = saveRecord(data, "hydration", record);
+    saveData(next);
+    data = next;
+    renderAll();
+    showToast(`饮水已增加 ${amount} ml`);
+  } catch (error) {
+    showToast(error.message || "饮水记录失败");
+  }
+}
+
+function getFormSignature() {
+  if (!activeForm) return "";
+  const fields = [elements.recordDate, ...activeForm.querySelectorAll("input, select, textarea")];
+  return fields.map((field) => `${field.name || field.id}:${field.value}`).join("|");
+}
+
+function requestCloseRecordDialog() {
+  if (!activeForm || getFormSignature() === formBaseline) {
+    elements.dialog.close();
+    return;
+  }
+  if (!elements.discardDialog.open) elements.discardDialog.showModal();
+}
+
+function discardFormChanges() {
+  elements.discardDialog.close();
+  elements.dialog.close();
 }
 
 function handleFormSubmit(event) {
@@ -778,6 +1032,10 @@ function renderImportPreview() {
     : "空账本";
   elements.importTotal.textContent = `${summary.totalRecords} 条`;
   elements.importCounts.textContent = `运动 ${summary.counts.workouts}、饮食 ${summary.counts.meals}、睡眠 ${summary.counts.sleepRecords}、体重 ${summary.counts.weights}、饮水 ${summary.counts.hydration}`;
+  const currentCount = data ? summarizeData(data).totalRecords : 0;
+  const restoreLabel = getRestoreLabel(currentCount, summary.totalRecords);
+  elements.importReplaceSummary.textContent = restoreLabel.summary;
+  elements.confirmImport.textContent = restoreLabel.action;
   elements.importPreview.hidden = false;
 }
 
@@ -815,6 +1073,25 @@ function confirmImport() {
 function setImportError(message) {
   elements.importError.textContent = message;
   elements.importError.hidden = !message;
+}
+
+function handleInstallPrompt(event) {
+  event.preventDefault();
+  installPromptEvent = event;
+  elements.installApp.hidden = false;
+}
+
+async function installApp() {
+  if (!installPromptEvent) return;
+  try {
+    await installPromptEvent.prompt();
+    await installPromptEvent.userChoice;
+  } catch {
+    showToast("暂时无法安装，请使用浏览器菜单添加到主屏幕");
+  } finally {
+    installPromptEvent = null;
+    elements.installApp.hidden = true;
+  }
 }
 
 function downloadText(text, fileName) {
@@ -857,6 +1134,16 @@ function formatBodyFat(basisPoints) {
 function formatSignedWeight(grams) {
   const value = grams / 1_000;
   return `${value > 0 ? "+" : ""}${formatDecimal(value, 3)}`;
+}
+
+function joinComparison(base, value, formatter) {
+  if (value === null) return `${base} · 上一周期暂无可比样本`;
+  if (value === 0) return `${base} · 较上一周期持平`;
+  return `${base} · 较上一周期 ${formatter(value)}`;
+}
+
+function formatSignedUnit(value, unit) {
+  return `${value > 0 ? "+" : ""}${value} ${unit}`;
 }
 
 function formatDecimal(value, digits) {

@@ -31,6 +31,11 @@
       <button id="open-data-reminder" class="text-button" type="button">数据管理</button>
     </aside>
 
+    <aside id="app-update" class="app-update" hidden>
+      <div><strong>新版本已准备好</strong><p>刷新后使用最新功能，本地记录不会丢失。</p></div>
+      <button id="reload-app" class="text-button" type="button">立即刷新</button>
+    </aside>
+
     <main>
       <section id="view-today" class="view" aria-labelledby="today-title">
         <div class="date-panel">
@@ -81,7 +86,11 @@
           <article class="summary-card water-card">
             <div class="card-heading"><span class="card-icon">水</span><h3>饮水</h3></div>
             <p id="hydration-summary" class="card-value">尚未记录</p>
-            <button id="hydration-action" type="button" data-open-form="hydration">记录饮水</button>
+            <div class="card-actions">
+              <button type="button" data-quick-water="250" aria-label="为所选日期增加 250 毫升饮水">＋250</button>
+              <button type="button" data-quick-water="500" aria-label="为所选日期增加 500 毫升饮水">＋500</button>
+              <button id="hydration-action" type="button" data-open-form="hydration">详情</button>
+            </div>
           </article>
         </div>
       </section>
@@ -92,15 +101,26 @@
             <p class="eyebrow">习惯变化</p>
             <h2 id="trends-title">趋势</h2>
           </div>
-          <label class="period-select"><span>统计周期</span><select id="trend-period"><option value="7">最近 7 天</option><option value="30">最近 30 天</option></select></label>
+          <div class="period-switch" role="group" aria-label="统计周期">
+            <button type="button" data-trend-days="7" aria-pressed="true">7 天</button>
+            <button type="button" data-trend-days="30" aria-pressed="false">30 天</button>
+          </div>
         </div>
         <p id="trend-period-label" class="trend-period-label"></p>
+        <div id="trend-empty" class="empty-state compact-empty" hidden>
+          <span>↗</span>
+          <h3>还没有近期趋势</h3>
+          <p>先记录一项健康数据，这里会按样本量展示变化。</p>
+          <button class="primary-button" type="button" data-go-today>去记录</button>
+        </div>
         <div class="trend-grid">
           <article class="trend-card weight-trend-card">
             <div class="trend-card-heading"><h3>体重</h3><span id="weight-trend-samples"></span></div>
             <strong id="weight-trend-value" class="trend-value">暂无数据</strong>
             <p id="weight-trend-meta" class="trend-meta"></p>
             <div id="weight-chart" class="weight-chart" aria-label="体重和七日均重趋势"></div>
+            <div id="weight-chart-legend" class="chart-legend"><span><i class="raw-dot"></i>原始值</span><span><i class="average-line"></i>7 日均重</span></div>
+            <p id="weight-chart-detail" class="chart-detail" aria-live="polite"></p>
           </article>
           <article class="trend-card">
             <div class="trend-card-heading"><h3>睡眠</h3><span id="sleep-trend-samples"></span></div>
@@ -134,6 +154,18 @@
           </div>
           <span id="record-count" class="count-badge">0 条</span>
         </div>
+        <div class="record-filters">
+          <label><span>记录类型</span><select id="record-type-filter">
+            <option value="all">全部类型</option>
+            <option value="workouts">运动</option>
+            <option value="meals">饮食</option>
+            <option value="sleepRecords">睡眠</option>
+            <option value="weights">体重</option>
+            <option value="hydration">饮水</option>
+          </select></label>
+          <label><span>月份</span><input id="record-month-filter" type="month"></label>
+          <button id="clear-record-filters" class="text-button" type="button" hidden>清除筛选</button>
+        </div>
         <div id="records-list" class="records-list"></div>
       </section>
     </main>
@@ -160,6 +192,10 @@
 
       <form id="workout-form" data-record-form="workout" hidden>
         <label class="field"><span>运动类型</span><select name="type" required><option value="strength">力量</option><option value="cardio">有氧</option><option value="walking">步行</option><option value="stretching">拉伸</option><option value="ballSports">球类</option><option value="other">其他</option></select></label>
+        <div class="quick-options" aria-label="快捷选择运动时长">
+          <span>快捷时长</span>
+          <div><button type="button" data-quick-duration="15">15 分</button><button type="button" data-quick-duration="30">30 分</button><button type="button" data-quick-duration="45">45 分</button><button type="button" data-quick-duration="60">60 分</button></div>
+        </div>
         <div class="field-row">
           <label class="field"><span>时长（分钟）</span><input name="durationMinutes" type="number" min="1" max="1440" inputmode="numeric" required></label>
           <label class="field"><span>强度</span><select name="intensity" required><option value="1">低</option><option value="2" selected>中</option><option value="3">高</option></select></label>
@@ -172,20 +208,22 @@
         <label class="field"><span>餐次</span><select name="mealType" required><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select></label>
         <label class="field"><span>吃了什么</span><input name="description" type="text" minlength="1" maxlength="200" required></label>
         <div class="field-row">
-          <label class="field"><span>健康程度</span><select name="healthScore" required><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
-          <label class="field"><span>饱腹感</span><select name="fullnessScore" required><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
+          <label class="field"><span>健康程度</span><select name="healthScore" required><option value="1">很不健康（1）</option><option value="2">偏不健康（2）</option><option value="3" selected>一般（3）</option><option value="4">比较健康（4）</option><option value="5">很健康（5）</option></select></label>
+          <label class="field"><span>饱腹感</span><select name="fullnessScore" required><option value="1">没吃饱（1）</option><option value="2">偏少（2）</option><option value="3" selected>刚好（3）</option><option value="4">偏饱（4）</option><option value="5">过饱（5）</option></select></label>
         </div>
         <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
         <button class="primary-button" type="submit">保存饮食</button>
       </form>
 
       <form id="sleep-form" data-record-form="sleep" hidden>
+        <p class="field-help">记录按起床日期归档。</p>
         <div class="field-row">
           <label class="field"><span>入睡时间</span><input name="sleepTime" type="time" required></label>
           <label class="field"><span>起床时间</span><input name="wakeTime" type="time" required></label>
         </div>
+        <output id="sleep-duration-preview" class="sleep-preview">预计睡眠：8 小时</output>
         <div class="field-row">
-          <label class="field"><span>睡眠质量</span><select name="qualityScore" required><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select></label>
+          <label class="field"><span>睡眠质量</span><select name="qualityScore" required><option value="1">很差（1）</option><option value="2">较差（2）</option><option value="3" selected>一般（3）</option><option value="4">良好（4）</option><option value="5">很好（5）</option></select></label>
           <label class="field"><span>夜醒次数</span><input name="awakeCount" type="number" min="0" max="50" value="0" inputmode="numeric" required></label>
         </div>
         <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
@@ -202,10 +240,25 @@
       </form>
 
       <form id="hydration-form" data-record-form="hydration" hidden>
-        <label class="field"><span>今日饮水（ml）</span><input name="milliliters" type="number" min="1" max="20000" step="1" inputmode="numeric" required></label>
+        <label class="field"><span id="hydration-amount-label">今日饮水（ml）</span><input name="milliliters" type="number" min="1" max="20000" step="1" inputmode="numeric" required></label>
+        <div class="quick-options" aria-label="快捷增加饮水量">
+          <span>快捷增加</span>
+          <div><button type="button" data-form-water-add="250">＋250 ml</button><button type="button" data-form-water-add="500">＋500 ml</button></div>
+        </div>
         <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
         <button class="primary-button" type="submit">保存饮水</button>
       </form>
+    </dialog>
+
+    <dialog id="discard-dialog" aria-labelledby="discard-dialog-title">
+      <div class="confirm-dialog-body">
+        <h2 id="discard-dialog-title">放弃未保存内容？</h2>
+        <p>关闭后，本次填写的内容不会保留。</p>
+        <div>
+          <button id="continue-editing" class="secondary-neutral-button" type="button">继续填写</button>
+          <button id="discard-changes" class="danger-button" type="button">放弃内容</button>
+        </div>
+      </div>
     </dialog>
 
     <dialog id="data-dialog" aria-labelledby="data-dialog-title">
@@ -234,9 +287,15 @@
               <div><dt>日期范围</dt><dd id="import-date-range"></dd></div>
               <div><dt>记录总数</dt><dd id="import-total"></dd></div>
               <div><dt>分类明细</dt><dd id="import-counts"></dd></div>
+              <div><dt>替换结果</dt><dd id="import-replace-summary"></dd></div>
             </dl>
             <button id="confirm-import" class="danger-button" type="button">确认完整替换</button>
           </div>
+        </section>
+        <section class="data-section">
+          <h3>安装与更新</h3>
+          <p class="data-help">可从浏览器菜单将 HealthLife 添加到主屏幕；检测到可直接安装时，下方会出现安装按钮。</p>
+          <button id="install-app" class="primary-button" type="button" hidden>安装 HealthLife</button>
         </section>
       </div>
     </dialog>

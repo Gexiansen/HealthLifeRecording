@@ -55,6 +55,29 @@ export function calculateTrendSummary(data, endDate, days) {
   };
 }
 
+export function calculateTrendComparison(data, endDate, days) {
+  const current = calculateTrendSummary(data, endDate, days);
+  const previous = calculateTrendSummary(data, shiftDate(current.period.startDate, -1), days);
+  return {
+    current,
+    previous,
+    changes: {
+      weightGrams: difference(current.weight.latestGrams, previous.weight.latestGrams),
+      sleepMinutes: difference(current.sleep.averageMinutes, previous.sleep.averageMinutes),
+      workoutMinutes: previous.workout.count && current.workout.count
+        ? current.workout.totalMinutes - previous.workout.totalMinutes
+        : null,
+      mealCompletionPoints: previous.meal.count && current.meal.count
+        ? current.meal.completionPercent - previous.meal.completionPercent
+        : null,
+      hydrationMilliliters: difference(
+        current.hydration.averageMilliliters,
+        previous.hydration.averageMilliliters,
+      ),
+    },
+  };
+}
+
 function sumBy(records, keySelector, valueSelector) {
   const result = {};
   for (const record of records) {
@@ -72,6 +95,10 @@ function averageRounded(values) {
 function averageFixed(values) {
   if (!values.length) return null;
   return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
+}
+
+function difference(current, previous) {
+  return current === null || previous === null ? null : current - previous;
 }
 
 function assertDays(days) {

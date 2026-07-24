@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { calculateTrendSummary } from "../docs/stats.js";
+import { calculateTrendComparison, calculateTrendSummary } from "../docs/stats.js";
 import { createEmptyData } from "../docs/model.js";
 
 const createdAt = "2026-07-23T08:00:00.000Z";
@@ -63,4 +63,28 @@ test("窗口外数据不会进入趋势", () => {
   assert.equal(summary.period.startDate, "2026-07-21");
   assert.equal(summary.weight.sampleCount, 1);
   assert.equal(summary.workout.count, 2);
+});
+
+test("趋势比较使用紧邻的等长上一周期且数据不足时不推断", () => {
+  const data = sampleData();
+  data.weights.push(
+    { ...base("10000000-0000-4000-8000-000000000004", "2026-07-16"), weightGrams: 70_500, bodyFatBasisPoints: null, note: "" },
+  );
+  data.sleepRecords.push(
+    { ...base("20000000-0000-4000-8000-000000000003", "2026-07-16"), sleepTime: "23:00", wakeTime: "06:00", qualityScore: 3, awakeCount: 0, note: "" },
+  );
+  data.workouts.push(
+    { ...base("30000000-0000-4000-8000-000000000004", "2026-07-16"), type: "walking", durationMinutes: 20, intensity: 1, note: "" },
+  );
+  data.meals.push(
+    { ...base("40000000-0000-4000-8000-000000000003", "2026-07-16"), mealType: "dinner", description: "虚构晚餐", healthScore: 3, fullnessScore: 3, note: "" },
+  );
+
+  const comparison = calculateTrendComparison(data, "2026-07-23", 7);
+  assert.equal(comparison.previous.period.endDate, "2026-07-16");
+  assert.equal(comparison.changes.weightGrams, -1_500);
+  assert.equal(comparison.changes.sleepMinutes, 30);
+  assert.equal(comparison.changes.workoutMinutes, 70);
+  assert.equal(comparison.changes.mealCompletionPoints, 15);
+  assert.equal(comparison.changes.hydrationMilliliters, null);
 });
