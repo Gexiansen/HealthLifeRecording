@@ -100,7 +100,6 @@ const elements = {
   calendarGrid: document.querySelector("#calendar-grid"),
   toggleCalendar: document.querySelector("#toggle-calendar"),
   streakDays: document.querySelector("#streak-days"),
-  dailyProgress: document.querySelector("#daily-progress"),
   workoutSummary: document.querySelector("#workout-summary"),
   mealSummary: document.querySelector("#meal-summary"),
   sleepSummary: document.querySelector("#sleep-summary"),
@@ -325,7 +324,6 @@ function renderToday() {
       elements.hydrationSummary,
     ]) element.textContent = "数据不可用";
     elements.streakDays.textContent = "—";
-    elements.dailyProgress.textContent = "写入已锁定";
     return;
   }
 
@@ -334,7 +332,6 @@ function renderToday() {
   const sleep = findDailyRecord(data, "sleepRecords", selectedDate);
   const weight = findDailyRecord(data, "weights", selectedDate);
   const hydration = findDailyRecord(data, "hydration", selectedDate);
-  const completed = [workouts.length > 0, meals.length > 0, sleep, weight, hydration].filter(Boolean).length;
 
   elements.workoutSummary.textContent = workouts.length
     ? `${workouts.length} 次，共 ${workouts.reduce((sum, item) => sum + item.durationMinutes, 0)} 分钟`
@@ -350,7 +347,6 @@ function renderToday() {
   elements.sleepAction.textContent = sleep ? "编辑睡眠" : "记录睡眠";
   elements.weightAction.textContent = weight ? "编辑体重" : "记录体重";
   elements.hydrationAction.textContent = hydration ? "编辑饮水" : "记录饮水";
-  elements.dailyProgress.textContent = `${formatDisplayDate(selectedDate)} · 已完成 ${completed}/5 类记录`;
   const streak = calculateRecordingStreak(data, today);
   elements.streakDays.textContent = `${streak.days} 天`;
   elements.streakDays.title = streak.todayRecorded ? "今天已有记录" : "今天尚未记录，连续天数截至昨天";
