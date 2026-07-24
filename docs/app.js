@@ -93,7 +93,6 @@ const elements = {
   appUpdate: document.querySelector("#app-update"),
   reloadApp: document.querySelector("#reload-app"),
   todayTitle: document.querySelector("#today-title"),
-  selectedDate: document.querySelector("#selected-date"),
   returnToday: document.querySelector("#return-today"),
   previousPeriod: document.querySelector("#previous-period"),
   nextPeriod: document.querySelector("#next-period"),
@@ -171,10 +170,8 @@ initialize();
 
 function initialize() {
   const today = localDateString(new Date());
-  elements.selectedDate.max = today;
   elements.recordDate.max = today;
   elements.recordMonthFilter.max = today.slice(0, 7);
-  elements.selectedDate.value = selectedDate;
   elements.recordDate.value = selectedDate;
   bindEvents();
   renderStorageState();
@@ -211,7 +208,6 @@ function bindEvents() {
   elements.nextPeriod.addEventListener("click", () => changeCalendarPeriod(1));
   elements.toggleCalendar.addEventListener("click", toggleCalendarMode);
   elements.returnToday.addEventListener("click", () => setSelectedDate(localDateString(new Date())));
-  elements.selectedDate.addEventListener("change", () => setSelectedDate(elements.selectedDate.value));
   document.querySelectorAll("[data-trend-days]").forEach((button) => {
     button.addEventListener("click", () => setTrendDays(Number(button.dataset.trendDays)));
   });
@@ -317,7 +313,6 @@ function renderToday() {
   const dateContext = getDateContext(selectedDate, today);
   elements.todayTitle.textContent = dateContext.heading;
   elements.hydrationAmountLabel.textContent = dateContext.hydrationLabel;
-  elements.selectedDate.value = selectedDate;
   elements.returnToday.hidden = selectedDate === today;
   renderCalendar();
 

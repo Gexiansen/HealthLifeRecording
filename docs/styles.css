@@ -133,9 +133,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px s
 .calendar-day.selected .day-status { color: rgba(255,255,255,.8); }
 .calendar-day.outside-month { opacity: .42; }
 .calendar-day:disabled { cursor: default; opacity: .32; }
-.calendar-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto auto; align-items: end; gap: 6px; }
-.date-input-label { display: grid; gap: 3px; color: var(--muted); font-size: 11px; font-weight: 700; }
-.date-input-label input { min-height: 44px; padding: 8px 10px; }
+.calendar-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 6px; }
 
 .summary-grid { display: grid; gap: 8px; margin-top: 12px; }
 .summary-card {

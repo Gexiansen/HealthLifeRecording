@@ -19,6 +19,11 @@ test("页面包含三个一级导航和五类记录表单", () => {
   }
 });
 
+test("首页日期只通过日历选择，不保留重复的精确日期输入", () => {
+  assert.doesNotMatch(html, /id="selected-date"/);
+  assert.doesNotMatch(html, />精确选择</);
+});
+
 test("正式页面不使用内联事件处理器", () => {
   assert.doesNotMatch(html, /\son[a-z]+\s*=/i);
 });
