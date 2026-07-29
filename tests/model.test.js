@@ -31,7 +31,21 @@ function validData() {
   data.meals.push({
     ...baseRecord("20000000-0000-4000-8000-000000000001", "2026-07-20"),
     mealType: "lunch",
-    description: "虚构午餐",
+    trackingMode: "precise",
+    confidence: "high",
+    items: [{
+      id: "21000000-0000-4000-8000-000000000001",
+      foodRef: "builtin:chicken-breast-cooked",
+      name: "鸡胸肉（熟）",
+      foodState: "cooked",
+      grams: 150,
+      energyKcalPer100g: 165,
+      proteinGramsPer100g: 31,
+      fatGramsPer100g: 3.6,
+      carbsGramsPer100g: 0,
+      source: "builtIn",
+      confidence: "high",
+    }],
     healthScore: 4,
     fullnessScore: 3,
     note: "",
@@ -58,14 +72,14 @@ function validData() {
   return data;
 }
 
-test("空数据和完整 schema v1 数据通过校验", () => {
+test("空数据和完整 schema v2 数据通过校验", () => {
   assert.equal(assertValidData(createEmptyData()), true);
   assert.equal(assertValidData(validData()), true);
 });
 
 test("拒绝未知版本、未知字段和不存在的日期", () => {
   const unknownVersion = validData();
-  unknownVersion.schemaVersion = 2;
+  unknownVersion.schemaVersion = 3;
   assert.throws(() => assertValidData(unknownVersion), /schemaVersion/);
 
   const unknownField = validData();
@@ -85,6 +99,14 @@ test("运动、饮食和设置字段执行严格范围校验", () => {
   const invalidMeal = validData();
   invalidMeal.meals[0].healthScore = 6;
   assert.throws(() => assertValidData(invalidMeal), /healthScore/);
+
+  const invalidNutrition = validData();
+  invalidNutrition.meals[0].items[0].proteinGramsPer100g = 31.25;
+  assert.throws(() => assertValidData(invalidNutrition), /一位小数/);
+
+  const invalidMode = validData();
+  invalidMode.meals[0].confidence = "low";
+  assert.throws(() => assertValidData(invalidMode), /精确模式/);
 
   const invalidSettings = validData();
   invalidSettings.settings.goalWeightGrams = 70.5;

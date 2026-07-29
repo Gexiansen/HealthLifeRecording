@@ -10,6 +10,32 @@ function base(id, date) {
   return { id, date, createdAt, updatedAt: createdAt };
 }
 
+function meal(id, itemId, date, mealType, trackingMode, food) {
+  const confidence = trackingMode === "precise" ? "high" : "medium";
+  return {
+    ...base(id, date),
+    mealType,
+    trackingMode,
+    confidence,
+    items: [{
+      id: itemId,
+      foodRef: food.ref,
+      name: food.name,
+      foodState: food.state,
+      grams: food.grams,
+      energyKcalPer100g: food.energy,
+      proteinGramsPer100g: food.protein,
+      fatGramsPer100g: food.fat,
+      carbsGramsPer100g: food.carbs,
+      source: "builtIn",
+      confidence,
+    }],
+    healthScore: 4,
+    fullnessScore: 3,
+    note: "",
+  };
+}
+
 function sampleData() {
   const data = createEmptyData();
   data.weights.push(
@@ -27,8 +53,26 @@ function sampleData() {
     { ...base("30000000-0000-4000-8000-000000000003", "2026-07-23"), type: "strength", durationMinutes: 40, intensity: 2, note: "" },
   );
   data.meals.push(
-    { ...base("40000000-0000-4000-8000-000000000001", "2026-07-22"), mealType: "lunch", description: "虚构午餐", healthScore: 4, fullnessScore: 3, note: "" },
-    { ...base("40000000-0000-4000-8000-000000000002", "2026-07-23"), mealType: "dinner", description: "虚构晚餐", healthScore: 5, fullnessScore: 4, note: "" },
+    meal(
+      "40000000-0000-4000-8000-000000000001",
+      "41000000-0000-4000-8000-000000000001",
+      "2026-07-22",
+      "lunch",
+      "precise",
+      { ref: "builtin:chicken", name: "虚构鸡胸", state: "cooked", grams: 150, energy: 165, protein: 31, fat: 3.6, carbs: 0 },
+    ),
+    {
+      ...meal(
+        "40000000-0000-4000-8000-000000000002",
+        "41000000-0000-4000-8000-000000000002",
+        "2026-07-23",
+        "dinner",
+        "estimated",
+        { ref: "builtin:rice", name: "虚构米饭", state: "cooked", grams: 200, energy: 130, protein: 2.7, fat: 0.3, carbs: 28.2 },
+      ),
+      healthScore: 5,
+      fullnessScore: 4,
+    },
   );
   data.hydration.push(
     { ...base("50000000-0000-4000-8000-000000000001", "2026-07-22"), milliliters: 1_500, note: "" },
@@ -46,7 +90,17 @@ test("7 天趋势按自然日窗口汇总全部类型", () => {
   assert.deepEqual(summary.weight.points.map((point) => point.movingAverageGrams), [70_000, 69_750, 69_500]);
   assert.deepEqual(summary.sleep, { sampleCount: 2, averageMinutes: 450, averageQuality: 3.5 });
   assert.deepEqual(summary.workout, { count: 3, totalMinutes: 90, byType: { walking: 50, strength: 40 } });
-  assert.deepEqual(summary.meal, { count: 2, recordedDays: 2, completionPercent: 29, averageHealth: 4.5, averageFullness: 3.5 });
+  assert.deepEqual(summary.meal, {
+    count: 2,
+    recordedDays: 2,
+    completionPercent: 29,
+    averageHealth: 4.5,
+    averageFullness: 3.5,
+    preciseCount: 1,
+    estimatedCount: 1,
+    totalNutrition: { energyKcal: 507.5, proteinGrams: 51.9, fatGrams: 6, carbsGrams: 56.4 },
+    dailyAverageNutrition: { energyKcal: 253.8, proteinGrams: 26, fatGrams: 3, carbsGrams: 28.2 },
+  });
   assert.deepEqual(summary.hydration, { sampleCount: 2, averageMilliliters: 1_750 });
 });
 
@@ -77,7 +131,17 @@ test("趋势比较使用紧邻的等长上一周期且数据不足时不推断",
     { ...base("30000000-0000-4000-8000-000000000004", "2026-07-16"), type: "walking", durationMinutes: 20, intensity: 1, note: "" },
   );
   data.meals.push(
-    { ...base("40000000-0000-4000-8000-000000000003", "2026-07-16"), mealType: "dinner", description: "虚构晚餐", healthScore: 3, fullnessScore: 3, note: "" },
+    {
+      ...meal(
+        "40000000-0000-4000-8000-000000000003",
+        "41000000-0000-4000-8000-000000000003",
+        "2026-07-16",
+        "dinner",
+        "precise",
+        { ref: "builtin:chicken", name: "虚构鸡胸", state: "cooked", grams: 100, energy: 165, protein: 31, fat: 3.6, carbs: 0 },
+      ),
+      healthScore: 3,
+    },
   );
 
   const comparison = calculateTrendComparison(data, "2026-07-23", 7);
@@ -86,5 +150,6 @@ test("趋势比较使用紧邻的等长上一周期且数据不足时不推断",
   assert.equal(comparison.changes.sleepMinutes, 30);
   assert.equal(comparison.changes.workoutMinutes, 70);
   assert.equal(comparison.changes.mealCompletionPoints, 15);
+  assert.equal(comparison.changes.mealProteinGrams, -5);
   assert.equal(comparison.changes.hydrationMilliliters, null);
 });

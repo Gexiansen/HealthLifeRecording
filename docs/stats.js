@@ -3,6 +3,7 @@ import {
   calculateSleepMinutes,
   calculateWeightMovingAverage,
 } from "./model.js";
+import { roundNutrition, sumNutrition } from "./nutrition.js";
 
 export function calculateTrendSummary(data, endDate, days) {
   assertValidData(data);
@@ -21,6 +22,8 @@ export function calculateTrendSummary(data, endDate, days) {
   const sleepMinutes = sleepRecords.map((record) => calculateSleepMinutes(record.sleepTime, record.wakeTime));
   const workouts = data.workouts.filter(inRange);
   const meals = data.meals.filter(inRange);
+  const mealNutrition = sumNutrition(meals.flatMap((record) => record.items));
+  const mealRecordedDays = new Set(meals.map((record) => record.date)).size;
   const hydration = data.hydration.filter(inRange);
 
   return {
@@ -43,10 +46,21 @@ export function calculateTrendSummary(data, endDate, days) {
     },
     meal: {
       count: meals.length,
-      recordedDays: new Set(meals.map((record) => record.date)).size,
-      completionPercent: Math.round(new Set(meals.map((record) => record.date)).size / days * 100),
+      recordedDays: mealRecordedDays,
+      completionPercent: Math.round(mealRecordedDays / days * 100),
       averageHealth: averageFixed(meals.map((record) => record.healthScore)),
       averageFullness: averageFixed(meals.map((record) => record.fullnessScore)),
+      preciseCount: meals.filter((record) => record.trackingMode === "precise").length,
+      estimatedCount: meals.filter((record) => record.trackingMode === "estimated").length,
+      totalNutrition: mealNutrition,
+      dailyAverageNutrition: mealRecordedDays
+        ? roundNutrition({
+          energyKcal: mealNutrition.energyKcal / mealRecordedDays,
+          proteinGrams: mealNutrition.proteinGrams / mealRecordedDays,
+          fatGrams: mealNutrition.fatGrams / mealRecordedDays,
+          carbsGrams: mealNutrition.carbsGrams / mealRecordedDays,
+        })
+        : null,
     },
     hydration: {
       sampleCount: hydration.length,
@@ -69,6 +83,10 @@ export function calculateTrendComparison(data, endDate, days) {
         : null,
       mealCompletionPoints: previous.meal.count && current.meal.count
         ? current.meal.completionPercent - previous.meal.completionPercent
+        : null,
+      mealProteinGrams: previous.meal.count && current.meal.count
+        ? current.meal.dailyAverageNutrition.proteinGrams
+          - previous.meal.dailyAverageNutrition.proteinGrams
         : null,
       hydrationMilliliters: difference(
         current.hydration.averageMilliliters,

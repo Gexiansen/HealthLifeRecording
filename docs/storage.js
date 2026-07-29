@@ -1,8 +1,8 @@
 import { createEmptyData, parseData, serializeData } from "./model.js";
 import { parseBackupMetadata } from "./backup.js";
 
-export const STORAGE_KEY = "healthlife:data:v1";
-export const BACKUP_META_KEY = "healthlife:backup-meta:v1";
+export const STORAGE_KEY = "healthlife:data:v2";
+export const BACKUP_META_KEY = "healthlife:backup-meta:v2";
 
 export class StorageWriteError extends Error {
   constructor(cause) {

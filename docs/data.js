@@ -66,6 +66,42 @@ export function allRecordsByDate(data) {
   });
 }
 
+export function saveCustomFood(data, food) {
+  const next = cloneData(data);
+  const index = next.customFoods.findIndex((item) => item.id === food.id);
+  if (index === -1) next.customFoods.push(structuredClone(food));
+  else next.customFoods[index] = structuredClone(food);
+  assertValidData(next);
+  return next;
+}
+
+export function saveRecipe(data, recipe) {
+  const next = cloneData(data);
+  const index = next.recipes.findIndex((item) => item.id === recipe.id);
+  if (index === -1) next.recipes.push(structuredClone(recipe));
+  else next.recipes[index] = structuredClone(recipe);
+  assertValidData(next);
+  return next;
+}
+
+export function updateFoodPreferences(data, foodRef, favorite = null) {
+  if (typeof foodRef !== "string" || foodRef.length < 1 || foodRef.length > 100) {
+    throw new TypeError("foodRef 无效");
+  }
+  const next = cloneData(data);
+  next.foodPreferences.recentRefs = [
+    foodRef,
+    ...next.foodPreferences.recentRefs.filter((ref) => ref !== foodRef),
+  ].slice(0, 12);
+  if (favorite === true && !next.foodPreferences.favoriteRefs.includes(foodRef)) {
+    next.foodPreferences.favoriteRefs.push(foodRef);
+  } else if (favorite === false) {
+    next.foodPreferences.favoriteRefs = next.foodPreferences.favoriteRefs.filter((ref) => ref !== foodRef);
+  }
+  assertValidData(next);
+  return next;
+}
+
 function cloneData(data) {
   assertValidData(data);
   return JSON.parse(serializeData(data));

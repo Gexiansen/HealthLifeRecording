@@ -2,7 +2,7 @@ import { assertValidData, parseData, serializeData } from "./model.js";
 import { COLLECTIONS } from "./data.js";
 
 export const BACKUP_FORMAT = "healthlife-complete-backup";
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 
 export function createCompleteBackup(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);

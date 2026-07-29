@@ -6,7 +6,10 @@ import {
   allRecordsByDate,
   deleteRecord,
   findDailyRecord,
+  saveCustomFood,
+  saveRecipe,
   saveRecord,
+  updateFoodPreferences,
 } from "./data.js";
 import {
   loadBackupMetadata,
@@ -37,6 +40,14 @@ import {
   getDefaultMealType,
   getRestoreLabel,
 } from "./interaction.js";
+import {
+  calculateRecipeNutrition,
+  createFoodEntry,
+  formatNutrition,
+  getFoodCatalog,
+  sumNutrition,
+} from "./nutrition.js";
+import { serializeAnalysisExport } from "./analysis.js";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -80,6 +91,8 @@ let trendDays = 7;
 let activeForm = null;
 let formBaseline = null;
 let installPromptEvent = null;
+let mealItemsDraft = [];
+let recipeIngredientsDraft = [];
 
 const elements = {
   storageAlert: document.querySelector("#storage-alert"),
@@ -141,6 +154,27 @@ const elements = {
   recordDate: document.querySelector("#record-date"),
   hydrationAmountLabel: document.querySelector("#hydration-amount-label"),
   sleepDurationPreview: document.querySelector("#sleep-duration-preview"),
+  mealFoodSelect: document.querySelector("#meal-food-select"),
+  mealFoodGrams: document.querySelector("#meal-food-grams"),
+  mealFoodFavorite: document.querySelector("#meal-food-favorite"),
+  addMealFood: document.querySelector("#add-meal-food"),
+  mealItems: document.querySelector("#meal-items"),
+  mealNutrition: document.querySelector("#meal-nutrition"),
+  openCustomFood: document.querySelector("#open-custom-food"),
+  openRecipe: document.querySelector("#open-recipe"),
+  customFoodDialog: document.querySelector("#custom-food-dialog"),
+  closeCustomFood: document.querySelector("#close-custom-food"),
+  customFoodForm: document.querySelector("#custom-food-form"),
+  customFoodError: document.querySelector("#custom-food-error"),
+  recipeDialog: document.querySelector("#recipe-dialog"),
+  closeRecipe: document.querySelector("#close-recipe"),
+  recipeForm: document.querySelector("#recipe-form"),
+  recipeFoodSelect: document.querySelector("#recipe-food-select"),
+  recipeFoodGrams: document.querySelector("#recipe-food-grams"),
+  addRecipeFood: document.querySelector("#add-recipe-food"),
+  recipeItems: document.querySelector("#recipe-items"),
+  recipeNutrition: document.querySelector("#recipe-nutrition"),
+  recipeError: document.querySelector("#recipe-error"),
   formError: document.querySelector("#form-error"),
   discardDialog: document.querySelector("#discard-dialog"),
   continueEditing: document.querySelector("#continue-editing"),
@@ -152,6 +186,7 @@ const elements = {
   closeDataDialog: document.querySelector("#close-data-dialog"),
   backupStatus: document.querySelector("#backup-status"),
   exportBackup: document.querySelector("#export-backup"),
+  exportAnalysis: document.querySelector("#export-analysis"),
   importFile: document.querySelector("#import-file"),
   importError: document.querySelector("#import-error"),
   importPreview: document.querySelector("#import-preview"),
@@ -226,6 +261,16 @@ function bindEvents() {
   elements.recordMonthFilter.addEventListener("change", renderRecords);
   elements.clearRecordFilters.addEventListener("click", clearRecordFilters);
   elements.recordDate.addEventListener("input", handleSharedDateInput);
+  elements.addMealFood.addEventListener("click", addMealFood);
+  elements.mealFoodSelect.addEventListener("change", syncFavoriteCheckbox);
+  elements.openCustomFood.addEventListener("click", openCustomFoodDialog);
+  elements.closeCustomFood.addEventListener("click", () => elements.customFoodDialog.close());
+  elements.customFoodForm.addEventListener("submit", handleCustomFoodSubmit);
+  elements.openRecipe.addEventListener("click", openRecipeDialog);
+  elements.closeRecipe.addEventListener("click", () => elements.recipeDialog.close());
+  elements.addRecipeFood.addEventListener("click", addRecipeFood);
+  elements.recipeForm.addEventListener("input", renderRecipeDraft);
+  elements.recipeForm.addEventListener("submit", handleRecipeSubmit);
   elements.closeDialog.addEventListener("click", requestCloseRecordDialog);
   elements.dialog.addEventListener("click", (event) => {
     if (event.target === elements.dialog) requestCloseRecordDialog();
@@ -248,6 +293,7 @@ function bindEvents() {
   elements.openDataReminder.addEventListener("click", openDataDialog);
   elements.closeDataDialog.addEventListener("click", () => elements.dataDialog.close());
   elements.exportBackup.addEventListener("click", exportCompleteBackup);
+  elements.exportAnalysis.addEventListener("click", exportAnalysisData);
   elements.importFile.addEventListener("change", handleImportFile);
   elements.confirmImport.addEventListener("click", confirmImport);
   elements.installApp.addEventListener("click", installApp);
@@ -290,9 +336,11 @@ function renderBackupState() {
     elements.backupReminder.hidden = true;
     elements.backupStatus.textContent = "当前数据不可用，可以选择有效完整备份进行恢复。";
     elements.exportBackup.disabled = true;
+    elements.exportAnalysis.disabled = true;
     return;
   }
   elements.exportBackup.disabled = false;
+  elements.exportAnalysis.disabled = false;
   const summary = summarizeData(data);
   const reminder = getBackupReminder(data, backupMetadata);
   elements.backupReminder.hidden = !reminder.needed;
@@ -337,7 +385,7 @@ function renderToday() {
     ? `${workouts.length} 次，共 ${workouts.reduce((sum, item) => sum + item.durationMinutes, 0)} 分钟`
     : "尚未记录";
   elements.mealSummary.textContent = meals.length
-    ? `${meals.length} 餐：${meals.map((item) => MEAL_LABELS[item.mealType]).join("、")}`
+    ? `${meals.length} 餐 · ${formatNutrition(sumNutrition(meals.flatMap((item) => item.items)))}`
     : "尚未记录";
   elements.sleepSummary.textContent = sleep
     ? `${formatMinutes(calculateSleepMinutes(sleep.sleepTime, sleep.wakeTime))}，质量 ${sleep.qualityScore}/5`
@@ -494,15 +542,15 @@ function renderTrends() {
 
   elements.mealTrendSamples.textContent = `${summary.meal.count} 餐`;
   elements.mealTrendValue.textContent = summary.meal.count
-    ? `记录覆盖 ${summary.meal.completionPercent}％`
+    ? `日均蛋白质 ${formatDecimal(summary.meal.dailyAverageNutrition.proteinGrams, 1)} g`
     : "暂无足够数据";
   elements.mealTrendMeta.textContent = summary.meal.count
     ? joinComparison(
-      `${summary.meal.recordedDays}/${trendDays} 天有饮食记录 · 健康 ${summary.meal.averageHealth}/5 · 饱腹 ${summary.meal.averageFullness}/5`,
-      comparison.changes.mealCompletionPoints,
-      (value) => formatSignedUnit(value, "个百分点"),
+      `日均 ${formatDecimal(summary.meal.dailyAverageNutrition.energyKcal, 1)} kcal · 脂肪 ${formatDecimal(summary.meal.dailyAverageNutrition.fatGrams, 1)} g · 碳水 ${formatDecimal(summary.meal.dailyAverageNutrition.carbsGrams, 1)} g · 精确 ${summary.meal.preciseCount} 餐／估算 ${summary.meal.estimatedCount} 餐`,
+      comparison.changes.mealProteinGrams,
+      (value) => formatSignedUnit(formatDecimal(value, 1), "g 蛋白质"),
     )
-    : "记录饮食后显示覆盖天数和主观评分";
+    : "按克记录食物后显示热量和宏量营养素";
 
   elements.hydrationTrendSamples.textContent = `${summary.hydration.sampleCount} 天`;
   elements.hydrationTrendValue.textContent = summary.hydration.sampleCount
@@ -644,7 +692,8 @@ function describeRecord(collectionName, record) {
   if (collectionName === "workouts") {
     detail = `${WORKOUT_LABELS[record.type]} · ${record.durationMinutes} 分钟 · 强度 ${record.intensity}/3`;
   } else if (collectionName === "meals") {
-    detail = `${MEAL_LABELS[record.mealType]} · ${record.description} · 健康 ${record.healthScore}/5 · 饱腹 ${record.fullnessScore}/5`;
+    const nutrition = sumNutrition(record.items);
+    detail = `${MEAL_LABELS[record.mealType]} · ${record.items.map((item) => `${item.name} ${item.grams}g`).join("、")} · ${formatNutrition(nutrition)} · ${record.trackingMode === "precise" ? "称重" : "估算"}／${confidenceLabel(record.confidence)}`;
   } else if (collectionName === "sleepRecords") {
     detail = `${record.sleepTime}–${record.wakeTime} · ${formatMinutes(calculateSleepMinutes(record.sleepTime, record.wakeTime))} · 质量 ${record.qualityScore}/5`;
   } else if (collectionName === "weights") {
@@ -718,10 +767,17 @@ function openForm(type, explicitRecord = null) {
   });
   const form = document.querySelector(`[data-record-form="${type}"]`);
   activeForm = form;
+  mealItemsDraft = type === "meal" ? structuredClone(record?.items ?? []) : [];
   elements.recordDate.value = record?.date ?? selectedDate;
   elements.dialogTitle.textContent = `${record ? "编辑" : "新增"}${config.label}`;
   setFormError("");
   fillForm(type, form, record);
+  if (type === "meal") {
+    populateFoodSelects();
+    renderMealDraft();
+    syncFavoriteCheckbox();
+    updateMealConfidenceState();
+  }
   updateFormContext();
   updateSleepDurationPreview();
   formBaseline = getFormSignature();
@@ -736,6 +792,8 @@ function fillForm(type, form, record) {
       form.elements.wakeTime.value = "07:00";
     } else if (type === "meal") {
       form.elements.mealType.value = getDefaultMealType(new Date().getHours());
+      form.elements.trackingMode.value = "precise";
+      form.elements.confidence.value = "medium";
     }
     return;
   }
@@ -751,9 +809,23 @@ function fillForm(type, form, record) {
   }
 }
 
-function handleFormInput() {
+function handleFormInput(event) {
+  if (editing?.type === "meal" && event?.target?.name === "trackingMode") {
+    activeForm.elements.confidence.value = "medium";
+    updateMealConfidenceState();
+  }
   updateFormContext();
   updateSleepDurationPreview();
+}
+
+function updateMealConfidenceState() {
+  if (editing?.type !== "meal" || !activeForm) return;
+  const lowOption = activeForm.elements.confidence.querySelector('option[value="low"]');
+  const isPrecise = activeForm.elements.trackingMode.value === "precise";
+  lowOption.disabled = isPrecise;
+  if (isPrecise && activeForm.elements.confidence.value === "low") {
+    activeForm.elements.confidence.value = "medium";
+  }
 }
 
 function handleSharedDateInput() {
@@ -824,10 +896,219 @@ function quickAddHydration(amount) {
   }
 }
 
+function populateFoodSelects(selectedMealRef = elements.mealFoodSelect.value) {
+  if (!data) return;
+  populateFoodSelect(elements.mealFoodSelect, getFoodCatalog(data), selectedMealRef);
+  populateFoodSelect(elements.recipeFoodSelect, getFoodCatalog(data, { includeRecipes: false }));
+}
+
+function populateFoodSelect(select, catalog, selectedRef = "") {
+  select.replaceChildren();
+  for (const food of catalog) {
+    const option = document.createElement("option");
+    option.value = food.ref;
+    option.textContent = `${favoritePrefix(food.ref)}${food.name} · ${foodStateLabel(food.foodState)} · 蛋白质 ${formatDecimal(food.proteinGramsPer100g, 1)}g/100g`;
+    select.append(option);
+  }
+  if (selectedRef && catalog.some((food) => food.ref === selectedRef)) select.value = selectedRef;
+}
+
+function addMealFood() {
+  if (!data || editing?.type !== "meal" || !activeForm) return;
+  try {
+    const food = selectedFood(elements.mealFoodSelect, true);
+    const grams = Number(elements.mealFoodGrams.value);
+    const confidence = activeForm.elements.confidence.value;
+    const entry = createFoodEntry(food, grams, confidence, createId());
+    const next = updateFoodPreferences(
+      data,
+      food.ref,
+      elements.mealFoodFavorite.checked,
+    );
+    saveData(next);
+    data = next;
+    mealItemsDraft.push(entry);
+    elements.mealFoodGrams.value = "";
+    populateFoodSelects(food.ref);
+    syncFavoriteCheckbox();
+    renderMealDraft();
+    setFormError("");
+  } catch (error) {
+    setFormError(error.message || "无法加入食物");
+  }
+}
+
+function renderMealDraft() {
+  renderFoodEntries(elements.mealItems, mealItemsDraft, (id) => {
+    mealItemsDraft = mealItemsDraft.filter((item) => item.id !== id);
+    renderMealDraft();
+  });
+  elements.mealNutrition.textContent = mealItemsDraft.length
+    ? `本餐估算：${formatNutrition(sumNutrition(mealItemsDraft))}`
+    : "尚未添加食物";
+}
+
+function renderFoodEntries(container, entries, remove) {
+  container.replaceChildren();
+  for (const entry of entries) {
+    const item = document.createElement("li");
+    item.className = "food-item";
+    const detail = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = `${entry.name} · ${entry.grams} g`;
+    const nutrition = document.createElement("span");
+    nutrition.textContent = formatNutrition(sumNutrition([entry]));
+    detail.append(title, nutrition);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "移除";
+    button.setAttribute("aria-label", `移除${entry.name}`);
+    button.addEventListener("click", () => remove(entry.id));
+    item.append(detail, button);
+    container.append(item);
+  }
+}
+
+function syncFavoriteCheckbox() {
+  if (!data) return;
+  elements.mealFoodFavorite.checked = data.foodPreferences.favoriteRefs.includes(
+    elements.mealFoodSelect.value,
+  );
+}
+
+function openCustomFoodDialog() {
+  elements.customFoodForm.reset();
+  setInlineError(elements.customFoodError, "");
+  elements.customFoodDialog.showModal();
+  elements.customFoodForm.elements.name.focus();
+}
+
+function handleCustomFoodSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const now = new Date().toISOString();
+  try {
+    const food = {
+      id: createId(),
+      name: form.elements.name.value.trim(),
+      foodState: form.elements.foodState.value,
+      energyKcalPer100g: oneDecimal(form.elements.energyKcalPer100g.value),
+      proteinGramsPer100g: oneDecimal(form.elements.proteinGramsPer100g.value),
+      fatGramsPer100g: oneDecimal(form.elements.fatGramsPer100g.value),
+      carbsGramsPer100g: oneDecimal(form.elements.carbsGramsPer100g.value),
+      createdAt: now,
+      updatedAt: now,
+    };
+    const next = saveCustomFood(data, food);
+    saveData(next);
+    data = next;
+    const ref = `custom:${food.id}`;
+    populateFoodSelects(ref);
+    syncFavoriteCheckbox();
+    elements.customFoodDialog.close();
+    showToast(`${food.name}已加入本地食物库`);
+  } catch (error) {
+    setInlineError(elements.customFoodError, error.message || "食品保存失败");
+  }
+}
+
+function openRecipeDialog() {
+  elements.recipeForm.reset();
+  recipeIngredientsDraft = [];
+  setInlineError(elements.recipeError, "");
+  populateFoodSelect(elements.recipeFoodSelect, getFoodCatalog(data, { includeRecipes: false }));
+  renderRecipeDraft();
+  elements.recipeDialog.showModal();
+  elements.recipeForm.elements.name.focus();
+}
+
+function addRecipeFood() {
+  try {
+    const food = selectedFood(elements.recipeFoodSelect, false);
+    const entry = createFoodEntry(food, Number(elements.recipeFoodGrams.value), "high", createId());
+    recipeIngredientsDraft.push(entry);
+    elements.recipeFoodGrams.value = "";
+    renderRecipeDraft();
+    setInlineError(elements.recipeError, "");
+  } catch (error) {
+    setInlineError(elements.recipeError, error.message || "无法加入原料");
+  }
+}
+
+function renderRecipeDraft() {
+  renderFoodEntries(elements.recipeItems, recipeIngredientsDraft, (id) => {
+    recipeIngredientsDraft = recipeIngredientsDraft.filter((item) => item.id !== id);
+    renderRecipeDraft();
+  });
+  const finishedWeightGrams = Number(elements.recipeForm.elements.finishedWeightGrams.value);
+  if (!recipeIngredientsDraft.length || !Number.isInteger(finishedWeightGrams) || finishedWeightGrams < 1) {
+    elements.recipeNutrition.textContent = "添加原料并填写成品熟重后计算";
+    return;
+  }
+  try {
+    const result = calculateRecipeNutrition({ ingredients: recipeIngredientsDraft, finishedWeightGrams });
+    elements.recipeNutrition.textContent = `整道菜：${formatNutrition(result.total)}；每 100g：${formatNutrition(result.per100g)}`;
+  } catch (error) {
+    elements.recipeNutrition.textContent = error.message;
+  }
+}
+
+function handleRecipeSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const now = new Date().toISOString();
+  try {
+    if (!recipeIngredientsDraft.length) throw new TypeError("请至少加入一种原料");
+    const recipe = {
+      id: createId(),
+      name: form.elements.name.value.trim(),
+      ingredients: structuredClone(recipeIngredientsDraft),
+      finishedWeightGrams: Number(form.elements.finishedWeightGrams.value),
+      createdAt: now,
+      updatedAt: now,
+    };
+    calculateRecipeNutrition(recipe);
+    const next = saveRecipe(data, recipe);
+    saveData(next);
+    data = next;
+    const ref = `recipe:${recipe.id}`;
+    populateFoodSelects(ref);
+    syncFavoriteCheckbox();
+    elements.recipeDialog.close();
+    showToast(`${recipe.name}菜谱已保存`);
+  } catch (error) {
+    setInlineError(elements.recipeError, error.message || "菜谱保存失败");
+  }
+}
+
+function selectedFood(select, includeRecipes) {
+  const food = getFoodCatalog(data, { includeRecipes }).find((item) => item.ref === select.value);
+  if (!food) throw new TypeError("请选择有效食物");
+  return food;
+}
+
+function favoritePrefix(foodRef) {
+  return data?.foodPreferences.favoriteRefs.includes(foodRef) ? "★ " : "";
+}
+
+function foodStateLabel(state) {
+  return { raw: "生重", cooked: "熟重", packaged: "包装", prepared: "成品" }[state] ?? state;
+}
+
+function setInlineError(element, message) {
+  element.textContent = message;
+  element.hidden = !message;
+}
+
+function oneDecimal(value) {
+  return Math.round(Number(value) * 10) / 10;
+}
+
 function getFormSignature() {
   if (!activeForm) return "";
   const fields = [elements.recordDate, ...activeForm.querySelectorAll("input, select, textarea")];
-  return fields.map((field) => `${field.name || field.id}:${field.value}`).join("|");
+  const value = fields.map((field) => `${field.name || field.id}:${field.value}`).join("|");
+  return editing?.type === "meal" ? `${value}|items:${JSON.stringify(mealItemsDraft)}` : value;
 }
 
 function requestCloseRecordDialog() {
@@ -880,10 +1161,14 @@ function buildRecord(type, form, base) {
     };
   }
   if (type === "meal") {
+    if (!mealItemsDraft.length) throw new TypeError("请至少加入一种食物");
+    const confidence = form.elements.confidence.value;
     return {
       ...base,
       mealType: form.elements.mealType.value,
-      description: form.elements.description.value.trim(),
+      trackingMode: form.elements.trackingMode.value,
+      confidence,
+      items: mealItemsDraft.map((item) => ({ ...item, confidence })),
       healthScore: Number(form.elements.healthScore.value),
       fullnessScore: Number(form.elements.fullnessScore.value),
       note: form.elements.note.value.trim(),
@@ -999,6 +1284,19 @@ function exportCompleteBackup() {
   }
 }
 
+function exportAnalysisData() {
+  if (!data) return;
+  try {
+    downloadText(
+      serializeAnalysisExport(data, new Date().toISOString()),
+      `healthlife-analysis-${localDateString(new Date())}.json`,
+    );
+    showToast("分析 JSON 已导出");
+  } catch (error) {
+    showToast(error.message || "分析数据导出失败");
+  }
+}
+
 async function handleImportFile() {
   pendingImport = null;
   elements.importPreview.hidden = true;
@@ -1022,7 +1320,7 @@ function renderImportPreview() {
     ? `${summary.firstDate} 至 ${summary.lastDate}`
     : "空账本";
   elements.importTotal.textContent = `${summary.totalRecords} 条`;
-  elements.importCounts.textContent = `运动 ${summary.counts.workouts}、饮食 ${summary.counts.meals}、睡眠 ${summary.counts.sleepRecords}、体重 ${summary.counts.weights}、饮水 ${summary.counts.hydration}`;
+  elements.importCounts.textContent = `运动 ${summary.counts.workouts}、饮食 ${summary.counts.meals}、睡眠 ${summary.counts.sleepRecords}、体重 ${summary.counts.weights}、饮水 ${summary.counts.hydration}；自定义食品 ${backup.data.customFoods.length}、菜谱 ${backup.data.recipes.length}`;
   const currentCount = data ? summarizeData(data).totalRecords : 0;
   const restoreLabel = getRestoreLabel(currentCount, summary.totalRecords);
   elements.importReplaceSummary.textContent = restoreLabel.summary;
@@ -1120,6 +1418,10 @@ function formatWeight(grams) {
 
 function formatBodyFat(basisPoints) {
   return formatDecimal(basisPoints / 100, 2);
+}
+
+function confidenceLabel(value) {
+  return { high: "较高可信度", medium: "中等可信度", low: "较低可信度" }[value] ?? value;
 }
 
 function formatSignedWeight(grams) {

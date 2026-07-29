@@ -1,0 +1,190 @@
+{
+  "format": "healthlife-complete-backup",
+  "backupVersion": 2,
+  "exportedAt": "2026-01-10T08:00:00.000Z",
+  "data": {
+    "schemaVersion": 2,
+    "settings": {
+      "weightUnit": "kg",
+      "goalWeightGrams": null
+    },
+    "foodPreferences": {
+      "favoriteRefs": [
+        "builtin:chicken-breast-cooked"
+      ],
+      "recentRefs": [
+        "recipe:17000000-0000-4000-8000-000000000001",
+        "builtin:chicken-breast-cooked"
+      ]
+    },
+    "customFoods": [
+      {
+        "id": "16000000-0000-4000-8000-000000000001",
+        "name": "虚构包装酸奶",
+        "foodState": "packaged",
+        "energyKcalPer100g": 72,
+        "proteinGramsPer100g": 4.2,
+        "fatGramsPer100g": 3.1,
+        "carbsGramsPer100g": 7.2,
+        "createdAt": "2026-01-08T08:00:00.000Z",
+        "updatedAt": "2026-01-08T08:00:00.000Z"
+      }
+    ],
+    "recipes": [
+      {
+        "id": "17000000-0000-4000-8000-000000000001",
+        "name": "虚构鸡肉饭",
+        "ingredients": [
+          {
+            "id": "17100000-0000-4000-8000-000000000001",
+            "foodRef": "builtin:chicken-breast-raw",
+            "name": "鸡胸肉（生）",
+            "foodState": "raw",
+            "grams": 300,
+            "energyKcalPer100g": 120,
+            "proteinGramsPer100g": 22.5,
+            "fatGramsPer100g": 2.6,
+            "carbsGramsPer100g": 0,
+            "source": "builtIn",
+            "confidence": "high"
+          },
+          {
+            "id": "17100000-0000-4000-8000-000000000002",
+            "foodRef": "builtin:rice-white-raw",
+            "name": "大米（生）",
+            "foodState": "raw",
+            "grams": 200,
+            "energyKcalPer100g": 365,
+            "proteinGramsPer100g": 7.1,
+            "fatGramsPer100g": 0.7,
+            "carbsGramsPer100g": 80,
+            "source": "builtIn",
+            "confidence": "high"
+          }
+        ],
+        "finishedWeightGrams": 900,
+        "createdAt": "2026-01-08T08:00:00.000Z",
+        "updatedAt": "2026-01-08T08:00:00.000Z"
+      }
+    ],
+    "workouts": [
+      {
+        "id": "11000000-0000-4000-8000-000000000001",
+        "date": "2026-01-08",
+        "type": "walking",
+        "durationMinutes": 35,
+        "intensity": 1,
+        "note": "虚构公园散步",
+        "createdAt": "2026-01-08T08:00:00.000Z",
+        "updatedAt": "2026-01-08T08:00:00.000Z"
+      }
+    ],
+    "meals": [
+      {
+        "id": "12000000-0000-4000-8000-000000000001",
+        "date": "2026-01-08",
+        "mealType": "lunch",
+        "trackingMode": "precise",
+        "confidence": "high",
+        "items": [
+          {
+            "id": "12100000-0000-4000-8000-000000000001",
+            "foodRef": "recipe:17000000-0000-4000-8000-000000000001",
+            "name": "虚构鸡肉饭",
+            "foodState": "prepared",
+            "grams": 360,
+            "energyKcalPer100g": 121.1,
+            "proteinGramsPer100g": 9.1,
+            "fatGramsPer100g": 1,
+            "carbsGramsPer100g": 17.8,
+            "source": "recipe",
+            "confidence": "high"
+          }
+        ],
+        "healthScore": 4,
+        "fullnessScore": 3,
+        "note": "公开演示数据",
+        "createdAt": "2026-01-08T08:00:00.000Z",
+        "updatedAt": "2026-01-08T08:00:00.000Z"
+      },
+      {
+        "id": "12000000-0000-4000-8000-000000000002",
+        "date": "2026-01-09",
+        "mealType": "dinner",
+        "trackingMode": "estimated",
+        "confidence": "medium",
+        "items": [
+          {
+            "id": "12100000-0000-4000-8000-000000000002",
+            "foodRef": "builtin:beef-lean-cooked",
+            "name": "瘦牛肉（熟）",
+            "foodState": "cooked",
+            "grams": 120,
+            "energyKcalPer100g": 250,
+            "proteinGramsPer100g": 26,
+            "fatGramsPer100g": 15,
+            "carbsGramsPer100g": 0,
+            "source": "builtIn",
+            "confidence": "medium"
+          }
+        ],
+        "healthScore": 3,
+        "fullnessScore": 4,
+        "note": "虚构堂食估算",
+        "createdAt": "2026-01-09T08:00:00.000Z",
+        "updatedAt": "2026-01-09T08:00:00.000Z"
+      }
+    ],
+    "sleepRecords": [
+      {
+        "id": "13000000-0000-4000-8000-000000000001",
+        "date": "2026-01-09",
+        "sleepTime": "23:10",
+        "wakeTime": "07:00",
+        "qualityScore": 4,
+        "awakeCount": 1,
+        "note": "虚构睡眠记录",
+        "createdAt": "2026-01-09T08:00:00.000Z",
+        "updatedAt": "2026-01-09T08:00:00.000Z"
+      }
+    ],
+    "weights": [
+      {
+        "id": "14000000-0000-4000-8000-000000000001",
+        "date": "2026-01-08",
+        "weightGrams": 70000,
+        "bodyFatBasisPoints": null,
+        "note": "虚构体重",
+        "createdAt": "2026-01-08T08:00:00.000Z",
+        "updatedAt": "2026-01-08T08:00:00.000Z"
+      },
+      {
+        "id": "14000000-0000-4000-8000-000000000002",
+        "date": "2026-01-09",
+        "weightGrams": 69800,
+        "bodyFatBasisPoints": 1850,
+        "note": "",
+        "createdAt": "2026-01-09T08:00:00.000Z",
+        "updatedAt": "2026-01-09T08:00:00.000Z"
+      }
+    ],
+    "hydration": [
+      {
+        "id": "15000000-0000-4000-8000-000000000001",
+        "date": "2026-01-08",
+        "milliliters": 1800,
+        "note": "虚构饮水",
+        "createdAt": "2026-01-08T08:00:00.000Z",
+        "updatedAt": "2026-01-08T08:00:00.000Z"
+      },
+      {
+        "id": "15000000-0000-4000-8000-000000000002",
+        "date": "2026-01-09",
+        "milliliters": 2000,
+        "note": "",
+        "createdAt": "2026-01-09T08:00:00.000Z",
+        "updatedAt": "2026-01-09T08:00:00.000Z"
+      }
+    ]
+  }
+}

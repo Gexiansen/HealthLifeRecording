@@ -21,7 +21,8 @@ test("Service Worker 缓存完整应用外壳并使用显式版本", () => {
   assert.match(source, /healthlife-shell-v\d+/);
   for (const asset of [
     "index.html", "styles.css", "app.js", "model.js", "data.js", "calendar.js",
-    "stats.js", "backup.js", "interaction.js", "storage.js", "manifest.webmanifest",
+    "stats.js", "backup.js", "interaction.js", "nutrition.js", "analysis.js",
+    "storage.js", "manifest.webmanifest",
     "icons/icon-192.png", "icons/icon-512.png",
   ]) {
     assert.equal(existsSync(resolve(docsRoot, asset)), true, `${asset} 应存在`);

@@ -17,6 +17,9 @@ test("页面包含三个一级导航和五类记录表单", () => {
   for (const form of ["workout", "meal", "sleep", "weight", "hydration"]) {
     assert.match(html, new RegExp(`data-record-form="${form}"`));
   }
+  assert.match(html, /id="custom-food-dialog"/);
+  assert.match(html, /id="recipe-dialog"/);
+  assert.match(html, /id="export-analysis"/);
 });
 
 test("首页日期只通过日历选择，不保留重复的精确日期输入", () => {

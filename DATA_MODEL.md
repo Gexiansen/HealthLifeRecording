@@ -1,4 +1,4 @@
-# HealthLife schema v1
+# HealthLife schema v2
 
 ## 根对象
 
@@ -6,8 +6,11 @@
 
 ```js
 {
-  schemaVersion: 1,
+  schemaVersion: 2,
   settings: {},
+  foodPreferences: {},
+  customFoods: [],
+  recipes: [],
   workouts: [],
   meals: [],
   sleepRecords: [],
@@ -18,12 +21,65 @@
 
 日期统一使用本地自然日 `YYYY-MM-DD`，时间统一使用 `HH:mm`。记录 ID 使用 UUID，`createdAt` 和 `updatedAt` 使用标准 UTC ISO 8601 时间戳。
 
+schema v2 使用 `healthlife:data:v2` 独立存储键，不读取、迁移或删除旧 `healthlife:data:v1`。完整备份版本同步升级为 2，不接受 v1 备份。
+
 ## 设置
 
 | 字段 | 类型 | 规则 |
 | --- | --- | --- |
 | `weightUnit` | string | `kg` 或 `lb`，只影响界面显示 |
 | `goalWeightGrams` | integer／null | 20,000～500,000 克 |
+
+## 食物偏好
+
+| 字段 | 类型 | 规则 |
+| --- | --- | --- |
+| `favoriteRefs` | string[] | 最多 100 项，不重复 |
+| `recentRefs` | string[] | 最近使用优先，最多 12 项，不重复 |
+
+食物引用使用稳定字符串：内置食物以 `builtin:` 开头，自定义食品以 `custom:` 开头，菜谱以 `recipe:` 开头。
+
+## 自定义食品
+
+| 字段 | 类型 | 规则 |
+| --- | --- | --- |
+| `id` | string | UUID，全数据唯一 |
+| `name` | string | 1～60 个字符 |
+| `foodState` | string | `raw`、`cooked`、`packaged`、`prepared` |
+| `energyKcalPer100g` | number | 每 100 克 0～1,000 kcal，最多一位小数 |
+| `proteinGramsPer100g` | number | 每 100 克 0～100 g，最多一位小数 |
+| `fatGramsPer100g` | number | 每 100 克 0～100 g，最多一位小数 |
+| `carbsGramsPer100g` | number | 每 100 克 0～100 g，最多一位小数 |
+| `createdAt`、`updatedAt` | string | UTC ISO 8601 时间戳 |
+
+## 食物明细快照
+
+餐食和菜谱原料都保存完整快照，字段固定：
+
+| 字段 | 类型 | 规则 |
+| --- | --- | --- |
+| `id` | string | UUID，全数据唯一 |
+| `foodRef` | string | 1～100 个字符的食物引用 |
+| `name` | string | 计算时使用的食物名称 |
+| `foodState` | string | 生重、熟重、包装或成品状态 |
+| `grams` | integer | 1～100,000 克 |
+| 四项 `*Per100g` | number | 计算时使用的每 100 克营养值快照 |
+| `source` | string | `builtIn`、`custom`、`recipe`、`estimated` |
+| `confidence` | string | `high`、`medium`、`low` |
+
+单项营养按“每 100 克营养值 × 实际克数 ÷ 100”计算，餐食营养是全部明细之和，最终统一保留一位小数。
+
+## 自制菜谱
+
+| 字段 | 类型 | 规则 |
+| --- | --- | --- |
+| `id` | string | UUID，全数据唯一 |
+| `name` | string | 1～60 个字符 |
+| `ingredients` | 食物明细快照[] | 1～50 项，记录各原料投入克数 |
+| `finishedWeightGrams` | integer | 烹饪完成后的整道菜熟重，1～100,000 克 |
+| `createdAt`、`updatedAt` | string | UTC ISO 8601 时间戳 |
+
+菜谱先汇总全部原料营养，再用成品熟重折算每 100 克营养。食用油和调料按普通原料加入。
 
 ## 运动记录
 
@@ -44,7 +100,9 @@
 | --- | --- | --- |
 | `id`、`date`、时间戳 | — | 与运动记录相同 |
 | `mealType` | string | `breakfast`、`lunch`、`dinner`、`snack` |
-| `description` | string | 1～200 个字符 |
+| `trackingMode` | string | `precise` 或 `estimated` |
+| `confidence` | string | `high`、`medium`、`low`；精确模式不得使用 `low` |
+| `items` | 食物明细快照[] | 1～50 项 |
 | `healthScore` | integer | 1～5，只表达用户主观评价 |
 | `fullnessScore` | integer | 1～5，只表达用户主观饱腹感 |
 | `note` | string | 0～500 个字符 |
@@ -86,9 +144,10 @@
 
 ## 完整性规则
 
-- 所有记录 ID 在整个根对象中唯一。
+- 自定义食品、菜谱、菜谱原料、业务记录和餐食明细的 ID 在整个根对象中唯一。
 - 睡眠、体重和饮水分别按日期唯一；运动和饮食允许同日多条。
-- 数值字段必须是整数并在规定范围内，不能使用字符串或隐式转换。
-- schema v1 不接受未知字段，不静默丢弃无效项。
+- 重量和其他整数单位字段必须是整数；每 100 克营养值最多一位小数，不能使用字符串或隐式转换。
+- schema v2 不接受未知字段，不静默丢弃无效项。
 - `serializeData` 和 `parseData` 在输出或返回数据前都会执行整体校验。
-- 未来修改字段时必须升级 schema 版本并提供明确迁移方案。
+- v2 完整备份保留食物库、菜谱、偏好和所有历史营养快照。
+- 分析 JSON 按自然日汇总体重、睡眠、运动、餐食明细、每日营养和饮水，供后续趋势分析使用。

@@ -6,7 +6,10 @@ import {
   deleteRecord,
   findDailyRecord,
   recordsForDate,
+  saveCustomFood,
+  saveRecipe,
   saveRecord,
+  updateFoodPreferences,
 } from "../docs/data.js";
 import { createEmptyData } from "../docs/model.js";
 
@@ -89,4 +92,60 @@ test("日期查询和全记录排序使用稳定集合信息", () => {
     allRecordsByDate(data).map((item) => item.record.date),
     ["2026-07-22", "2026-07-21"],
   );
+});
+
+test("自定义食品和菜谱保存为不可变数据", () => {
+  const original = createEmptyData();
+  const food = {
+    id: "b0000000-0000-4000-8000-000000000001",
+    name: "自制鸡肉",
+    foodState: "cooked",
+    energyKcalPer100g: 165,
+    proteinGramsPer100g: 31,
+    fatGramsPer100g: 3.6,
+    carbsGramsPer100g: 0,
+    createdAt: CREATED_AT,
+    updatedAt: CREATED_AT,
+  };
+  const withFood = saveCustomFood(original, food);
+  assert.equal(original.customFoods.length, 0);
+  assert.equal(withFood.customFoods[0].name, "自制鸡肉");
+
+  const recipe = {
+    id: "c0000000-0000-4000-8000-000000000001",
+    name: "鸡肉饭",
+    finishedWeightGrams: 300,
+    ingredients: [{
+      id: "d0000000-0000-4000-8000-000000000001",
+      foodRef: `custom:${food.id}`,
+      name: food.name,
+      foodState: food.foodState,
+      grams: 100,
+      energyKcalPer100g: food.energyKcalPer100g,
+      proteinGramsPer100g: food.proteinGramsPer100g,
+      fatGramsPer100g: food.fatGramsPer100g,
+      carbsGramsPer100g: food.carbsGramsPer100g,
+      source: "custom",
+      confidence: "high",
+    }],
+    createdAt: CREATED_AT,
+    updatedAt: CREATED_AT,
+  };
+  const withRecipe = saveRecipe(withFood, recipe);
+  assert.equal(withFood.recipes.length, 0);
+  assert.equal(withRecipe.recipes[0].finishedWeightGrams, 300);
+});
+
+test("食物偏好更新最近使用顺序并维护收藏", () => {
+  const original = createEmptyData();
+  const first = updateFoodPreferences(original, "builtin:egg-boiled", true);
+  const second = updateFoodPreferences(first, "builtin:milk-whole");
+  const third = updateFoodPreferences(second, "builtin:egg-boiled", false);
+
+  assert.deepEqual(original.foodPreferences.recentRefs, []);
+  assert.deepEqual(third.foodPreferences.recentRefs, [
+    "builtin:egg-boiled",
+    "builtin:milk-whole",
+  ]);
+  assert.deepEqual(third.foodPreferences.favoriteRefs, []);
 });

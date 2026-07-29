@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const WORKOUT_TYPES = Object.freeze([
   "strength",
@@ -16,9 +16,17 @@ export const MEAL_TYPES = Object.freeze([
   "snack",
 ]);
 
+export const FOOD_STATES = Object.freeze(["raw", "cooked", "packaged", "prepared"]);
+export const FOOD_SOURCES = Object.freeze(["builtIn", "custom", "recipe", "estimated"]);
+export const NUTRITION_CONFIDENCE = Object.freeze(["high", "medium", "low"]);
+export const MEAL_TRACKING_MODES = Object.freeze(["precise", "estimated"]);
+
 const ROOT_KEYS = Object.freeze([
   "schemaVersion",
   "settings",
+  "foodPreferences",
+  "customFoods",
+  "recipes",
   "workouts",
   "meals",
   "sleepRecords",
@@ -44,6 +52,12 @@ export function createEmptyData() {
       weightUnit: "kg",
       goalWeightGrams: null,
     },
+    foodPreferences: {
+      favoriteRefs: [],
+      recentRefs: [],
+    },
+    customFoods: [],
+    recipes: [],
     workouts: [],
     meals: [],
     sleepRecords: [],
@@ -106,6 +120,9 @@ export function assertValidData(data) {
   }
 
   validateSettings(data.settings);
+  validateFoodPreferences(data.foodPreferences);
+  validateCustomFoods(data.customFoods);
+  validateRecipes(data.recipes);
   validateRecordArray(data.workouts, "workouts", validateWorkout);
   validateRecordArray(data.meals, "meals", validateMeal);
   validateRecordArray(data.sleepRecords, "sleepRecords", validateSleep);
@@ -151,6 +168,63 @@ function validateSettings(settings) {
   );
 }
 
+function validateFoodPreferences(preferences) {
+  assertPlainObject(preferences, "foodPreferences");
+  assertExactKeys(preferences, ["favoriteRefs", "recentRefs"], "foodPreferences");
+  assertUniqueStringArray(preferences.favoriteRefs, 100, "foodPreferences.favoriteRefs");
+  assertUniqueStringArray(preferences.recentRefs, 12, "foodPreferences.recentRefs");
+}
+
+function validateCustomFoods(foods) {
+  if (!Array.isArray(foods) || foods.length > 500) {
+    throw new TypeError("customFoods 必须是最多 500 项的数组");
+  }
+  foods.forEach((food, index) => validateCustomFood(food, `customFoods[${index}]`));
+}
+
+function validateCustomFood(food, path) {
+  assertPlainObject(food, path);
+  assertExactKeys(food, [
+    "id",
+    "name",
+    "foodState",
+    "energyKcalPer100g",
+    "proteinGramsPer100g",
+    "fatGramsPer100g",
+    "carbsGramsPer100g",
+    "createdAt",
+    "updatedAt",
+  ], path);
+  assertUuid(food.id, `${path}.id`);
+  assertStringLength(food.name, 1, 60, `${path}.name`);
+  assertEnum(food.foodState, FOOD_STATES, `${path}.foodState`);
+  validateNutritionPer100g(food, path);
+  assertTimestamps(food, path);
+}
+
+function validateRecipes(recipes) {
+  if (!Array.isArray(recipes) || recipes.length > 200) {
+    throw new TypeError("recipes 必须是最多 200 项的数组");
+  }
+  recipes.forEach((recipe, index) => {
+    const path = `recipes[${index}]`;
+    assertPlainObject(recipe, path);
+    assertExactKeys(recipe, [
+      "id",
+      "name",
+      "ingredients",
+      "finishedWeightGrams",
+      "createdAt",
+      "updatedAt",
+    ], path);
+    assertUuid(recipe.id, `${path}.id`);
+    assertStringLength(recipe.name, 1, 60, `${path}.name`);
+    validateFoodEntries(recipe.ingredients, `${path}.ingredients`, 1, 50);
+    assertIntegerInRange(recipe.finishedWeightGrams, 1, 100_000, `${path}.finishedWeightGrams`);
+    assertTimestamps(recipe, path);
+  });
+}
+
 function validateWorkout(record, path) {
   validateBaseRecord(
     record,
@@ -169,7 +243,9 @@ function validateMeal(record, path) {
     [
       ...BASE_RECORD_KEYS,
       "mealType",
-      "description",
+      "trackingMode",
+      "confidence",
+      "items",
       "healthScore",
       "fullnessScore",
       "note",
@@ -177,7 +253,12 @@ function validateMeal(record, path) {
     path,
   );
   assertEnum(record.mealType, MEAL_TYPES, `${path}.mealType`);
-  assertStringLength(record.description, 1, 200, `${path}.description`);
+  assertEnum(record.trackingMode, MEAL_TRACKING_MODES, `${path}.trackingMode`);
+  assertEnum(record.confidence, NUTRITION_CONFIDENCE, `${path}.confidence`);
+  if (record.trackingMode === "precise" && record.confidence === "low") {
+    throw new TypeError(`${path}.confidence 与精确模式不匹配`);
+  }
+  validateFoodEntries(record.items, `${path}.items`, 1, 50);
   assertIntegerInRange(record.healthScore, 1, 5, `${path}.healthScore`);
   assertIntegerInRange(record.fullnessScore, 1, 5, `${path}.fullnessScore`);
   assertStringLength(record.note, 0, 500, `${path}.note`);
@@ -231,15 +312,47 @@ function validateHydration(record, path) {
 function validateBaseRecord(record, keys, path) {
   assertPlainObject(record, path);
   assertExactKeys(record, keys, path);
-  if (typeof record.id !== "string" || !UUID_PATTERN.test(record.id)) {
-    throw new TypeError(`${path}.id 必须是 UUID`);
-  }
+  assertUuid(record.id, `${path}.id`);
   assertDate(record.date, `${path}.date`);
-  assertIsoTimestamp(record.createdAt, `${path}.createdAt`);
-  assertIsoTimestamp(record.updatedAt, `${path}.updatedAt`);
-  if (record.updatedAt < record.createdAt) {
-    throw new TypeError(`${path}.updatedAt 不能早于 createdAt`);
+  assertTimestamps(record, path);
+}
+
+function validateFoodEntries(entries, path, min, max) {
+  if (!Array.isArray(entries) || entries.length < min || entries.length > max) {
+    throw new TypeError(`${path} 必须包含 ${min}～${max} 项`);
   }
+  entries.forEach((entry, index) => {
+    const entryPath = `${path}[${index}]`;
+    assertPlainObject(entry, entryPath);
+    assertExactKeys(entry, [
+      "id",
+      "foodRef",
+      "name",
+      "foodState",
+      "grams",
+      "energyKcalPer100g",
+      "proteinGramsPer100g",
+      "fatGramsPer100g",
+      "carbsGramsPer100g",
+      "source",
+      "confidence",
+    ], entryPath);
+    assertUuid(entry.id, `${entryPath}.id`);
+    assertStringLength(entry.foodRef, 1, 100, `${entryPath}.foodRef`);
+    assertStringLength(entry.name, 1, 60, `${entryPath}.name`);
+    assertEnum(entry.foodState, FOOD_STATES, `${entryPath}.foodState`);
+    assertIntegerInRange(entry.grams, 1, 100_000, `${entryPath}.grams`);
+    validateNutritionPer100g(entry, entryPath);
+    assertEnum(entry.source, FOOD_SOURCES, `${entryPath}.source`);
+    assertEnum(entry.confidence, NUTRITION_CONFIDENCE, `${entryPath}.confidence`);
+  });
+}
+
+function validateNutritionPer100g(value, path) {
+  assertDecimalInRange(value.energyKcalPer100g, 0, 1_000, `${path}.energyKcalPer100g`);
+  assertDecimalInRange(value.proteinGramsPer100g, 0, 100, `${path}.proteinGramsPer100g`);
+  assertDecimalInRange(value.fatGramsPer100g, 0, 100, `${path}.fatGramsPer100g`);
+  assertDecimalInRange(value.carbsGramsPer100g, 0, 100, `${path}.carbsGramsPer100g`);
 }
 
 function validateRecordArray(records, path, validate) {
@@ -251,6 +364,15 @@ function validateRecordArray(records, path, validate) {
 
 function assertGlobalUniqueIds(data) {
   const seen = new Set();
+  const collect = (id) => {
+    if (seen.has(id)) throw new TypeError(`记录 ID 重复：${id}`);
+    seen.add(id);
+  };
+  for (const food of data.customFoods) collect(food.id);
+  for (const recipe of data.recipes) {
+    collect(recipe.id);
+    recipe.ingredients.forEach((entry) => collect(entry.id));
+  }
   for (const collectionName of [
     "workouts",
     "meals",
@@ -259,10 +381,10 @@ function assertGlobalUniqueIds(data) {
     "hydration",
   ]) {
     for (const record of data[collectionName]) {
-      if (seen.has(record.id)) {
-        throw new TypeError(`记录 ID 重复：${record.id}`);
+      collect(record.id);
+      if (collectionName === "meals") {
+        record.items.forEach((entry) => collect(entry.id));
       }
-      seen.add(record.id);
     }
   }
 }
@@ -303,6 +425,18 @@ function assertIntegerInRange(value, min, max, path) {
   }
 }
 
+function assertDecimalInRange(value, min, max, path) {
+  if (
+    typeof value !== "number"
+    || !Number.isFinite(value)
+    || value < min
+    || value > max
+    || Math.abs(value * 10 - Math.round(value * 10)) > 1e-9
+  ) {
+    throw new TypeError(`${path} 必须是 ${min}～${max} 且最多一位小数的数字`);
+  }
+}
+
 function assertNullableIntegerInRange(value, min, max, path) {
   if (value !== null) {
     assertIntegerInRange(value, min, max, path);
@@ -312,6 +446,32 @@ function assertNullableIntegerInRange(value, min, max, path) {
 function assertStringLength(value, min, max, path) {
   if (typeof value !== "string" || value.length < min || value.length > max) {
     throw new TypeError(`${path} 长度必须为 ${min}～${max}`);
+  }
+}
+
+function assertUniqueStringArray(values, max, path) {
+  if (!Array.isArray(values) || values.length > max) {
+    throw new TypeError(`${path} 必须是最多 ${max} 项的数组`);
+  }
+  const seen = new Set();
+  values.forEach((value, index) => {
+    assertStringLength(value, 1, 100, `${path}[${index}]`);
+    if (seen.has(value)) throw new TypeError(`${path} 包含重复值`);
+    seen.add(value);
+  });
+}
+
+function assertUuid(value, path) {
+  if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+    throw new TypeError(`${path} 必须是 UUID`);
+  }
+}
+
+function assertTimestamps(value, path) {
+  assertIsoTimestamp(value.createdAt, `${path}.createdAt`);
+  assertIsoTimestamp(value.updatedAt, `${path}.updatedAt`);
+  if (value.updatedAt < value.createdAt) {
+    throw new TypeError(`${path}.updatedAt 不能早于 createdAt`);
   }
 }
 

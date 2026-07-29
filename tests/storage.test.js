@@ -27,7 +27,7 @@ function memoryStorage(initial = null) {
   };
 }
 
-test("空存储返回新的 schema v1 数据但不立即写入", () => {
+test("空存储返回新的 schema v2 数据但不立即写入", () => {
   const storage = memoryStorage();
   const result = loadData(storage);
   assert.equal(result.status, "empty");

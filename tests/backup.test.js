@@ -45,9 +45,9 @@ test("完整备份可以严格往返并生成摘要", () => {
 test("完整备份拒绝损坏 JSON、未知版本、未知字段和无效数据", () => {
   assert.throws(() => parseCompleteBackup("{broken"), /有效 JSON/);
   const valid = JSON.parse(serializeCompleteBackup(dataWithWeight(), EXPORTED_AT));
-  valid.backupVersion = 2;
+  valid.backupVersion = 3;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /backupVersion/);
-  valid.backupVersion = 1;
+  valid.backupVersion = 2;
   valid.extra = true;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /未知字段/);
   delete valid.extra;
@@ -74,7 +74,7 @@ test("备份提醒覆盖从未备份、过期、新增较多和最新状态", ()
 });
 
 test("虚构演示备份通过应用自身校验", async () => {
-  const text = await readFile(new URL("../test-data/healthlife-demo-v1.json", import.meta.url), "utf8");
+  const text = await readFile(new URL("../test-data/healthlife-demo-v2.json", import.meta.url), "utf8");
   const result = parseCompleteBackup(text);
   assert.equal(result.summary.totalRecords, 8);
   assert.equal(result.summary.counts.weights, 2);
