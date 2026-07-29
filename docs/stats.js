@@ -21,6 +21,7 @@ export function calculateTrendSummary(data, endDate, days) {
   const sleepRecords = data.sleepRecords.filter(inRange);
   const sleepMinutes = sleepRecords.map((record) => calculateSleepMinutes(record.sleepTime, record.wakeTime));
   const workouts = data.workouts.filter(inRange);
+  const dailyActivities = data.dailyActivities.filter(inRange);
   const meals = data.meals.filter(inRange);
   const mealNutrition = sumNutrition(meals.flatMap((record) => record.items));
   const mealRecordedDays = new Set(meals.map((record) => record.date)).size;
@@ -43,6 +44,21 @@ export function calculateTrendSummary(data, endDate, days) {
       count: workouts.length,
       totalMinutes: workouts.reduce((sum, record) => sum + record.durationMinutes, 0),
       byType: sumBy(workouts, (record) => record.type, (record) => record.durationMinutes),
+      appleWatchCount: workouts.filter((record) => record.source === "appleWatch").length,
+      activeEnergySampleCount: workouts.filter((record) => record.activeEnergyKcal !== null).length,
+      totalActiveEnergyKcal: sumNullable(workouts, (record) => record.activeEnergyKcal),
+      heartRateSampleCount: workouts.filter((record) => record.averageHeartRateBpm !== null).length,
+      averageHeartRateBpm: averageRounded(
+        workouts
+          .map((record) => record.averageHeartRateBpm)
+          .filter((value) => value !== null),
+      ),
+      totalDistanceMeters: sumNullable(workouts, (record) => record.distanceMeters),
+    },
+    dailyActivity: {
+      sampleCount: dailyActivities.length,
+      averageSteps: averageRounded(dailyActivities.map((record) => record.steps)),
+      totalSteps: dailyActivities.reduce((sum, record) => sum + record.steps, 0),
     },
     meal: {
       count: meals.length,
@@ -81,6 +97,10 @@ export function calculateTrendComparison(data, endDate, days) {
       workoutMinutes: previous.workout.count && current.workout.count
         ? current.workout.totalMinutes - previous.workout.totalMinutes
         : null,
+      dailySteps: difference(
+        current.dailyActivity.averageSteps,
+        previous.dailyActivity.averageSteps,
+      ),
       mealCompletionPoints: previous.meal.count && current.meal.count
         ? current.meal.completionPercent - previous.meal.completionPercent
         : null,
@@ -113,6 +133,11 @@ function averageRounded(values) {
 function averageFixed(values) {
   if (!values.length) return null;
   return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
+}
+
+function sumNullable(records, selector) {
+  const values = records.map(selector).filter((value) => value !== null);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
 }
 
 function difference(current, previous) {

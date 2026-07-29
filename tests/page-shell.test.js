@@ -10,16 +10,18 @@ test("正式页面只引用本地相对运行时资源", () => {
   assert.doesNotMatch(html, /https?:\/\//);
 });
 
-test("页面包含三个一级导航和五类记录表单", () => {
+test("页面包含三个一级导航和六类记录表单", () => {
   for (const view of ["today", "trends", "records"]) {
     assert.match(html, new RegExp(`data-view="${view}"`));
   }
-  for (const form of ["workout", "meal", "sleep", "weight", "hydration"]) {
+  for (const form of ["workout", "activity", "meal", "sleep", "weight", "hydration"]) {
     assert.match(html, new RegExp(`data-record-form="${form}"`));
   }
   assert.match(html, /id="custom-food-dialog"/);
   assert.match(html, /id="recipe-dialog"/);
   assert.match(html, /id="export-analysis"/);
+  assert.match(html, /id="meal-food-unit"/);
+  assert.match(html, /value="appleWatch"/);
 });
 
 test("首页日期只通过日历选择，不保留重复的精确日期输入", () => {

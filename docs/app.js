@@ -9,6 +9,7 @@ import {
   saveCustomFood,
   saveRecipe,
   saveRecord,
+  updateEggGramsPerPiece,
   updateFoodPreferences,
 } from "./data.js";
 import {
@@ -35,6 +36,7 @@ import {
 } from "./backup.js";
 import {
   addHydrationAmount,
+  calculatePaceSecondsPerKilometer,
   filterRecordItems,
   getDateContext,
   getDefaultMealType,
@@ -51,6 +53,7 @@ import { serializeAnalysisExport } from "./analysis.js";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
+  activity: { collectionName: "dailyActivities", label: "每日活动" },
   meal: { collectionName: "meals", label: "饮食" },
   sleep: { collectionName: "sleepRecords", label: "睡眠" },
   weight: { collectionName: "weights", label: "体重" },
@@ -63,6 +66,7 @@ const COLLECTION_TO_TYPE = Object.freeze(
 
 const WORKOUT_LABELS = Object.freeze({
   strength: "力量",
+  running: "跑步",
   cardio: "有氧",
   walking: "步行",
   stretching: "拉伸",
@@ -114,6 +118,7 @@ const elements = {
   toggleCalendar: document.querySelector("#toggle-calendar"),
   streakDays: document.querySelector("#streak-days"),
   workoutSummary: document.querySelector("#workout-summary"),
+  activitySummary: document.querySelector("#activity-summary"),
   mealSummary: document.querySelector("#meal-summary"),
   sleepSummary: document.querySelector("#sleep-summary"),
   weightSummary: document.querySelector("#weight-summary"),
@@ -121,6 +126,7 @@ const elements = {
   sleepAction: document.querySelector("#sleep-action"),
   weightAction: document.querySelector("#weight-action"),
   hydrationAction: document.querySelector("#hydration-action"),
+  activityAction: document.querySelector("#activity-action"),
   trendPeriodLabel: document.querySelector("#trend-period-label"),
   trendEmpty: document.querySelector("#trend-empty"),
   trendGrid: document.querySelector(".trend-grid"),
@@ -137,6 +143,9 @@ const elements = {
   workoutTrendSamples: document.querySelector("#workout-trend-samples"),
   workoutTrendValue: document.querySelector("#workout-trend-value"),
   workoutTrendMeta: document.querySelector("#workout-trend-meta"),
+  activityTrendSamples: document.querySelector("#activity-trend-samples"),
+  activityTrendValue: document.querySelector("#activity-trend-value"),
+  activityTrendMeta: document.querySelector("#activity-trend-meta"),
   mealTrendSamples: document.querySelector("#meal-trend-samples"),
   mealTrendValue: document.querySelector("#meal-trend-value"),
   mealTrendMeta: document.querySelector("#meal-trend-meta"),
@@ -155,7 +164,11 @@ const elements = {
   hydrationAmountLabel: document.querySelector("#hydration-amount-label"),
   sleepDurationPreview: document.querySelector("#sleep-duration-preview"),
   mealFoodSelect: document.querySelector("#meal-food-select"),
-  mealFoodGrams: document.querySelector("#meal-food-grams"),
+  mealFoodQuantity: document.querySelector("#meal-food-quantity"),
+  mealFoodQuantityLabel: document.querySelector("#meal-food-quantity-label"),
+  mealFoodUnit: document.querySelector("#meal-food-unit"),
+  eggPieceWeightField: document.querySelector("#egg-piece-weight-field"),
+  eggGramsPerPiece: document.querySelector("#egg-grams-per-piece"),
   mealFoodFavorite: document.querySelector("#meal-food-favorite"),
   addMealFood: document.querySelector("#add-meal-food"),
   mealItems: document.querySelector("#meal-items"),
@@ -175,6 +188,8 @@ const elements = {
   recipeItems: document.querySelector("#recipe-items"),
   recipeNutrition: document.querySelector("#recipe-nutrition"),
   recipeError: document.querySelector("#recipe-error"),
+  workoutPacePreview: document.querySelector("#workout-pace-preview"),
+  workoutDistanceField: document.querySelector("#workout-distance-field"),
   formError: document.querySelector("#form-error"),
   discardDialog: document.querySelector("#discard-dialog"),
   continueEditing: document.querySelector("#continue-editing"),
@@ -262,7 +277,11 @@ function bindEvents() {
   elements.clearRecordFilters.addEventListener("click", clearRecordFilters);
   elements.recordDate.addEventListener("input", handleSharedDateInput);
   elements.addMealFood.addEventListener("click", addMealFood);
-  elements.mealFoodSelect.addEventListener("change", syncFavoriteCheckbox);
+  elements.mealFoodSelect.addEventListener("change", () => {
+    syncFavoriteCheckbox();
+    updateMealFoodUnitState(true);
+  });
+  elements.mealFoodUnit.addEventListener("change", () => updateMealFoodUnitState(false));
   elements.openCustomFood.addEventListener("click", openCustomFoodDialog);
   elements.closeCustomFood.addEventListener("click", () => elements.customFoodDialog.close());
   elements.customFoodForm.addEventListener("submit", handleCustomFoodSubmit);
@@ -366,6 +385,7 @@ function renderToday() {
   if (!data) {
     for (const element of [
       elements.workoutSummary,
+      elements.activitySummary,
       elements.mealSummary,
       elements.sleepSummary,
       elements.weightSummary,
@@ -376,6 +396,7 @@ function renderToday() {
   }
 
   const workouts = data.workouts.filter((record) => record.date === selectedDate);
+  const activity = findDailyRecord(data, "dailyActivities", selectedDate);
   const meals = data.meals.filter((record) => record.date === selectedDate);
   const sleep = findDailyRecord(data, "sleepRecords", selectedDate);
   const weight = findDailyRecord(data, "weights", selectedDate);
@@ -384,6 +405,7 @@ function renderToday() {
   elements.workoutSummary.textContent = workouts.length
     ? `${workouts.length} 次，共 ${workouts.reduce((sum, item) => sum + item.durationMinutes, 0)} 分钟`
     : "尚未记录";
+  elements.activitySummary.textContent = activity ? `${activity.steps.toLocaleString("zh-CN")} 步` : "尚未记录";
   elements.mealSummary.textContent = meals.length
     ? `${meals.length} 餐 · ${formatNutrition(sumNutrition(meals.flatMap((item) => item.items)))}`
     : "尚未记录";
@@ -395,6 +417,7 @@ function renderToday() {
   elements.sleepAction.textContent = sleep ? "编辑睡眠" : "记录睡眠";
   elements.weightAction.textContent = weight ? "编辑体重" : "记录体重";
   elements.hydrationAction.textContent = hydration ? "编辑饮水" : "记录饮水";
+  elements.activityAction.textContent = activity ? "编辑步数" : "记录步数";
   const streak = calculateRecordingStreak(data, today);
   elements.streakDays.textContent = `${streak.days} 天`;
   elements.streakDays.title = streak.todayRecorded ? "今天已有记录" : "今天尚未记录，连续天数截至昨天";
@@ -423,13 +446,13 @@ function renderCalendar() {
     button.setAttribute("aria-pressed", String(entry.date === selectedDate));
     if (status.hasRecord) button.classList.add("has-record");
     button.disabled = entry.date > today || !data;
-    button.setAttribute("aria-label", `${formatDisplayDate(entry.date)}，已完成 ${status.completedCount}/5 类记录`);
+    button.setAttribute("aria-label", `${formatDisplayDate(entry.date)}，已完成 ${status.completedCount}/6 类记录`);
     const dayNumber = document.createElement("span");
     dayNumber.className = "day-number";
     dayNumber.textContent = String(Number(entry.date.slice(-2)));
     const dayStatus = document.createElement("span");
     dayStatus.className = "day-status";
-    dayStatus.textContent = status.hasRecord ? `${status.completedCount}/5` : "—";
+    dayStatus.textContent = status.hasRecord ? `${status.completedCount}/6` : "—";
     button.append(dayNumber, dayStatus);
     button.addEventListener("click", () => setSelectedDate(entry.date));
     elements.calendarGrid.append(button);
@@ -492,6 +515,7 @@ function renderTrends() {
   const hasAnySamples = summary.weight.sampleCount
     + summary.sleep.sampleCount
     + summary.workout.count
+    + summary.dailyActivity.sampleCount
     + summary.meal.count
     + summary.hydration.sampleCount > 0;
   elements.trendEmpty.hidden = hasAnySamples;
@@ -534,11 +558,35 @@ function renderTrends() {
     : "暂无足够数据";
   elements.workoutTrendMeta.textContent = summary.workout.count
     ? joinComparison(
-      Object.entries(summary.workout.byType).map(([type, minutes]) => `${WORKOUT_LABELS[type]} ${minutes} 分`).join(" · "),
+      [
+        Object.entries(summary.workout.byType).map(([type, minutes]) => `${WORKOUT_LABELS[type]} ${minutes} 分`).join(" · "),
+        summary.workout.totalActiveEnergyKcal === null
+          ? null
+          : `活动热量 ${summary.workout.totalActiveEnergyKcal} kcal`,
+        summary.workout.averageHeartRateBpm === null
+          ? null
+          : `平均心率 ${summary.workout.averageHeartRateBpm} bpm`,
+        summary.workout.totalDistanceMeters === null
+          ? null
+          : `距离 ${formatDistance(summary.workout.totalDistanceMeters)}`,
+        summary.workout.appleWatchCount ? `Apple Watch ${summary.workout.appleWatchCount} 次` : null,
+      ].filter(Boolean).join(" · "),
       comparison.changes.workoutMinutes,
       (value) => formatSignedUnit(value, "分钟"),
     )
     : "记录运动后显示次数、时长和类型分布";
+
+  elements.activityTrendSamples.textContent = `${summary.dailyActivity.sampleCount} 天`;
+  elements.activityTrendValue.textContent = summary.dailyActivity.sampleCount
+    ? `日均 ${summary.dailyActivity.averageSteps.toLocaleString("zh-CN")} 步`
+    : "暂无足够数据";
+  elements.activityTrendMeta.textContent = summary.dailyActivity.sampleCount
+    ? joinComparison(
+      `累计 ${summary.dailyActivity.totalSteps.toLocaleString("zh-CN")} 步，仅按有记录日期计算`,
+      comparison.changes.dailySteps,
+      (value) => formatSignedUnit(value, "步"),
+    )
+    : "记录 Apple Watch 当日步数后显示活动趋势";
 
   elements.mealTrendSamples.textContent = `${summary.meal.count} 餐`;
   elements.mealTrendValue.textContent = summary.meal.count
@@ -690,10 +738,23 @@ function createRecordCard(collectionName, record) {
 function describeRecord(collectionName, record) {
   let detail;
   if (collectionName === "workouts") {
-    detail = `${WORKOUT_LABELS[record.type]} · ${record.durationMinutes} 分钟 · 强度 ${record.intensity}/3`;
+    const metrics = [
+      `${WORKOUT_LABELS[record.type]} · ${record.durationMinutes} 分钟 · 强度 ${record.intensity}/3`,
+      record.source === "appleWatch" ? "Apple Watch" : "手动",
+      record.activeEnergyKcal === null ? null : `${record.activeEnergyKcal} kcal`,
+      record.averageHeartRateBpm === null ? null : `平均心率 ${record.averageHeartRateBpm}`,
+      record.maxHeartRateBpm === null ? null : `最高心率 ${record.maxHeartRateBpm}`,
+      record.distanceMeters === null ? null : formatDistance(record.distanceMeters),
+      record.distanceMeters === null
+        ? null
+        : `配速 ${formatPace(record.durationMinutes, record.distanceMeters)}`,
+    ];
+    detail = metrics.filter(Boolean).join(" · ");
+  } else if (collectionName === "dailyActivities") {
+    detail = `${record.steps.toLocaleString("zh-CN")} 步 · ${record.source === "appleWatch" ? "Apple Watch" : "手动"}`;
   } else if (collectionName === "meals") {
     const nutrition = sumNutrition(record.items);
-    detail = `${MEAL_LABELS[record.mealType]} · ${record.items.map((item) => `${item.name} ${item.grams}g`).join("、")} · ${formatNutrition(nutrition)} · ${record.trackingMode === "precise" ? "称重" : "估算"}／${confidenceLabel(record.confidence)}`;
+    detail = `${MEAL_LABELS[record.mealType]} · ${record.items.map((item) => `${item.name} ${formatFoodAmount(item)}`).join("、")} · ${formatNutrition(nutrition)} · ${record.trackingMode === "precise" ? "称重" : "估算"}／${confidenceLabel(record.confidence)}`;
   } else if (collectionName === "sleepRecords") {
     detail = `${record.sleepTime}–${record.wakeTime} · ${formatMinutes(calculateSleepMinutes(record.sleepTime, record.wakeTime))} · 质量 ${record.qualityScore}/5`;
   } else if (collectionName === "weights") {
@@ -756,7 +817,7 @@ function openForm(type, explicitRecord = null) {
   if (!data) return;
   const config = TYPE_CONFIG[type];
   let record = explicitRecord;
-  if (!record && ["sleep", "weight", "hydration"].includes(type)) {
+  if (!record && ["activity", "sleep", "weight", "hydration"].includes(type)) {
     record = findDailyRecord(data, config.collectionName, selectedDate);
   }
 
@@ -780,6 +841,8 @@ function openForm(type, explicitRecord = null) {
   }
   updateFormContext();
   updateSleepDurationPreview();
+  updateWorkoutFieldState(false);
+  updateWorkoutPacePreview();
   formBaseline = getFormSignature();
   elements.dialog.showModal();
   form.querySelector("input, select, textarea")?.focus();
@@ -794,6 +857,10 @@ function fillForm(type, form, record) {
       form.elements.mealType.value = getDefaultMealType(new Date().getHours());
       form.elements.trackingMode.value = "precise";
       form.elements.confidence.value = "medium";
+    } else if (type === "workout") {
+      form.elements.source.value = "manual";
+    } else if (type === "activity") {
+      form.elements.source.value = "appleWatch";
     }
     return;
   }
@@ -807,6 +874,11 @@ function fillForm(type, form, record) {
       ? ""
       : formatBodyFat(record.bodyFatBasisPoints);
   }
+  if (type === "workout") {
+    form.elements.distanceKm.value = record.distanceMeters === null
+      ? ""
+      : formatDecimal(record.distanceMeters / 1_000, 3);
+  }
 }
 
 function handleFormInput(event) {
@@ -814,8 +886,12 @@ function handleFormInput(event) {
     activeForm.elements.confidence.value = "medium";
     updateMealConfidenceState();
   }
+  if (editing?.type === "workout" && event?.target?.name === "type") {
+    updateWorkoutFieldState(true);
+  }
   updateFormContext();
   updateSleepDurationPreview();
+  updateWorkoutPacePreview();
 }
 
 function updateMealConfidenceState() {
@@ -852,6 +928,33 @@ function updateSleepDurationPreview() {
     elements.sleepDurationPreview.textContent = `预计睡眠：${formatMinutes(calculateSleepMinutes(sleepTime, wakeTime))}`;
   } catch {
     elements.sleepDurationPreview.textContent = "入睡和起床时间不能相同";
+  }
+}
+
+function updateWorkoutPacePreview() {
+  if (editing?.type !== "workout" || !activeForm) return;
+  const durationMinutes = Number(activeForm.elements.durationMinutes.value);
+  const distanceKm = Number(activeForm.elements.distanceKm.value);
+  if (!durationMinutes || !distanceKm) {
+    elements.workoutPacePreview.textContent = "填写时长和距离后显示平均配速";
+    return;
+  }
+  try {
+    elements.workoutPacePreview.textContent = `平均配速：${formatPace(durationMinutes, Math.round(distanceKm * 1_000))}`;
+  } catch {
+    elements.workoutPacePreview.textContent = "请输入有效的整数时长和距离";
+  }
+}
+
+function updateWorkoutFieldState(clearUnsupported) {
+  if (editing?.type !== "workout" || !activeForm) return;
+  const supportsDistance = ["running", "walking", "cardio"].includes(
+    activeForm.elements.type.value,
+  );
+  elements.workoutDistanceField.hidden = !supportsDistance;
+  elements.workoutPacePreview.hidden = !supportsDistance;
+  if (!supportsDistance && clearUnsupported) {
+    activeForm.elements.distanceKm.value = "";
   }
 }
 
@@ -900,6 +1003,7 @@ function populateFoodSelects(selectedMealRef = elements.mealFoodSelect.value) {
   if (!data) return;
   populateFoodSelect(elements.mealFoodSelect, getFoodCatalog(data), selectedMealRef);
   populateFoodSelect(elements.recipeFoodSelect, getFoodCatalog(data, { includeRecipes: false }));
+  updateMealFoodUnitState(elements.mealFoodSelect.value === "builtin:egg-boiled");
 }
 
 function populateFoodSelect(select, catalog, selectedRef = "") {
@@ -907,7 +1011,10 @@ function populateFoodSelect(select, catalog, selectedRef = "") {
   for (const food of catalog) {
     const option = document.createElement("option");
     option.value = food.ref;
-    option.textContent = `${favoritePrefix(food.ref)}${food.name} · ${foodStateLabel(food.foodState)} · 蛋白质 ${formatDecimal(food.proteinGramsPer100g, 1)}g/100g`;
+    const pieceHint = food.pieceGrams
+      ? ` · 1 个≈${data.settings.eggGramsPerPiece}g`
+      : "";
+    option.textContent = `${favoritePrefix(food.ref)}${food.name} · ${foodStateLabel(food.foodState)}${pieceHint} · 蛋白质 ${formatDecimal(food.proteinGramsPer100g, 1)}g/100g`;
     select.append(option);
   }
   if (selectedRef && catalog.some((food) => food.ref === selectedRef)) select.value = selectedRef;
@@ -917,18 +1024,33 @@ function addMealFood() {
   if (!data || editing?.type !== "meal" || !activeForm) return;
   try {
     const food = selectedFood(elements.mealFoodSelect, true);
-    const grams = Number(elements.mealFoodGrams.value);
+    const inputQuantity = Number(elements.mealFoodQuantity.value);
+    const inputUnit = elements.mealFoodUnit.value;
+    const unitGrams = inputUnit === "piece"
+      ? Number(elements.eggGramsPerPiece.value)
+      : 1;
     const confidence = activeForm.elements.confidence.value;
-    const entry = createFoodEntry(food, grams, confidence, createId());
-    const next = updateFoodPreferences(
-      data,
+    const entry = createFoodEntry(
+      food,
+      inputQuantity,
+      confidence,
+      createId(),
+      inputUnit,
+      unitGrams,
+    );
+    let next = data;
+    if (inputUnit === "piece" && unitGrams !== data.settings.eggGramsPerPiece) {
+      next = updateEggGramsPerPiece(next, unitGrams);
+    }
+    next = updateFoodPreferences(
+      next,
       food.ref,
       elements.mealFoodFavorite.checked,
     );
     saveData(next);
     data = next;
     mealItemsDraft.push(entry);
-    elements.mealFoodGrams.value = "";
+    elements.mealFoodQuantity.value = "";
     populateFoodSelects(food.ref);
     syncFavoriteCheckbox();
     renderMealDraft();
@@ -955,7 +1077,9 @@ function renderFoodEntries(container, entries, remove) {
     item.className = "food-item";
     const detail = document.createElement("div");
     const title = document.createElement("strong");
-    title.textContent = `${entry.name} · ${entry.grams} g`;
+    title.textContent = entry.inputUnit === "piece"
+      ? `${entry.name} · ${entry.inputQuantity} 个（${entry.grams} g）`
+      : `${entry.name} · ${entry.grams} g`;
     const nutrition = document.createElement("span");
     nutrition.textContent = formatNutrition(sumNutrition([entry]));
     detail.append(title, nutrition);
@@ -974,6 +1098,21 @@ function syncFavoriteCheckbox() {
   elements.mealFoodFavorite.checked = data.foodPreferences.favoriteRefs.includes(
     elements.mealFoodSelect.value,
   );
+}
+
+function updateMealFoodUnitState(preferPiece) {
+  if (!data) return;
+  const food = getFoodCatalog(data).find((item) => item.ref === elements.mealFoodSelect.value);
+  const pieceOption = elements.mealFoodUnit.querySelector('option[value="piece"]');
+  const supportsPiece = Number.isInteger(food?.pieceGrams);
+  pieceOption.disabled = !supportsPiece;
+  if (!supportsPiece) elements.mealFoodUnit.value = "grams";
+  else if (preferPiece) elements.mealFoodUnit.value = "piece";
+  const usesPiece = supportsPiece && elements.mealFoodUnit.value === "piece";
+  elements.eggPieceWeightField.hidden = !usesPiece;
+  elements.eggGramsPerPiece.value = String(data.settings.eggGramsPerPiece);
+  elements.mealFoodQuantityLabel.textContent = usesPiece ? "实际食用（个）" : "实际食用（克）";
+  elements.mealFoodQuantity.max = usesPiece ? "50" : "100000";
 }
 
 function openCustomFoodDialog() {
@@ -1157,6 +1296,21 @@ function buildRecord(type, form, base) {
       type: form.elements.type.value,
       durationMinutes: Number(form.elements.durationMinutes.value),
       intensity: Number(form.elements.intensity.value),
+      source: form.elements.source.value,
+      activeEnergyKcal: nullableInteger(form.elements.activeEnergyKcal.value),
+      averageHeartRateBpm: nullableInteger(form.elements.averageHeartRateBpm.value),
+      maxHeartRateBpm: nullableInteger(form.elements.maxHeartRateBpm.value),
+      distanceMeters: form.elements.distanceKm.value === ""
+        ? null
+        : Math.round(Number(form.elements.distanceKm.value) * 1_000),
+      note: form.elements.note.value.trim(),
+    };
+  }
+  if (type === "activity") {
+    return {
+      ...base,
+      steps: Number(form.elements.steps.value),
+      source: form.elements.source.value,
       note: form.elements.note.value.trim(),
     };
   }
@@ -1320,7 +1474,7 @@ function renderImportPreview() {
     ? `${summary.firstDate} 至 ${summary.lastDate}`
     : "空账本";
   elements.importTotal.textContent = `${summary.totalRecords} 条`;
-  elements.importCounts.textContent = `运动 ${summary.counts.workouts}、饮食 ${summary.counts.meals}、睡眠 ${summary.counts.sleepRecords}、体重 ${summary.counts.weights}、饮水 ${summary.counts.hydration}；自定义食品 ${backup.data.customFoods.length}、菜谱 ${backup.data.recipes.length}`;
+  elements.importCounts.textContent = `运动 ${summary.counts.workouts}、每日活动 ${summary.counts.dailyActivities}、饮食 ${summary.counts.meals}、睡眠 ${summary.counts.sleepRecords}、体重 ${summary.counts.weights}、饮水 ${summary.counts.hydration}；自定义食品 ${backup.data.customFoods.length}、菜谱 ${backup.data.recipes.length}`;
   const currentCount = data ? summarizeData(data).totalRecords : 0;
   const restoreLabel = getRestoreLabel(currentCount, summary.totalRecords);
   elements.importReplaceSummary.textContent = restoreLabel.summary;
@@ -1412,6 +1566,26 @@ function formatMinutes(minutes) {
   return remainder === 0 ? `${hours} 小时` : `${hours} 小时 ${remainder} 分`;
 }
 
+function formatDistance(meters) {
+  return `${formatDecimal(meters / 1_000, 3)} km`;
+}
+
+function formatFoodAmount(entry) {
+  return entry.inputUnit === "piece"
+    ? `${entry.inputQuantity} 个（${entry.grams}g）`
+    : `${entry.grams}g`;
+}
+
+function formatPace(durationMinutes, distanceMeters) {
+  const secondsPerKilometer = calculatePaceSecondsPerKilometer(
+    durationMinutes,
+    distanceMeters,
+  );
+  const minutes = Math.floor(secondsPerKilometer / 60);
+  const seconds = String(secondsPerKilometer % 60).padStart(2, "0");
+  return `${minutes}:${seconds} 分／km`;
+}
+
 function formatWeight(grams) {
   return formatDecimal(grams / 1_000, 3);
 }
@@ -1441,6 +1615,10 @@ function formatSignedUnit(value, unit) {
 
 function formatDecimal(value, digits) {
   return value.toFixed(digits).replace(/\.?0+$/, "");
+}
+
+function nullableInteger(value) {
+  return value === "" ? null : Number(value);
 }
 
 function formatDisplayDate(value) {

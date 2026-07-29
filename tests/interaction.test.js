@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   addHydrationAmount,
+  calculatePaceSecondsPerKilometer,
   filterRecordItems,
   getDateContext,
   getDefaultMealType,
@@ -32,6 +33,13 @@ test("饮水快捷增加执行整数和上限校验", () => {
   assert.equal(addHydrationAmount(1_500, 250), 1_750);
   assert.equal(addHydrationAmount(0, 500), 500);
   assert.throws(() => addHydrationAmount(19_800, 500), /20000/);
+});
+
+test("平均配速由整数时长和距离计算", () => {
+  assert.equal(calculatePaceSecondsPerKilometer(30, 5_000), 360);
+  assert.equal(calculatePaceSecondsPerKilometer(31, 5_000), 372);
+  assert.throws(() => calculatePaceSecondsPerKilometer(0, 5_000), /durationMinutes/);
+  assert.throws(() => calculatePaceSecondsPerKilometer(30, 0), /distanceMeters/);
 });
 
 test("记录筛选可以组合类型和月份", () => {

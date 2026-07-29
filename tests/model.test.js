@@ -26,6 +26,11 @@ function validData() {
     type: "strength",
     durationMinutes: 45,
     intensity: 2,
+    source: "appleWatch",
+    activeEnergyKcal: 180,
+    averageHeartRateBpm: 108,
+    maxHeartRateBpm: 136,
+    distanceMeters: null,
     note: "虚构训练",
   });
   data.meals.push({
@@ -39,6 +44,9 @@ function validData() {
       name: "鸡胸肉（熟）",
       foodState: "cooked",
       grams: 150,
+      inputUnit: "grams",
+      inputQuantity: 150,
+      unitGrams: 1,
       energyKcalPer100g: 165,
       proteinGramsPer100g: 31,
       fatGramsPer100g: 3.6,
@@ -69,17 +77,23 @@ function validData() {
     milliliters: 1_800,
     note: "",
   });
+  data.dailyActivities.push({
+    ...baseRecord("51000000-0000-4000-8000-000000000001", "2026-07-21"),
+    steps: 8_000,
+    source: "appleWatch",
+    note: "",
+  });
   return data;
 }
 
-test("空数据和完整 schema v2 数据通过校验", () => {
+test("空数据和完整 schema v3 数据通过校验", () => {
   assert.equal(assertValidData(createEmptyData()), true);
   assert.equal(assertValidData(validData()), true);
 });
 
 test("拒绝未知版本、未知字段和不存在的日期", () => {
   const unknownVersion = validData();
-  unknownVersion.schemaVersion = 3;
+  unknownVersion.schemaVersion = 4;
   assert.throws(() => assertValidData(unknownVersion), /schemaVersion/);
 
   const unknownField = validData();
@@ -111,6 +125,18 @@ test("运动、饮食和设置字段执行严格范围校验", () => {
   const invalidSettings = validData();
   invalidSettings.settings.goalWeightGrams = 70.5;
   assert.throws(() => assertValidData(invalidSettings), /goalWeightGrams/);
+
+  const invalidHeartRate = validData();
+  invalidHeartRate.workouts[0].maxHeartRateBpm = 100;
+  assert.throws(() => assertValidData(invalidHeartRate), /不能低于平均心率/);
+
+  const invalidStrengthDistance = validData();
+  invalidStrengthDistance.workouts[0].distanceMeters = 1_000;
+  assert.throws(() => assertValidData(invalidStrengthDistance), /只适用于/);
+
+  const invalidServing = validData();
+  invalidServing.meals[0].items[0].grams = 149;
+  assert.throws(() => assertValidData(invalidServing), /换算不一致/);
 });
 
 test("跨日和同日睡眠时长计算正确，并拒绝相同时间", () => {
@@ -120,7 +146,7 @@ test("跨日和同日睡眠时长计算正确，并拒绝相同时间", () => {
   assert.throws(() => calculateSleepMinutes("24:00", "08:00"), /HH:mm/);
 });
 
-test("睡眠、体重和饮水分别按日期唯一", () => {
+test("睡眠、体重、饮水和每日活动分别按日期唯一", () => {
   const duplicateWeight = validData();
   duplicateWeight.weights.push({
     ...duplicateWeight.weights[0],
@@ -141,6 +167,13 @@ test("睡眠、体重和饮水分别按日期唯一", () => {
     id: "50000000-0000-4000-8000-000000000002",
   });
   assert.throws(() => assertValidData(duplicateHydration), /hydration 的日期重复/);
+
+  const duplicateActivity = validData();
+  duplicateActivity.dailyActivities.push({
+    ...duplicateActivity.dailyActivities[0],
+    id: "51000000-0000-4000-8000-000000000002",
+  });
+  assert.throws(() => assertValidData(duplicateActivity), /dailyActivities 的日期重复/);
 });
 
 test("所有记录集合共享全局 ID 唯一性", () => {

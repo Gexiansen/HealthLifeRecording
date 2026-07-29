@@ -47,6 +47,29 @@ test("按实际克数计算单项和整餐营养", () => {
   });
 });
 
+test("水煮鸡蛋按个数和单个克数换算后计算营养", () => {
+  const egg = getFoodCatalog(createEmptyData()).find(
+    (food) => food.ref === "builtin:egg-boiled",
+  );
+  const entry = createFoodEntry(
+    egg,
+    2,
+    "medium",
+    "91500000-0000-4000-8000-000000000001",
+    "piece",
+    50,
+  );
+  assert.equal(entry.grams, 100);
+  assert.equal(entry.inputQuantity, 2);
+  assert.equal(entry.unitGrams, 50);
+  assert.deepEqual(sumNutrition([entry]), {
+    energyKcal: 155,
+    proteinGrams: 12.6,
+    fatGrams: 10.6,
+    carbsGrams: 1.1,
+  });
+});
+
 test("菜谱按原料总营养和成品熟重折算每百克", () => {
   const ingredient = createFoodEntry(
     FOOD,

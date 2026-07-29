@@ -52,7 +52,7 @@ test("周和月导航按明确周期移动", () => {
   assert.equal(shiftCalendarAnchor("2026-01-20", "month", -1), "2025-12-01");
 });
 
-test("每日状态按五类记录计算且同类多条只计一次", () => {
+test("每日状态按六类记录计算且同类多条只计一次", () => {
   const data = createEmptyData();
   data.weights.push(weight("10000000-0000-4000-8000-000000000001", "2026-07-23"));
   data.workouts.push({
@@ -61,6 +61,11 @@ test("每日状态按五类记录计算且同类多条只计一次", () => {
     type: "walking",
     durationMinutes: 30,
     intensity: 1,
+    source: "manual",
+    activeEnergyKcal: null,
+    averageHeartRateBpm: null,
+    maxHeartRateBpm: null,
+    distanceMeters: null,
     note: "",
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -69,6 +74,7 @@ test("每日状态按五类记录计算且同类多条只计一次", () => {
   assert.deepEqual(getDailyStatus(data, "2026-07-23"), {
     categories: {
       workout: true,
+      dailyActivity: false,
       meal: false,
       sleep: false,
       weight: true,

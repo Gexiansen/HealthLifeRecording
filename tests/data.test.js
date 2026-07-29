@@ -9,6 +9,7 @@ import {
   saveCustomFood,
   saveRecipe,
   saveRecord,
+  updateEggGramsPerPiece,
   updateFoodPreferences,
 } from "../docs/data.js";
 import { createEmptyData } from "../docs/model.js";
@@ -121,6 +122,9 @@ test("自定义食品和菜谱保存为不可变数据", () => {
       name: food.name,
       foodState: food.foodState,
       grams: 100,
+      inputUnit: "grams",
+      inputQuantity: 100,
+      unitGrams: 1,
       energyKcalPer100g: food.energyKcalPer100g,
       proteinGramsPer100g: food.proteinGramsPer100g,
       fatGramsPer100g: food.fatGramsPer100g,
@@ -148,4 +152,12 @@ test("食物偏好更新最近使用顺序并维护收藏", () => {
     "builtin:milk-whole",
   ]);
   assert.deepEqual(third.foodPreferences.favoriteRefs, []);
+});
+
+test("鸡蛋单个克数设置以不可变方式保存", () => {
+  const original = createEmptyData();
+  const updated = updateEggGramsPerPiece(original, 55);
+  assert.equal(original.settings.eggGramsPerPiece, 50);
+  assert.equal(updated.settings.eggGramsPerPiece, 55);
+  assert.throws(() => updateEggGramsPerPiece(updated, 101), /eggGramsPerPiece/);
 });

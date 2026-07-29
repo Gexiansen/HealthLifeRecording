@@ -67,6 +67,11 @@
             <p id="workout-summary" class="card-value">尚未记录</p>
             <button type="button" data-open-form="workout">记录运动</button>
           </article>
+          <article class="summary-card activity-card">
+            <div class="card-heading"><span class="card-icon">步</span><h3>每日活动</h3></div>
+            <p id="activity-summary" class="card-value">尚未记录</p>
+            <button id="activity-action" type="button" data-open-form="activity">记录步数</button>
+          </article>
           <article class="summary-card meal-card">
             <div class="card-heading"><span class="card-icon">食</span><h3>饮食</h3></div>
             <p id="meal-summary" class="card-value">尚未记录</p>
@@ -132,6 +137,11 @@
             <p id="workout-trend-meta" class="trend-meta"></p>
           </article>
           <article class="trend-card">
+            <div class="trend-card-heading"><h3>每日活动</h3><span id="activity-trend-samples"></span></div>
+            <strong id="activity-trend-value" class="trend-value">暂无数据</strong>
+            <p id="activity-trend-meta" class="trend-meta"></p>
+          </article>
+          <article class="trend-card">
             <div class="trend-card-heading"><h3>饮食</h3><span id="meal-trend-samples"></span></div>
             <strong id="meal-trend-value" class="trend-value">暂无数据</strong>
             <p id="meal-trend-meta" class="trend-meta"></p>
@@ -157,6 +167,7 @@
           <label><span>记录类型</span><select id="record-type-filter">
             <option value="all">全部类型</option>
             <option value="workouts">运动</option>
+            <option value="dailyActivities">每日活动</option>
             <option value="meals">饮食</option>
             <option value="sleepRecords">睡眠</option>
             <option value="weights">体重</option>
@@ -190,7 +201,10 @@
       <p id="form-error" class="form-error" role="alert" hidden></p>
 
       <form id="workout-form" data-record-form="workout" hidden>
-        <label class="field"><span>运动类型</span><select name="type" required><option value="strength">力量</option><option value="cardio">有氧</option><option value="walking">步行</option><option value="stretching">拉伸</option><option value="ballSports">球类</option><option value="other">其他</option></select></label>
+        <div class="field-row">
+          <label class="field"><span>运动类型</span><select name="type" required><option value="strength">力量</option><option value="running">跑步</option><option value="cardio">其他有氧</option><option value="walking">步行</option><option value="stretching">拉伸</option><option value="ballSports">球类</option><option value="other">其他</option></select></label>
+          <label class="field"><span>数据来源</span><select name="source" required><option value="manual">手动记录</option><option value="appleWatch">Apple Watch 摘要</option></select></label>
+        </div>
         <div class="quick-options" aria-label="快捷选择运动时长">
           <span>快捷时长</span>
           <div><button type="button" data-quick-duration="15">15 分</button><button type="button" data-quick-duration="30">30 分</button><button type="button" data-quick-duration="45">45 分</button><button type="button" data-quick-duration="60">60 分</button></div>
@@ -199,8 +213,29 @@
           <label class="field"><span>时长（分钟）</span><input name="durationMinutes" type="number" min="1" max="1440" inputmode="numeric" required></label>
           <label class="field"><span>强度</span><select name="intensity" required><option value="1">低</option><option value="2" selected>中</option><option value="3">高</option></select></label>
         </div>
+        <fieldset class="watch-fields">
+          <legend>设备摘要（可选）</legend>
+          <p class="field-help">从 Apple Watch 训练详情手动抄录；热量为设备估算值。</p>
+          <div class="nutrition-fields">
+            <label class="field"><span>活动热量（kcal）</span><input name="activeEnergyKcal" type="number" min="1" max="10000" step="1" inputmode="numeric"></label>
+            <label class="field"><span>平均心率（bpm）</span><input name="averageHeartRateBpm" type="number" min="30" max="240" step="1" inputmode="numeric"></label>
+            <label class="field"><span>最高心率（bpm）</span><input name="maxHeartRateBpm" type="number" min="30" max="240" step="1" inputmode="numeric"></label>
+            <label id="workout-distance-field" class="field"><span>距离（km）</span><input name="distanceKm" type="number" min="0.001" max="1000" step="0.001" inputmode="decimal"></label>
+          </div>
+          <output id="workout-pace-preview" class="sleep-preview">填写时长和距离后显示平均配速</output>
+        </fieldset>
         <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
         <button class="primary-button" type="submit">保存运动</button>
+      </form>
+
+      <form id="activity-form" data-record-form="activity" hidden>
+        <div class="field-row">
+          <label class="field"><span>当日步数</span><input name="steps" type="number" min="1" max="100000" step="1" inputmode="numeric" required></label>
+          <label class="field"><span>数据来源</span><select name="source" required><option value="appleWatch">Apple Watch</option><option value="manual">手动记录</option></select></label>
+        </div>
+        <p class="field-help">每天保留一条步数记录；从健身或健康 App 查看当日总步数后填写。</p>
+        <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
+        <button class="primary-button" type="submit">保存每日活动</button>
       </form>
 
       <form id="meal-form" data-record-form="meal" hidden>
@@ -216,7 +251,9 @@
           </div>
           <label class="field"><span>选择食物或菜谱</span><select id="meal-food-select"></select></label>
           <div class="food-add-row">
-            <label class="field"><span>实际食用（克）</span><input id="meal-food-grams" type="number" min="1" max="100000" step="1" inputmode="numeric"></label>
+            <label class="field"><span id="meal-food-quantity-label">实际食用（克）</span><input id="meal-food-quantity" type="number" min="1" max="100000" step="1" inputmode="numeric"></label>
+            <label class="field"><span>单位</span><select id="meal-food-unit"><option value="grams">克</option><option value="piece">个</option></select></label>
+            <label id="egg-piece-weight-field" class="field" hidden><span>每个可食部分（克）</span><input id="egg-grams-per-piece" type="number" min="20" max="100" step="1" inputmode="numeric"></label>
             <label class="favorite-toggle"><input id="meal-food-favorite" type="checkbox"><span>收藏</span></label>
             <button id="add-meal-food" type="button">加入本餐</button>
           </div>

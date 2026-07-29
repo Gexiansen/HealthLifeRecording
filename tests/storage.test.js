@@ -13,6 +13,11 @@ import {
 import { createBackupMetadata } from "../docs/backup.js";
 import { createEmptyData } from "../docs/model.js";
 
+test("schema v3 使用独立存储键", () => {
+  assert.equal(STORAGE_KEY, "healthlife:data:v3");
+  assert.equal(BACKUP_META_KEY, "healthlife:backup-meta:v3");
+});
+
 function memoryStorage(initial = null) {
   let value = initial;
   return {
@@ -27,7 +32,7 @@ function memoryStorage(initial = null) {
   };
 }
 
-test("空存储返回新的 schema v2 数据但不立即写入", () => {
+test("空存储返回新的 schema v3 数据但不立即写入", () => {
   const storage = memoryStorage();
   const result = loadData(storage);
   assert.equal(result.status, "empty");

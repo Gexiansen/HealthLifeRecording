@@ -1,4 +1,11 @@
-const COLLECTIONS = new Set(["workouts", "meals", "sleepRecords", "weights", "hydration"]);
+const COLLECTIONS = new Set([
+  "workouts",
+  "dailyActivities",
+  "meals",
+  "sleepRecords",
+  "weights",
+  "hydration",
+]);
 
 export function getDateContext(selectedDate, today) {
   assertDateString(selectedDate, "selectedDate");
@@ -36,6 +43,16 @@ export function addHydrationAmount(currentMilliliters, addedMilliliters) {
   const total = currentMilliliters + addedMilliliters;
   if (total > 20_000) throw new RangeError("单日饮水量不能超过 20000 ml");
   return total;
+}
+
+export function calculatePaceSecondsPerKilometer(durationMinutes, distanceMeters) {
+  if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1_440) {
+    throw new TypeError("durationMinutes 必须是 1～1440 的整数");
+  }
+  if (!Number.isInteger(distanceMeters) || distanceMeters < 1 || distanceMeters > 1_000_000) {
+    throw new TypeError("distanceMeters 必须是 1～1000000 的整数");
+  }
+  return Math.round(durationMinutes * 60_000 / distanceMeters);
 }
 
 export function filterRecordItems(items, collectionName = "all", month = "") {

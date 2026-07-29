@@ -23,6 +23,9 @@ function meal(id, itemId, date, mealType, trackingMode, food) {
       name: food.name,
       foodState: food.state,
       grams: food.grams,
+      inputUnit: "grams",
+      inputQuantity: food.grams,
+      unitGrams: 1,
       energyKcalPer100g: food.energy,
       proteinGramsPer100g: food.protein,
       fatGramsPer100g: food.fat,
@@ -48,9 +51,46 @@ function sampleData() {
     { ...base("20000000-0000-4000-8000-000000000002", "2026-07-23"), sleepTime: "23:30", wakeTime: "06:30", qualityScore: 3, awakeCount: 1, note: "" },
   );
   data.workouts.push(
-    { ...base("30000000-0000-4000-8000-000000000001", "2026-07-20"), type: "walking", durationMinutes: 30, intensity: 1, note: "" },
-    { ...base("30000000-0000-4000-8000-000000000002", "2026-07-22"), type: "walking", durationMinutes: 20, intensity: 1, note: "" },
-    { ...base("30000000-0000-4000-8000-000000000003", "2026-07-23"), type: "strength", durationMinutes: 40, intensity: 2, note: "" },
+    {
+      ...base("30000000-0000-4000-8000-000000000001", "2026-07-20"),
+      type: "walking",
+      durationMinutes: 30,
+      intensity: 1,
+      source: "appleWatch",
+      activeEnergyKcal: 120,
+      averageHeartRateBpm: 102,
+      maxHeartRateBpm: 118,
+      distanceMeters: 2_500,
+      note: "",
+    },
+    {
+      ...base("30000000-0000-4000-8000-000000000002", "2026-07-22"),
+      type: "walking",
+      durationMinutes: 20,
+      intensity: 1,
+      source: "manual",
+      activeEnergyKcal: null,
+      averageHeartRateBpm: null,
+      maxHeartRateBpm: null,
+      distanceMeters: null,
+      note: "",
+    },
+    {
+      ...base("30000000-0000-4000-8000-000000000003", "2026-07-23"),
+      type: "strength",
+      durationMinutes: 40,
+      intensity: 2,
+      source: "appleWatch",
+      activeEnergyKcal: 180,
+      averageHeartRateBpm: 110,
+      maxHeartRateBpm: 138,
+      distanceMeters: null,
+      note: "",
+    },
+  );
+  data.dailyActivities.push(
+    { ...base("35000000-0000-4000-8000-000000000001", "2026-07-22"), steps: 8_000, source: "appleWatch", note: "" },
+    { ...base("35000000-0000-4000-8000-000000000002", "2026-07-23"), steps: 10_000, source: "appleWatch", note: "" },
   );
   data.meals.push(
     meal(
@@ -89,7 +129,22 @@ test("7 天趋势按自然日窗口汇总全部类型", () => {
   assert.equal(summary.weight.changeGrams, -1_000);
   assert.deepEqual(summary.weight.points.map((point) => point.movingAverageGrams), [70_000, 69_750, 69_500]);
   assert.deepEqual(summary.sleep, { sampleCount: 2, averageMinutes: 450, averageQuality: 3.5 });
-  assert.deepEqual(summary.workout, { count: 3, totalMinutes: 90, byType: { walking: 50, strength: 40 } });
+  assert.deepEqual(summary.workout, {
+    count: 3,
+    totalMinutes: 90,
+    byType: { walking: 50, strength: 40 },
+    appleWatchCount: 2,
+    activeEnergySampleCount: 2,
+    totalActiveEnergyKcal: 300,
+    heartRateSampleCount: 2,
+    averageHeartRateBpm: 106,
+    totalDistanceMeters: 2_500,
+  });
+  assert.deepEqual(summary.dailyActivity, {
+    sampleCount: 2,
+    averageSteps: 9_000,
+    totalSteps: 18_000,
+  });
   assert.deepEqual(summary.meal, {
     count: 2,
     recordedDays: 2,
@@ -110,6 +165,7 @@ test("无数据时返回明确空样本而不是零值推断", () => {
   assert.deepEqual(summary.sleep, { sampleCount: 0, averageMinutes: null, averageQuality: null });
   assert.equal(summary.meal.completionPercent, 0);
   assert.equal(summary.hydration.averageMilliliters, null);
+  assert.equal(summary.dailyActivity.averageSteps, null);
 });
 
 test("窗口外数据不会进入趋势", () => {
@@ -128,7 +184,21 @@ test("趋势比较使用紧邻的等长上一周期且数据不足时不推断",
     { ...base("20000000-0000-4000-8000-000000000003", "2026-07-16"), sleepTime: "23:00", wakeTime: "06:00", qualityScore: 3, awakeCount: 0, note: "" },
   );
   data.workouts.push(
-    { ...base("30000000-0000-4000-8000-000000000004", "2026-07-16"), type: "walking", durationMinutes: 20, intensity: 1, note: "" },
+    {
+      ...base("30000000-0000-4000-8000-000000000004", "2026-07-16"),
+      type: "walking",
+      durationMinutes: 20,
+      intensity: 1,
+      source: "manual",
+      activeEnergyKcal: null,
+      averageHeartRateBpm: null,
+      maxHeartRateBpm: null,
+      distanceMeters: null,
+      note: "",
+    },
+  );
+  data.dailyActivities.push(
+    { ...base("35000000-0000-4000-8000-000000000003", "2026-07-16"), steps: 7_000, source: "appleWatch", note: "" },
   );
   data.meals.push(
     {
@@ -149,6 +219,7 @@ test("趋势比较使用紧邻的等长上一周期且数据不足时不推断",
   assert.equal(comparison.changes.weightGrams, -1_500);
   assert.equal(comparison.changes.sleepMinutes, 30);
   assert.equal(comparison.changes.workoutMinutes, 70);
+  assert.equal(comparison.changes.dailySteps, 2_000);
   assert.equal(comparison.changes.mealCompletionPoints, 15);
   assert.equal(comparison.changes.mealProteinGrams, -5);
   assert.equal(comparison.changes.hydrationMilliliters, null);

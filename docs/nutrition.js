@@ -3,7 +3,7 @@ import { assertValidData } from "./model.js";
 // Generic reference values are adapted from USDA FoodData Central per 100 g entries.
 // They remain estimates because cultivar, brand, cut and cooking water can change the result.
 export const BUILT_IN_FOODS = Object.freeze([
-  food("builtin:egg-boiled", "鸡蛋（水煮）", "cooked", 155, 12.6, 10.6, 1.1),
+  food("builtin:egg-boiled", "鸡蛋（水煮）", "cooked", 155, 12.6, 10.6, 1.1, 50),
   food("builtin:chicken-breast-raw", "鸡胸肉（生）", "raw", 120, 22.5, 2.6, 0),
   food("builtin:chicken-breast-cooked", "鸡胸肉（熟）", "cooked", 165, 31, 3.6, 0),
   food("builtin:beef-lean-cooked", "瘦牛肉（熟）", "cooked", 250, 26, 15, 0),
@@ -55,7 +55,23 @@ export function calculateRecipeNutrition(recipe) {
   };
 }
 
-export function createFoodEntry(foodValue, grams, confidence, id) {
+export function createFoodEntry(
+  foodValue,
+  inputQuantity,
+  confidence,
+  id,
+  inputUnit = "grams",
+  unitGrams = 1,
+) {
+  assertPositiveInteger(inputQuantity, "inputQuantity");
+  assertPositiveInteger(unitGrams, "unitGrams");
+  if (!["grams", "piece"].includes(inputUnit)) {
+    throw new TypeError("inputUnit 必须是 grams 或 piece");
+  }
+  if (inputUnit === "grams" && unitGrams !== 1) {
+    throw new TypeError("按克录入时 unitGrams 必须为 1");
+  }
+  const grams = inputQuantity * unitGrams;
   assertPositiveInteger(grams, "grams");
   if (typeof id !== "string") throw new TypeError("id 必须是字符串");
   return {
@@ -64,6 +80,9 @@ export function createFoodEntry(foodValue, grams, confidence, id) {
     name: foodValue.name,
     foodState: foodValue.foodState,
     grams,
+    inputUnit,
+    inputQuantity,
+    unitGrams,
     energyKcalPer100g: foodValue.energyKcalPer100g,
     proteinGramsPer100g: foodValue.proteinGramsPer100g,
     fatGramsPer100g: foodValue.fatGramsPer100g,
@@ -128,7 +147,7 @@ export function roundNutrition(value) {
   };
 }
 
-function food(ref, name, foodState, energy, protein, fat, carbs) {
+function food(ref, name, foodState, energy, protein, fat, carbs, pieceGrams = null) {
   return Object.freeze({
     ref,
     name,
@@ -138,6 +157,7 @@ function food(ref, name, foodState, energy, protein, fat, carbs) {
     fatGramsPer100g: fat,
     carbsGramsPer100g: carbs,
     source: "builtIn",
+    pieceGrams,
   });
 }
 

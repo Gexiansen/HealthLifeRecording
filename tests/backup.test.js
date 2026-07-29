@@ -38,16 +38,23 @@ test("完整备份可以严格往返并生成摘要", () => {
     totalRecords: 2,
     firstDate: "2026-07-01",
     lastDate: "2026-07-02",
-    counts: { workouts: 0, meals: 0, sleepRecords: 0, weights: 2, hydration: 0 },
+    counts: {
+      workouts: 0,
+      dailyActivities: 0,
+      meals: 0,
+      sleepRecords: 0,
+      weights: 2,
+      hydration: 0,
+    },
   });
 });
 
 test("完整备份拒绝损坏 JSON、未知版本、未知字段和无效数据", () => {
   assert.throws(() => parseCompleteBackup("{broken"), /有效 JSON/);
   const valid = JSON.parse(serializeCompleteBackup(dataWithWeight(), EXPORTED_AT));
-  valid.backupVersion = 3;
+  valid.backupVersion = 4;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /backupVersion/);
-  valid.backupVersion = 2;
+  valid.backupVersion = 3;
   valid.extra = true;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /未知字段/);
   delete valid.extra;
@@ -74,9 +81,9 @@ test("备份提醒覆盖从未备份、过期、新增较多和最新状态", ()
 });
 
 test("虚构演示备份通过应用自身校验", async () => {
-  const text = await readFile(new URL("../test-data/healthlife-demo-v2.json", import.meta.url), "utf8");
+  const text = await readFile(new URL("../test-data/healthlife-demo-v3.json", import.meta.url), "utf8");
   const result = parseCompleteBackup(text);
-  assert.equal(result.summary.totalRecords, 8);
+  assert.equal(result.summary.totalRecords, 9);
   assert.equal(result.summary.counts.weights, 2);
-  assert.equal(summarizeData(result.backup.data).totalRecords, 8);
+  assert.equal(summarizeData(result.backup.data).totalRecords, 9);
 });

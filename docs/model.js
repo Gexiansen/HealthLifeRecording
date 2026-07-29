@@ -1,7 +1,8 @@
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const WORKOUT_TYPES = Object.freeze([
   "strength",
+  "running",
   "cardio",
   "walking",
   "stretching",
@@ -20,6 +21,8 @@ export const FOOD_STATES = Object.freeze(["raw", "cooked", "packaged", "prepared
 export const FOOD_SOURCES = Object.freeze(["builtIn", "custom", "recipe", "estimated"]);
 export const NUTRITION_CONFIDENCE = Object.freeze(["high", "medium", "low"]);
 export const MEAL_TRACKING_MODES = Object.freeze(["precise", "estimated"]);
+export const RECORD_SOURCES = Object.freeze(["manual", "appleWatch"]);
+export const FOOD_INPUT_UNITS = Object.freeze(["grams", "piece"]);
 
 const ROOT_KEYS = Object.freeze([
   "schemaVersion",
@@ -28,6 +31,7 @@ const ROOT_KEYS = Object.freeze([
   "customFoods",
   "recipes",
   "workouts",
+  "dailyActivities",
   "meals",
   "sleepRecords",
   "weights",
@@ -51,6 +55,7 @@ export function createEmptyData() {
     settings: {
       weightUnit: "kg",
       goalWeightGrams: null,
+      eggGramsPerPiece: 50,
     },
     foodPreferences: {
       favoriteRefs: [],
@@ -59,6 +64,7 @@ export function createEmptyData() {
     customFoods: [],
     recipes: [],
     workouts: [],
+    dailyActivities: [],
     meals: [],
     sleepRecords: [],
     weights: [],
@@ -124,6 +130,7 @@ export function assertValidData(data) {
   validateCustomFoods(data.customFoods);
   validateRecipes(data.recipes);
   validateRecordArray(data.workouts, "workouts", validateWorkout);
+  validateRecordArray(data.dailyActivities, "dailyActivities", validateDailyActivity);
   validateRecordArray(data.meals, "meals", validateMeal);
   validateRecordArray(data.sleepRecords, "sleepRecords", validateSleep);
   validateRecordArray(data.weights, "weights", validateWeight);
@@ -132,6 +139,7 @@ export function assertValidData(data) {
   assertUniqueDates(data.sleepRecords, "sleepRecords");
   assertUniqueDates(data.weights, "weights");
   assertUniqueDates(data.hydration, "hydration");
+  assertUniqueDates(data.dailyActivities, "dailyActivities");
   return true;
 }
 
@@ -158,7 +166,11 @@ export function parseData(text) {
 
 function validateSettings(settings) {
   assertPlainObject(settings, "settings");
-  assertExactKeys(settings, ["weightUnit", "goalWeightGrams"], "settings");
+  assertExactKeys(
+    settings,
+    ["weightUnit", "goalWeightGrams", "eggGramsPerPiece"],
+    "settings",
+  );
   assertEnum(settings.weightUnit, ["kg", "lb"], "settings.weightUnit");
   assertNullableIntegerInRange(
     settings.goalWeightGrams,
@@ -166,6 +178,7 @@ function validateSettings(settings) {
     500_000,
     "settings.goalWeightGrams",
   );
+  assertIntegerInRange(settings.eggGramsPerPiece, 20, 100, "settings.eggGramsPerPiece");
 }
 
 function validateFoodPreferences(preferences) {
@@ -228,12 +241,57 @@ function validateRecipes(recipes) {
 function validateWorkout(record, path) {
   validateBaseRecord(
     record,
-    [...BASE_RECORD_KEYS, "type", "durationMinutes", "intensity", "note"],
+    [
+      ...BASE_RECORD_KEYS,
+      "type",
+      "durationMinutes",
+      "intensity",
+      "source",
+      "activeEnergyKcal",
+      "averageHeartRateBpm",
+      "maxHeartRateBpm",
+      "distanceMeters",
+      "note",
+    ],
     path,
   );
   assertEnum(record.type, WORKOUT_TYPES, `${path}.type`);
   assertIntegerInRange(record.durationMinutes, 1, 1_440, `${path}.durationMinutes`);
   assertIntegerInRange(record.intensity, 1, 3, `${path}.intensity`);
+  assertEnum(record.source, RECORD_SOURCES, `${path}.source`);
+  assertNullableIntegerInRange(record.activeEnergyKcal, 1, 10_000, `${path}.activeEnergyKcal`);
+  assertNullableIntegerInRange(
+    record.averageHeartRateBpm,
+    30,
+    240,
+    `${path}.averageHeartRateBpm`,
+  );
+  assertNullableIntegerInRange(record.maxHeartRateBpm, 30, 240, `${path}.maxHeartRateBpm`);
+  if (
+    record.averageHeartRateBpm !== null
+    && record.maxHeartRateBpm !== null
+    && record.maxHeartRateBpm < record.averageHeartRateBpm
+  ) {
+    throw new TypeError(`${path}.maxHeartRateBpm 不能低于平均心率`);
+  }
+  assertNullableIntegerInRange(record.distanceMeters, 1, 1_000_000, `${path}.distanceMeters`);
+  if (
+    record.distanceMeters !== null
+    && !["running", "walking", "cardio"].includes(record.type)
+  ) {
+    throw new TypeError(`${path}.distanceMeters 只适用于跑步、步行或有氧`);
+  }
+  assertStringLength(record.note, 0, 500, `${path}.note`);
+}
+
+function validateDailyActivity(record, path) {
+  validateBaseRecord(
+    record,
+    [...BASE_RECORD_KEYS, "steps", "source", "note"],
+    path,
+  );
+  assertIntegerInRange(record.steps, 1, 100_000, `${path}.steps`);
+  assertEnum(record.source, RECORD_SOURCES, `${path}.source`);
   assertStringLength(record.note, 0, 500, `${path}.note`);
 }
 
@@ -330,6 +388,9 @@ function validateFoodEntries(entries, path, min, max) {
       "name",
       "foodState",
       "grams",
+      "inputUnit",
+      "inputQuantity",
+      "unitGrams",
       "energyKcalPer100g",
       "proteinGramsPer100g",
       "fatGramsPer100g",
@@ -342,6 +403,15 @@ function validateFoodEntries(entries, path, min, max) {
     assertStringLength(entry.name, 1, 60, `${entryPath}.name`);
     assertEnum(entry.foodState, FOOD_STATES, `${entryPath}.foodState`);
     assertIntegerInRange(entry.grams, 1, 100_000, `${entryPath}.grams`);
+    assertEnum(entry.inputUnit, FOOD_INPUT_UNITS, `${entryPath}.inputUnit`);
+    assertIntegerInRange(entry.inputQuantity, 1, 100_000, `${entryPath}.inputQuantity`);
+    assertIntegerInRange(entry.unitGrams, 1, 100_000, `${entryPath}.unitGrams`);
+    if (entry.inputUnit === "grams" && entry.unitGrams !== 1) {
+      throw new TypeError(`${entryPath}.unitGrams 按克录入时必须为 1`);
+    }
+    if (entry.grams !== entry.inputQuantity * entry.unitGrams) {
+      throw new TypeError(`${entryPath}.grams 与录入数量换算不一致`);
+    }
     validateNutritionPer100g(entry, entryPath);
     assertEnum(entry.source, FOOD_SOURCES, `${entryPath}.source`);
     assertEnum(entry.confidence, NUTRITION_CONFIDENCE, `${entryPath}.confidence`);
@@ -375,6 +445,7 @@ function assertGlobalUniqueIds(data) {
   }
   for (const collectionName of [
     "workouts",
+    "dailyActivities",
     "meals",
     "sleepRecords",
     "weights",

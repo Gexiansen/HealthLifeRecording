@@ -3,6 +3,7 @@ import { COLLECTIONS } from "./data.js";
 export function getDailyStatus(data, date) {
   const categories = {
     workout: data.workouts.some((record) => record.date === date),
+    dailyActivity: data.dailyActivities.some((record) => record.date === date),
     meal: data.meals.some((record) => record.date === date),
     sleep: data.sleepRecords.some((record) => record.date === date),
     weight: data.weights.some((record) => record.date === date),

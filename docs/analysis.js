@@ -1,5 +1,6 @@
 import { assertValidData, calculateSleepMinutes } from "./model.js";
 import { sumNutrition } from "./nutrition.js";
+import { calculatePaceSecondsPerKilometer } from "./interaction.js";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
 export const ANALYSIS_VERSION = 1;
@@ -29,6 +30,7 @@ export function serializeAnalysisExport(data, exportedAt) {
 function createDay(data, date) {
   const meals = data.meals.filter((record) => record.date === date);
   const workouts = data.workouts.filter((record) => record.date === date);
+  const dailyActivity = data.dailyActivities.find((record) => record.date === date) ?? null;
   const sleep = data.sleepRecords.find((record) => record.date === date) ?? null;
   const weight = data.weights.find((record) => record.date === date) ?? null;
   const hydration = data.hydration.find((record) => record.date === date) ?? null;
@@ -50,8 +52,23 @@ function createDay(data, date) {
       type: record.type,
       durationMinutes: record.durationMinutes,
       intensity: record.intensity,
+      source: record.source,
+      activeEnergyKcal: record.activeEnergyKcal,
+      averageHeartRateBpm: record.averageHeartRateBpm,
+      maxHeartRateBpm: record.maxHeartRateBpm,
+      distanceMeters: record.distanceMeters,
+      paceSecondsPerKilometer: record.distanceMeters === null
+        ? null
+        : calculatePaceSecondsPerKilometer(record.durationMinutes, record.distanceMeters),
       note: record.note,
     })),
+    dailyActivity: dailyActivity
+      ? {
+        steps: dailyActivity.steps,
+        source: dailyActivity.source,
+        note: dailyActivity.note,
+      }
+      : null,
     meals: meals.map((record) => ({
       mealType: record.mealType,
       trackingMode: record.trackingMode,
@@ -61,6 +78,9 @@ function createDay(data, date) {
         name: item.name,
         foodState: item.foodState,
         grams: item.grams,
+        inputUnit: item.inputUnit,
+        inputQuantity: item.inputQuantity,
+        unitGrams: item.unitGrams,
         source: item.source,
         confidence: item.confidence,
         nutrition: sumNutrition([item]),
@@ -77,6 +97,7 @@ function createDay(data, date) {
 function allDates(data) {
   return [...new Set([
     ...data.workouts,
+    ...data.dailyActivities,
     ...data.meals,
     ...data.sleepRecords,
     ...data.weights,

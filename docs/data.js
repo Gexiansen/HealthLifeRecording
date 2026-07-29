@@ -2,6 +2,7 @@ import { assertValidData, serializeData } from "./model.js";
 
 export const COLLECTIONS = Object.freeze([
   "workouts",
+  "dailyActivities",
   "meals",
   "sleepRecords",
   "weights",
@@ -42,7 +43,7 @@ export function findRecord(data, collectionName, recordId) {
 }
 
 export function findDailyRecord(data, collectionName, date) {
-  if (!["sleepRecords", "weights", "hydration"].includes(collectionName)) {
+  if (!["sleepRecords", "weights", "hydration", "dailyActivities"].includes(collectionName)) {
     throw new TypeError(`${collectionName} 不支持每日唯一查询`);
   }
   return data[collectionName].find((item) => item.date === date) ?? null;
@@ -98,6 +99,13 @@ export function updateFoodPreferences(data, foodRef, favorite = null) {
   } else if (favorite === false) {
     next.foodPreferences.favoriteRefs = next.foodPreferences.favoriteRefs.filter((ref) => ref !== foodRef);
   }
+  assertValidData(next);
+  return next;
+}
+
+export function updateEggGramsPerPiece(data, grams) {
+  const next = cloneData(data);
+  next.settings.eggGramsPerPiece = grams;
   assertValidData(next);
   return next;
 }
