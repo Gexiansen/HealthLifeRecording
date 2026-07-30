@@ -53,6 +53,14 @@ test("记录筛选可以组合类型和月份", () => {
   assert.equal(filterRecordItems(items, "weights", "").length, 2);
 });
 
+test("记录筛选支持健康计划类型", () => {
+  const items = [{
+    collectionName: "plans",
+    record: { date: "2026-08-01" },
+  }];
+  assert.deepEqual(filterRecordItems(items, "plans", "2026-08"), items);
+});
+
 test("恢复文案明确展示当前和备份记录数量", () => {
   assert.deepEqual(getRestoreLabel(0, 8), {
     summary: "将恢复备份中的 8 条记录。",

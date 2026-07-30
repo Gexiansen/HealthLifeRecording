@@ -4,7 +4,7 @@ import { calculatePaceSecondsPerKilometer } from "./interaction.js";
 import { findDailyPlan, getEffectiveTraining } from "./planning.js";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
-export const ANALYSIS_VERSION = 2;
+export const ANALYSIS_VERSION = 3;
 
 export function createAnalysisExport(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);
@@ -43,6 +43,7 @@ function createDay(data, date) {
       plannedTraining: getEffectiveTraining(data.trainingPlan, date),
       status: dailyPlan?.status ?? "planned",
       rescheduledToDate: dailyPlan?.rescheduledToDate ?? null,
+      rescheduledFromDate: dailyPlan?.rescheduledFromDate ?? null,
     },
     weight: weight
       ? { weightGrams: weight.weightGrams, bodyFatBasisPoints: weight.bodyFatBasisPoints }

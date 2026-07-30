@@ -5,6 +5,7 @@ const COLLECTIONS = new Set([
   "sleepRecords",
   "weights",
   "hydration",
+  "plans",
 ]);
 
 export function getDateContext(selectedDate, today) {

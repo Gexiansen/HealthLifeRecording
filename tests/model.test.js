@@ -6,7 +6,6 @@ import {
   calculateSleepMinutes,
   calculateWeightMovingAverage,
   createEmptyData,
-  migrateV3Data,
 } from "../docs/model.js";
 
 const CREATED_AT = "2026-07-22T08:00:00.000Z";
@@ -87,34 +86,14 @@ function validData() {
   return data;
 }
 
-test("空数据和完整 schema v4 数据通过校验", () => {
+test("空数据和完整 schema v5 数据通过校验", () => {
   assert.equal(assertValidData(createEmptyData()), true);
   assert.equal(assertValidData(validData()), true);
 });
 
-test("schema v3 数据只增加默认训练计划并迁移为 v4", () => {
-  const legacy = validData();
-  legacy.schemaVersion = 3;
-  delete legacy.trainingPlan;
-  const migrated = migrateV3Data(legacy);
-  assert.equal(migrated.schemaVersion, 4);
-  assert.deepEqual(migrated.trainingPlan.weeklyTraining, [
-    "rest",
-    "strengthA",
-    "rest",
-    "strengthB",
-    "rest",
-    "runWalk",
-    "rest",
-  ]);
-  assert.deepEqual(migrated.trainingPlan.dailyPlans, []);
-  assert.equal(assertValidData(migrated), true);
-  assert.equal("trainingPlan" in legacy, false);
-});
-
 test("拒绝未知版本、未知字段和不存在的日期", () => {
   const unknownVersion = validData();
-  unknownVersion.schemaVersion = 5;
+  unknownVersion.schemaVersion = 4;
   assert.throws(() => assertValidData(unknownVersion), /schemaVersion/);
 
   const unknownField = validData();
@@ -172,8 +151,16 @@ test("每日计划严格校验状态、改期日期和日期唯一性", () => {
     trainingOverride: null,
     status: "rescheduled",
     rescheduledToDate: "2026-07-22",
+    rescheduledFromDate: null,
   };
-  data.trainingPlan.dailyPlans.push(plan);
+  data.trainingPlan.dailyPlans.push(plan, {
+    ...baseRecord("52000000-0000-4000-8000-000000000002", "2026-07-22"),
+    workdayType: "normal",
+    trainingOverride: "strengthA",
+    status: "planned",
+    rescheduledToDate: null,
+    rescheduledFromDate: "2026-07-21",
+  });
   assert.equal(assertValidData(data), true);
 
   const invalidStatus = structuredClone(data);
@@ -187,9 +174,13 @@ test("每日计划严格校验状态、改期日期和日期唯一性", () => {
   const duplicateDate = structuredClone(data);
   duplicateDate.trainingPlan.dailyPlans.push({
     ...plan,
-    id: "52000000-0000-4000-8000-000000000002",
+    id: "52000000-0000-4000-8000-000000000003",
   });
   assert.throws(() => assertValidData(duplicateDate), /dailyPlans 的日期重复/);
+
+  const orphanedTarget = structuredClone(data);
+  orphanedTarget.trainingPlan.dailyPlans[1].rescheduledFromDate = null;
+  assert.throws(() => assertValidData(orphanedTarget), /缺少来源关联/);
 });
 
 test("跨日和同日睡眠时长计算正确，并拒绝相同时间", () => {

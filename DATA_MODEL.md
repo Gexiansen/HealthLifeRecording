@@ -1,4 +1,4 @@
-# HealthLife schema v4
+# HealthLife schema v5
 
 ## 根对象
 
@@ -6,7 +6,7 @@
 
 ```js
 {
-  schemaVersion: 4,
+  schemaVersion: 5,
   settings: {},
   trainingPlan: {
     weeklyTraining: [],
@@ -26,7 +26,7 @@
 
 日期统一使用本地自然日 `YYYY-MM-DD`，时间统一使用 `HH:mm`。记录 ID 使用 UUID，`createdAt` 和 `updatedAt` 使用标准 UTC ISO 8601 时间戳。
 
-schema v4 使用 `healthlife:data:v4` 独立存储键。首次读取不到 v4 时，只尝试从 `healthlife:data:v3` 自动迁移并写入 v4；原 v3 键不删除。应用不读取或迁移 v1／v2。完整备份版本升级为 4，并允许导入有效的 v3 完整备份后转换为 v4。
+schema v5 使用 `healthlife:data:v5` 独立存储键。当前尚无正式数据，因此不读取或迁移 v1／v2／v3／v4，旧键不会被主动删除。完整备份版本同步升级为 5，只接受严格有效的 v5 完整备份。
 
 ## 设置
 
@@ -49,8 +49,11 @@ schema v4 使用 `healthlife:data:v4` 独立存储键。首次读取不到 v4 �
 | `trainingOverride` | string／null | 覆盖当周模板的训练类型；`null` 表示继续使用模板 |
 | `status` | string | `planned`、`completed`、`shortened`、`rescheduled`、`rest` |
 | `rescheduledToDate` | string／null | 仅 `rescheduled` 状态必填，且不能与原日期相同 |
+| `rescheduledFromDate` | string／null | 目标计划保存来源日期；目标不能再次改期 |
 
-计划状态不等于实际运动记录。只有用户另外保存运动记录后，运动才进入训练统计。
+改期时必须同时保存来源计划和目标计划：来源的 `rescheduledToDate` 指向目标，目标的 `rescheduledFromDate` 指回来源。任意单边、孤立或链式改期都会被整体校验拒绝；目标日期已有训练时，界面先要求用户确认覆盖。
+
+计划状态不等于实际运动记录。只有用户另外保存运动记录后，运动才进入训练统计；界面会提示匹配记录与计划状态是否一致，但不会自动生成记录或改变状态。
 
 ## 食物偏好
 
@@ -188,7 +191,7 @@ schema v4 使用 `healthlife:data:v4` 独立存储键。首次读取不到 v4 �
 - 自定义食品、菜谱、菜谱原料、业务记录和餐食明细的 ID 在整个根对象中唯一。
 - 睡眠、体重、饮水和每日活动分别按日期唯一；运动和饮食允许同日多条。
 - 重量和其他整数单位字段必须是整数；每 100 克营养值最多一位小数，不能使用字符串或隐式转换。
-- schema v4 不接受未知字段，不静默丢弃无效项。
+- schema v5 不接受未知字段，不静默丢弃无效项。
 - `serializeData` 和 `parseData` 在输出或返回数据前都会执行整体校验。
-- v4 完整备份保留训练模板、每日计划、食物库、菜谱、偏好、所有历史营养快照、运动摘要和每日步数。
+- v5 完整备份保留训练模板、双向改期关系、每日计划、食物库、菜谱、偏好、所有历史营养快照、运动摘要和每日步数。
 - 分析 JSON 按自然日汇总计划状态、体重、睡眠、运动、每日步数、餐食明细、每日营养和饮水，供后续趋势分析使用。

@@ -17,7 +17,7 @@
         <p class="eyebrow">个人健康记录</p>
         <h1>HealthLife</h1>
       </div>
-      <button id="open-data" class="local-badge" type="button">数据</button>
+      <button id="open-data" class="local-badge" type="button">设置</button>
     </header>
 
     <aside id="storage-alert" class="storage-alert" hidden>
@@ -28,7 +28,7 @@
 
     <aside id="backup-reminder" class="backup-reminder" hidden>
       <div><strong>该备份了</strong><p id="backup-reminder-message"></p></div>
-      <button id="open-data-reminder" class="text-button" type="button">数据管理</button>
+      <button id="open-data-reminder" class="text-button" type="button">前往设置</button>
     </aside>
 
     <aside id="app-update" class="app-update" hidden>
@@ -75,6 +75,7 @@
           </div>
           <strong id="plan-headline" class="plan-headline">正在读取每周训练模板</strong>
           <p id="plan-detail" class="plan-detail"></p>
+          <p id="plan-link-detail" class="plan-link-detail" hidden></p>
           <p id="plan-meal-reminder" class="plan-meal-reminder" hidden></p>
         </article>
 
@@ -168,6 +169,11 @@
             <strong id="hydration-trend-value" class="trend-value">暂无数据</strong>
             <p id="hydration-trend-meta" class="trend-meta"></p>
           </article>
+          <article class="trend-card">
+            <div class="trend-card-heading"><h3>健康计划</h3><span id="plan-trend-samples"></span></div>
+            <strong id="plan-trend-value" class="trend-value">暂无计划</strong>
+            <p id="plan-trend-meta" class="trend-meta"></p>
+          </article>
         </div>
         <p class="trend-boundary">趋势只基于当前浏览器中的已有记录和样本量，不构成健康诊断。</p>
       </section>
@@ -189,6 +195,7 @@
             <option value="sleepRecords">睡眠</option>
             <option value="weights">体重</option>
             <option value="hydration">饮水</option>
+            <option value="plans">健康计划</option>
           </select></label>
           <label><span>月份</span><input id="record-month-filter" type="month"></label>
           <button id="clear-record-filters" class="text-button" type="button" hidden>清除筛选</button>
@@ -355,6 +362,7 @@
           <option value="rest">休息</option>
         </select></label>
         <label id="rescheduled-date-field" class="field" hidden><span>改到哪一天</span><input name="rescheduledToDate" type="date"></label>
+        <p id="plan-workout-link" class="field-help"></p>
         <p id="plan-form-error" class="form-error inline-error" role="alert" hidden></p>
         <button class="primary-button" type="submit">保存当天安排</button>
       </form>
@@ -413,13 +421,24 @@
       </div>
     </dialog>
 
+    <dialog id="plan-conflict-dialog" aria-labelledby="plan-conflict-title">
+      <div class="confirm-dialog-body">
+        <h2 id="plan-conflict-title">目标日期已有训练安排</h2>
+        <p id="plan-conflict-message"></p>
+        <div>
+          <button id="cancel-plan-conflict" class="secondary-neutral-button" type="button">返回修改</button>
+          <button id="confirm-plan-conflict" class="danger-button" type="button">确认覆盖</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="data-dialog" aria-labelledby="data-dialog-title">
       <div class="dialog-header">
         <div>
-          <p class="eyebrow">本地数据安全</p>
-          <h2 id="data-dialog-title">数据管理</h2>
+          <p class="eyebrow">健康计划与本地数据</p>
+          <h2 id="data-dialog-title">设置</h2>
         </div>
-        <button id="close-data-dialog" class="icon-button" type="button" aria-label="关闭数据管理">×</button>
+        <button id="close-data-dialog" class="icon-button" type="button" aria-label="关闭设置">×</button>
       </div>
       <div class="data-dialog-body">
         <section class="data-section">
@@ -455,6 +474,7 @@
               <div><dt>日期范围</dt><dd id="import-date-range"></dd></div>
               <div><dt>记录总数</dt><dd id="import-total"></dd></div>
               <div><dt>分类明细</dt><dd id="import-counts"></dd></div>
+              <div><dt>健康计划</dt><dd id="import-plans"></dd></div>
               <div><dt>替换结果</dt><dd id="import-replace-summary"></dd></div>
             </dl>
             <button id="confirm-import" class="danger-button" type="button">确认完整替换</button>

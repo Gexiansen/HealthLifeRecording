@@ -25,6 +25,9 @@ test("页面包含三个一级导航和六类记录表单", () => {
   assert.match(html, /id="health-plan-title"/);
   assert.match(html, /id="daily-plan-form"/);
   assert.match(html, /id="weekly-plan-form"/);
+  assert.match(html, /id="plan-conflict-dialog"/);
+  assert.match(html, /id="import-plans"/);
+  assert.match(html, />设置<\/button>/);
 });
 
 test("首页日期只通过日历选择，不保留重复的精确日期输入", () => {

@@ -65,12 +65,13 @@ test("分析导出按日期汇总餐食营养并保留可信度", () => {
     trainingOverride: "rest",
     status: "rest",
     rescheduledToDate: null,
+    rescheduledFromDate: null,
     createdAt: "2026-07-29T08:00:00.000Z",
     updatedAt: "2026-07-29T08:00:00.000Z",
   });
   const result = createAnalysisExport(data, "2026-07-29T09:00:00.000Z");
-  assert.equal(result.analysisVersion, 2);
-  assert.equal(result.schemaVersion, 4);
+  assert.equal(result.analysisVersion, 3);
+  assert.equal(result.schemaVersion, 5);
   assert.deepEqual(result.dateRange, {
     firstDate: "2026-07-29",
     lastDate: "2026-07-29",
@@ -91,5 +92,6 @@ test("分析导出按日期汇总餐食营养并保留可信度", () => {
     plannedTraining: "rest",
     status: "rest",
     rescheduledToDate: null,
+    rescheduledFromDate: null,
   });
 });

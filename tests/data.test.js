@@ -8,6 +8,7 @@ import {
   recordsForDate,
   saveCustomFood,
   saveDailyPlan,
+  saveRescheduledPlan,
   saveRecipe,
   saveRecord,
   updateEggGramsPerPiece,
@@ -179,6 +180,7 @@ test("每周模板和每日计划以不可变方式保存", () => {
     trainingOverride: null,
     status: "planned",
     rescheduledToDate: null,
+    rescheduledFromDate: null,
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,
   };
@@ -193,4 +195,35 @@ test("每周模板和每日计划以不可变方式保存", () => {
   });
   assert.equal(edited.trainingPlan.dailyPlans.length, 1);
   assert.equal(edited.trainingPlan.dailyPlans[0].status, "completed");
+});
+
+test("改期计划同时保存来源和目标关联", () => {
+  const data = createEmptyData();
+  const source = {
+    id: "e0000000-0000-4000-8000-000000000011",
+    date: "2026-08-01",
+    workdayType: "weekendOvertime",
+    trainingOverride: "runWalk",
+    status: "rescheduled",
+    rescheduledToDate: "2026-08-02",
+    rescheduledFromDate: null,
+    createdAt: CREATED_AT,
+    updatedAt: CREATED_AT,
+  };
+  const target = {
+    id: "e0000000-0000-4000-8000-000000000012",
+    date: "2026-08-02",
+    workdayType: "rest",
+    trainingOverride: "runWalk",
+    status: "planned",
+    rescheduledToDate: null,
+    rescheduledFromDate: "2026-08-01",
+    createdAt: CREATED_AT,
+    updatedAt: CREATED_AT,
+  };
+  const updated = saveRescheduledPlan(data, source, target);
+  assert.equal(updated.trainingPlan.dailyPlans.length, 2);
+  assert.equal(updated.trainingPlan.dailyPlans[0].rescheduledToDate, "2026-08-02");
+  assert.equal(updated.trainingPlan.dailyPlans[1].rescheduledFromDate, "2026-08-01");
+  assert.deepEqual(data.trainingPlan.dailyPlans, []);
 });

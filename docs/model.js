@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const WORKOUT_TYPES = Object.freeze([
   "strength",
@@ -61,8 +61,6 @@ const ROOT_KEYS = Object.freeze([
   "weights",
   "hydration",
 ]);
-
-const V3_ROOT_KEYS = Object.freeze(ROOT_KEYS.filter((key) => key !== "trainingPlan"));
 
 const BASE_RECORD_KEYS = Object.freeze([
   "id",
@@ -183,19 +181,6 @@ export function assertValidData(data) {
   return true;
 }
 
-export function migrateV3Data(value) {
-  assertPlainObject(value, "data");
-  assertExactKeys(value, V3_ROOT_KEYS, "data");
-  if (value.schemaVersion !== 3) {
-    throw new TypeError(`不支持迁移的 schemaVersion：${String(value.schemaVersion)}`);
-  }
-  const next = structuredClone(value);
-  next.schemaVersion = SCHEMA_VERSION;
-  next.trainingPlan = createEmptyData().trainingPlan;
-  assertValidData(next);
-  return next;
-}
-
 export function serializeData(data) {
   assertValidData(data);
   return JSON.stringify(data, null, 2);
@@ -256,6 +241,7 @@ function validateTrainingPlan(trainingPlan) {
         "trainingOverride",
         "status",
         "rescheduledToDate",
+        "rescheduledFromDate",
       ],
       path,
     );
@@ -269,10 +255,38 @@ function validateTrainingPlan(trainingPlan) {
       if (plan.rescheduledToDate === plan.date) {
         throw new TypeError(`${path}.rescheduledToDate 不能与原日期相同`);
       }
+      if (plan.rescheduledFromDate !== null) {
+        throw new TypeError(`${path} 不能同时作为改期来源和目标`);
+      }
     } else if (plan.rescheduledToDate !== null) {
       throw new TypeError(`${path}.rescheduledToDate 仅在改期时填写`);
     }
+    if (plan.rescheduledFromDate !== null) {
+      assertDate(plan.rescheduledFromDate, `${path}.rescheduledFromDate`);
+      if (plan.rescheduledFromDate === plan.date) {
+        throw new TypeError(`${path}.rescheduledFromDate 不能与当前日期相同`);
+      }
+    }
   });
+  assertRescheduleLinks(trainingPlan.dailyPlans);
+}
+
+function assertRescheduleLinks(plans) {
+  const byDate = new Map(plans.map((plan) => [plan.date, plan]));
+  for (const plan of plans) {
+    if (plan.status === "rescheduled") {
+      const target = byDate.get(plan.rescheduledToDate);
+      if (!target || target.rescheduledFromDate !== plan.date) {
+        throw new TypeError(`改期目标 ${plan.rescheduledToDate} 缺少来源关联`);
+      }
+    }
+    if (plan.rescheduledFromDate !== null) {
+      const source = byDate.get(plan.rescheduledFromDate);
+      if (!source || source.status !== "rescheduled" || source.rescheduledToDate !== plan.date) {
+        throw new TypeError(`改期来源 ${plan.rescheduledFromDate} 缺少目标关联`);
+      }
+    }
+  }
 }
 
 function validateFoodPreferences(preferences) {

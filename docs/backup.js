@@ -1,13 +1,13 @@
 import {
   assertValidData,
-  migrateV3Data,
+  createEmptyData,
   parseData,
   serializeData,
 } from "./model.js";
 import { COLLECTIONS } from "./data.js";
 
 export const BACKUP_FORMAT = "healthlife-complete-backup";
-export const BACKUP_VERSION = 4;
+export const BACKUP_VERSION = 5;
 
 export function createCompleteBackup(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);
@@ -34,13 +34,11 @@ export function parseCompleteBackup(text) {
   }
   assertExactKeys(backup, ["format", "backupVersion", "exportedAt", "data"], "backup");
   if (backup.format !== BACKUP_FORMAT) throw new TypeError("不是 HealthLife 完整备份");
-  if (![3, BACKUP_VERSION].includes(backup.backupVersion)) {
+  if (backup.backupVersion !== BACKUP_VERSION) {
     throw new TypeError(`不支持的 backupVersion：${String(backup.backupVersion)}`);
   }
   assertIsoTimestamp(backup.exportedAt, "backup.exportedAt");
-  const data = backup.backupVersion === 3
-    ? migrateV3Data(backup.data)
-    : parseData(JSON.stringify(backup.data));
+  const data = parseData(JSON.stringify(backup.data));
   return {
     backup: { ...backup, backupVersion: BACKUP_VERSION, data },
     summary: summarizeData(data),
@@ -49,20 +47,34 @@ export function parseCompleteBackup(text) {
 
 export function summarizeData(data) {
   assertValidData(data);
-  const dates = COLLECTIONS.flatMap((collectionName) => data[collectionName].map((record) => record.date)).sort();
+  const recordDates = COLLECTIONS.flatMap(
+    (collectionName) => data[collectionName].map((record) => record.date),
+  );
+  const dates = [
+    ...recordDates,
+    ...data.trainingPlan.dailyPlans.map((plan) => plan.date),
+  ].sort();
   const counts = Object.fromEntries(COLLECTIONS.map((collectionName) => [collectionName, data[collectionName].length]));
   return {
-    totalRecords: dates.length,
+    totalRecords: recordDates.length,
     firstDate: dates[0] ?? null,
     lastDate: dates.at(-1) ?? null,
     counts,
+    dailyPlanCount: data.trainingPlan.dailyPlans.length,
+    weeklyTraining: [...data.trainingPlan.weeklyTraining],
+    workdayCounts: countBy(data.trainingPlan.dailyPlans, (plan) => plan.workdayType),
   };
 }
 
-export function createBackupMetadata(lastBackupAt, recordCount) {
+export function createBackupMetadata(lastBackupAt, data) {
   assertIsoTimestamp(lastBackupAt, "lastBackupAt");
-  if (!Number.isInteger(recordCount) || recordCount < 0) throw new TypeError("recordCount 必须是非负整数");
-  return { version: 1, lastBackupAt, recordCount };
+  const summary = summarizeData(data);
+  return {
+    version: 2,
+    lastBackupAt,
+    recordCount: summary.totalRecords,
+    planSignature: createPlanSignature(data.trainingPlan),
+  };
 }
 
 export function parseBackupMetadata(text) {
@@ -74,9 +86,19 @@ export function parseBackupMetadata(text) {
     return null;
   }
   try {
-    assertExactKeys(metadata, ["version", "lastBackupAt", "recordCount"], "metadata");
-    if (metadata.version !== 1) return null;
-    return createBackupMetadata(metadata.lastBackupAt, metadata.recordCount);
+    assertExactKeys(
+      metadata,
+      ["version", "lastBackupAt", "recordCount", "planSignature"],
+      "metadata",
+    );
+    if (
+      metadata.version !== 2
+      || !Number.isInteger(metadata.recordCount)
+      || metadata.recordCount < 0
+      || typeof metadata.planSignature !== "string"
+    ) return null;
+    assertIsoTimestamp(metadata.lastBackupAt, "metadata.lastBackupAt");
+    return metadata;
   } catch {
     return null;
   }
@@ -84,13 +106,38 @@ export function parseBackupMetadata(text) {
 
 export function getBackupReminder(data, metadata, now = new Date().toISOString()) {
   const recordCount = summarizeData(data).totalRecords;
-  if (recordCount === 0) return { needed: false, reason: "empty" };
+  const hasPlanContent = data.trainingPlan.dailyPlans.length > 0
+    || JSON.stringify(data.trainingPlan.weeklyTraining)
+      !== JSON.stringify(createEmptyData().trainingPlan.weeklyTraining);
+  if (recordCount === 0 && !hasPlanContent) return { needed: false, reason: "empty" };
   if (!metadata) return { needed: true, reason: "never" };
   assertIsoTimestamp(now, "now");
   const ageDays = Math.floor((Date.parse(now) - Date.parse(metadata.lastBackupAt)) / 86_400_000);
   if (ageDays >= 14) return { needed: true, reason: "stale" };
   if (recordCount - metadata.recordCount >= 10) return { needed: true, reason: "manyChanges" };
+  if (metadata.planSignature !== createPlanSignature(data.trainingPlan)) {
+    return { needed: true, reason: "planChanges" };
+  }
   return { needed: false, reason: "current" };
+}
+
+function createPlanSignature(trainingPlan) {
+  const text = JSON.stringify(trainingPlan);
+  let hash = 2_166_136_261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function countBy(values, select) {
+  const counts = {};
+  for (const value of values) {
+    const key = select(value);
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
 }
 
 function assertExactKeys(value, expectedKeys, path) {

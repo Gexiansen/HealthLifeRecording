@@ -4,4 +4,4 @@
 
 - 不得复制浏览器导出的真实个人健康备份。
 - 示例中的日期、体重、睡眠和备注不得对应真实用户。
-- `healthlife-demo-v1.json`、`healthlife-demo-v2.json` 和 `healthlife-demo-v3.json` 只用于对应版本的回归测试；当前应用只接受 v3。
+- `healthlife-demo-v1.json`、`healthlife-demo-v2.json` 和 `healthlife-demo-v3.json` 是历史版本的虚构样例；当前应用只接受 schema v5，不读取这些旧样例。

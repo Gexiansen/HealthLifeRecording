@@ -4,6 +4,7 @@ import {
   calculateWeightMovingAverage,
 } from "./model.js";
 import { roundNutrition, sumNutrition } from "./nutrition.js";
+import { summarizePlanWindow } from "./planning.js";
 
 export function calculateTrendSummary(data, endDate, days) {
   assertValidData(data);
@@ -82,6 +83,7 @@ export function calculateTrendSummary(data, endDate, days) {
       sampleCount: hydration.length,
       averageMilliliters: averageRounded(hydration.map((record) => record.milliliters)),
     },
+    plan: summarizePlanWindow(data.trainingPlan, startDate, endDate),
   };
 }
 

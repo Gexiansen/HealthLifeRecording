@@ -42,6 +42,34 @@ export function findDailyPlan(trainingPlan, date) {
   return trainingPlan.dailyPlans.find((plan) => plan.date === date) ?? null;
 }
 
+export function findWorkoutPlanMatches(data, date) {
+  const plannedTraining = getEffectiveTraining(data.trainingPlan, date);
+  const compatibleTypes = {
+    strengthA: ["strength"],
+    strengthB: ["strength"],
+    runWalk: ["running", "walking", "cardio"],
+    walking: ["walking"],
+    mobility: ["stretching"],
+    rest: [],
+  }[plannedTraining];
+  return data.workouts.filter(
+    (workout) => workout.date === date && compatibleTypes.includes(workout.type),
+  );
+}
+
+export function summarizePlanWindow(trainingPlan, startDate, endDate) {
+  const plans = trainingPlan.dailyPlans.filter(
+    (plan) => plan.date >= startDate && plan.date <= endDate,
+  );
+  return {
+    count: plans.length,
+    completed: plans.filter((plan) => plan.status === "completed").length,
+    shortened: plans.filter((plan) => plan.status === "shortened").length,
+    rescheduled: plans.filter((plan) => plan.status === "rescheduled").length,
+    rest: plans.filter((plan) => plan.status === "rest").length,
+  };
+}
+
 export function getEffectiveTraining(trainingPlan, date) {
   const dailyPlan = findDailyPlan(trainingPlan, date);
   return dailyPlan?.trainingOverride
