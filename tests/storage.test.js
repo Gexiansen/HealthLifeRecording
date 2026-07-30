@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   BACKUP_META_KEY,
+  LEGACY_STORAGE_KEY,
   loadBackupMetadata,
   loadData,
   saveBackupMetadata,
@@ -13,31 +14,47 @@ import {
 import { createBackupMetadata } from "../docs/backup.js";
 import { createEmptyData } from "../docs/model.js";
 
-test("schema v3 使用独立存储键", () => {
-  assert.equal(STORAGE_KEY, "healthlife:data:v3");
+test("schema v4 使用独立存储键并保留 v3 迁移来源", () => {
+  assert.equal(STORAGE_KEY, "healthlife:data:v4");
+  assert.equal(LEGACY_STORAGE_KEY, "healthlife:data:v3");
   assert.equal(BACKUP_META_KEY, "healthlife:backup-meta:v3");
 });
 
-function memoryStorage(initial = null) {
-  let value = initial;
+function memoryStorage(initial = null, legacy = null) {
+  const values = new Map([
+    [STORAGE_KEY, initial],
+    [LEGACY_STORAGE_KEY, legacy],
+  ]);
   return {
     getItem(key) {
-      assert.equal(key, STORAGE_KEY);
-      return value;
+      return values.get(key) ?? null;
     },
     setItem(key, next) {
       assert.equal(key, STORAGE_KEY);
-      value = next;
+      values.set(key, next);
     },
   };
 }
 
-test("空存储返回新的 schema v3 数据但不立即写入", () => {
+test("空存储返回新的 schema v4 数据但不立即写入", () => {
   const storage = memoryStorage();
   const result = loadData(storage);
   assert.equal(result.status, "empty");
   assert.deepEqual(result.data, createEmptyData());
   assert.equal(storage.getItem(STORAGE_KEY), null);
+});
+
+test("没有 v4 数据时读取并迁移有效 v3 数据且不删除旧键", () => {
+  const legacy = createEmptyData();
+  legacy.schemaVersion = 3;
+  delete legacy.trainingPlan;
+  const legacyRaw = JSON.stringify(legacy);
+  const storage = memoryStorage(null, legacyRaw);
+  const result = loadData(storage);
+  assert.equal(result.status, "migrated");
+  assert.equal(result.data.schemaVersion, 4);
+  assert.deepEqual(result.data.trainingPlan.dailyPlans, []);
+  assert.equal(storage.getItem(LEGACY_STORAGE_KEY), legacyRaw);
 });
 
 test("有效内容保存后可以重新读取", () => {

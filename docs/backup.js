@@ -1,8 +1,13 @@
-import { assertValidData, parseData, serializeData } from "./model.js";
+import {
+  assertValidData,
+  migrateV3Data,
+  parseData,
+  serializeData,
+} from "./model.js";
 import { COLLECTIONS } from "./data.js";
 
 export const BACKUP_FORMAT = "healthlife-complete-backup";
-export const BACKUP_VERSION = 3;
+export const BACKUP_VERSION = 4;
 
 export function createCompleteBackup(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);
@@ -29,13 +34,15 @@ export function parseCompleteBackup(text) {
   }
   assertExactKeys(backup, ["format", "backupVersion", "exportedAt", "data"], "backup");
   if (backup.format !== BACKUP_FORMAT) throw new TypeError("不是 HealthLife 完整备份");
-  if (backup.backupVersion !== BACKUP_VERSION) {
+  if (![3, BACKUP_VERSION].includes(backup.backupVersion)) {
     throw new TypeError(`不支持的 backupVersion：${String(backup.backupVersion)}`);
   }
   assertIsoTimestamp(backup.exportedAt, "backup.exportedAt");
-  const data = parseData(JSON.stringify(backup.data));
+  const data = backup.backupVersion === 3
+    ? migrateV3Data(backup.data)
+    : parseData(JSON.stringify(backup.data));
   return {
-    backup: { ...backup, data },
+    backup: { ...backup, backupVersion: BACKUP_VERSION, data },
     summary: summarizeData(data),
   };
 }

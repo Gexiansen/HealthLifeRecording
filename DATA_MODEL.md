@@ -1,4 +1,4 @@
-# HealthLife schema v3
+# HealthLife schema v4
 
 ## 根对象
 
@@ -6,8 +6,12 @@
 
 ```js
 {
-  schemaVersion: 2,
+  schemaVersion: 4,
   settings: {},
+  trainingPlan: {
+    weeklyTraining: [],
+    dailyPlans: []
+  },
   foodPreferences: {},
   customFoods: [],
   recipes: [],
@@ -22,7 +26,7 @@
 
 日期统一使用本地自然日 `YYYY-MM-DD`，时间统一使用 `HH:mm`。记录 ID 使用 UUID，`createdAt` 和 `updatedAt` 使用标准 UTC ISO 8601 时间戳。
 
-schema v3 使用 `healthlife:data:v3` 独立存储键，不读取、迁移或删除旧 `healthlife:data:v1` 和 `healthlife:data:v2`。完整备份版本同步升级为 3，不接受 v1／v2 备份。
+schema v4 使用 `healthlife:data:v4` 独立存储键。首次读取不到 v4 时，只尝试从 `healthlife:data:v3` 自动迁移并写入 v4；原 v3 键不删除。应用不读取或迁移 v1／v2。完整备份版本升级为 4，并允许导入有效的 v3 完整备份后转换为 v4。
 
 ## 设置
 
@@ -31,6 +35,22 @@ schema v3 使用 `healthlife:data:v3` 独立存储键，不读取、迁移或删
 | `weightUnit` | string | `kg` 或 `lb`，只影响界面显示 |
 | `goalWeightGrams` | integer／null | 20,000～500,000 克 |
 | `eggGramsPerPiece` | integer | 每个水煮鸡蛋的可食部分克数，20～100，默认 50 |
+
+## 健康计划
+
+`trainingPlan.weeklyTraining` 固定保存周一至周日 7 项默认训练，可选值为 `strengthA`、`strengthB`、`runWalk`、`walking`、`mobility`、`rest`。默认模板为周二力量 A、周四力量 B、周六跑走结合，其他日期休息。
+
+`trainingPlan.dailyPlans` 每个自然日最多一条，字段如下：
+
+| 字段 | 类型 | 规则 |
+| --- | --- | --- |
+| `id`、`date`、时间戳 | — | UUID、自然日和标准时间戳；日期唯一 |
+| `workdayType` | string | `normal`、`overtime25`、`overtime30`、`overtime35`、`weekendOvertime`、`rest` |
+| `trainingOverride` | string／null | 覆盖当周模板的训练类型；`null` 表示继续使用模板 |
+| `status` | string | `planned`、`completed`、`shortened`、`rescheduled`、`rest` |
+| `rescheduledToDate` | string／null | 仅 `rescheduled` 状态必填，且不能与原日期相同 |
+
+计划状态不等于实际运动记录。只有用户另外保存运动记录后，运动才进入训练统计。
 
 ## 食物偏好
 
@@ -168,7 +188,7 @@ schema v3 使用 `healthlife:data:v3` 独立存储键，不读取、迁移或删
 - 自定义食品、菜谱、菜谱原料、业务记录和餐食明细的 ID 在整个根对象中唯一。
 - 睡眠、体重、饮水和每日活动分别按日期唯一；运动和饮食允许同日多条。
 - 重量和其他整数单位字段必须是整数；每 100 克营养值最多一位小数，不能使用字符串或隐式转换。
-- schema v3 不接受未知字段，不静默丢弃无效项。
+- schema v4 不接受未知字段，不静默丢弃无效项。
 - `serializeData` 和 `parseData` 在输出或返回数据前都会执行整体校验。
-- v3 完整备份保留食物库、菜谱、偏好、所有历史营养快照、运动摘要和每日步数。
-- 分析 JSON 按自然日汇总体重、睡眠、运动、每日步数、餐食明细、每日营养和饮水，供后续趋势分析使用。
+- v4 完整备份保留训练模板、每日计划、食物库、菜谱、偏好、所有历史营养快照、运动摘要和每日步数。
+- 分析 JSON 按自然日汇总计划状态、体重、睡眠、运动、每日步数、餐食明细、每日营养和饮水，供后续趋势分析使用。

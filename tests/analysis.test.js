@@ -58,8 +58,19 @@ test("分析导出按日期汇总餐食营养并保留可信度", () => {
     createdAt: "2026-07-29T08:00:00.000Z",
     updatedAt: "2026-07-29T08:00:00.000Z",
   });
+  data.trainingPlan.dailyPlans.push({
+    id: "95400000-0000-4000-8000-000000000001",
+    date: "2026-07-29",
+    workdayType: "overtime35",
+    trainingOverride: "rest",
+    status: "rest",
+    rescheduledToDate: null,
+    createdAt: "2026-07-29T08:00:00.000Z",
+    updatedAt: "2026-07-29T08:00:00.000Z",
+  });
   const result = createAnalysisExport(data, "2026-07-29T09:00:00.000Z");
-  assert.equal(result.schemaVersion, 3);
+  assert.equal(result.analysisVersion, 2);
+  assert.equal(result.schemaVersion, 4);
   assert.deepEqual(result.dateRange, {
     firstDate: "2026-07-29",
     lastDate: "2026-07-29",
@@ -75,4 +86,10 @@ test("分析导出按日期汇总餐食营养并保留可信度", () => {
   assert.equal(result.days[0].dailyActivity.steps, 8_500);
   assert.equal(result.days[0].workouts[0].paceSecondsPerKilometer, 360);
   assert.equal(result.days[0].meals[0].items[0].inputUnit, "grams");
+  assert.deepEqual(result.days[0].plan, {
+    workdayType: "overtime35",
+    plannedTraining: "rest",
+    status: "rest",
+    rescheduledToDate: null,
+  });
 });

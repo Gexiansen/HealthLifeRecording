@@ -128,6 +128,21 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px s
 .calendar-day:disabled { cursor: default; opacity: .32; }
 .calendar-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 6px; }
 
+.health-plan-card {
+  margin-top: 12px;
+  border: 1px solid #b8d2c7;
+  border-radius: 20px;
+  background: #edf6f1;
+  padding: 15px 16px;
+}
+.health-plan-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.health-plan-heading .eyebrow { color: var(--muted); }
+.plan-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.plan-badges span { border-radius: 999px; background: rgba(31, 98, 82, .1); color: var(--primary-dark); padding: 6px 9px; font-size: 11px; font-weight: 800; }
+.plan-headline { display: block; margin-top: 12px; font-size: 18px; }
+.plan-detail, .plan-meal-reminder { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.plan-meal-reminder { border-left: 3px solid #d6a64a; color: #654a12; padding-left: 9px; }
+
 .summary-grid { display: grid; gap: 8px; margin-top: 12px; }
 .summary-card {
   display: grid;
@@ -305,6 +320,8 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .data-section:first-child { border-top: 0; padding-top: 6px; }
 .data-section h3 { margin-bottom: 8px; }
 .data-help { margin-bottom: 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.weekly-plan-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.weekly-plan-form .primary-button, .weekly-plan-form .form-error { grid-column: 1 / -1; }
 .file-field { display: grid; gap: 7px; color: var(--muted); font-size: 13px; font-weight: 700; }
 .file-field input { padding: 8px; }
 .import-preview { margin-top: 14px; border: 1px solid var(--line); border-radius: 15px; background: #f7f9f6; padding: 14px; }
@@ -335,4 +352,6 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
   .food-add-row { grid-template-columns: minmax(0, 1fr) auto; }
   .food-add-row > button { grid-column: 1 / -1; }
   .recipe-add-row > button { grid-column: auto; }
+  .weekly-plan-form { grid-template-columns: 1fr; }
+  .weekly-plan-form .primary-button, .weekly-plan-form .form-error { grid-column: auto; }
 }

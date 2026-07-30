@@ -7,10 +7,12 @@ import {
   deleteRecord,
   findDailyRecord,
   saveCustomFood,
+  saveDailyPlan,
   saveRecipe,
   saveRecord,
   updateEggGramsPerPiece,
   updateFoodPreferences,
+  updateWeeklyTraining,
 } from "./data.js";
 import {
   loadBackupMetadata,
@@ -50,6 +52,13 @@ import {
   sumNutrition,
 } from "./nutrition.js";
 import { serializeAnalysisExport } from "./analysis.js";
+import {
+  createDailyAdvice,
+  findDailyPlan,
+  PLAN_STATUS_LABELS,
+  TRAINING_PLAN_LABELS,
+  WORKDAY_LABELS,
+} from "./planning.js";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -117,6 +126,12 @@ const elements = {
   calendarGrid: document.querySelector("#calendar-grid"),
   toggleCalendar: document.querySelector("#toggle-calendar"),
   streakDays: document.querySelector("#streak-days"),
+  editDailyPlan: document.querySelector("#edit-daily-plan"),
+  planWorkdayBadge: document.querySelector("#plan-workday-badge"),
+  planStatusBadge: document.querySelector("#plan-status-badge"),
+  planHeadline: document.querySelector("#plan-headline"),
+  planDetail: document.querySelector("#plan-detail"),
+  planMealReminder: document.querySelector("#plan-meal-reminder"),
   workoutSummary: document.querySelector("#workout-summary"),
   activitySummary: document.querySelector("#activity-summary"),
   mealSummary: document.querySelector("#meal-summary"),
@@ -213,15 +228,38 @@ const elements = {
   importReplaceSummary: document.querySelector("#import-replace-summary"),
   confirmImport: document.querySelector("#confirm-import"),
   installApp: document.querySelector("#install-app"),
+  planDialog: document.querySelector("#plan-dialog"),
+  closePlanDialog: document.querySelector("#close-plan-dialog"),
+  dailyPlanForm: document.querySelector("#daily-plan-form"),
+  planDateLabel: document.querySelector("#plan-date-label"),
+  rescheduledDateField: document.querySelector("#rescheduled-date-field"),
+  planFormError: document.querySelector("#plan-form-error"),
+  weeklyPlanForm: document.querySelector("#weekly-plan-form"),
+  weeklyPlanError: document.querySelector("#weekly-plan-error"),
 };
 
 initialize();
 
 function initialize() {
+  if (storageState.status === "migrated") {
+    try {
+      saveData(data);
+      storageState = { status: "ready", data, raw: null, error: null };
+    } catch (error) {
+      storageState = {
+        status: "migration-failed",
+        data: null,
+        raw: storageState.raw,
+        error,
+      };
+      data = null;
+    }
+  }
   const today = localDateString(new Date());
   elements.recordDate.max = today;
   elements.recordMonthFilter.max = today.slice(0, 7);
   elements.recordDate.value = selectedDate;
+  populateWeeklyPlanOptions();
   bindEvents();
   renderStorageState();
   renderAll();
@@ -317,6 +355,11 @@ function bindEvents() {
   elements.confirmImport.addEventListener("click", confirmImport);
   elements.installApp.addEventListener("click", installApp);
   elements.reloadApp.addEventListener("click", () => window.location.reload());
+  elements.editDailyPlan.addEventListener("click", openDailyPlanDialog);
+  elements.closePlanDialog.addEventListener("click", () => elements.planDialog.close());
+  elements.dailyPlanForm.elements.status.addEventListener("change", syncRescheduledDateField);
+  elements.dailyPlanForm.addEventListener("submit", handleDailyPlanSubmit);
+  elements.weeklyPlanForm.addEventListener("submit", handleWeeklyPlanSubmit);
   window.addEventListener("beforeinstallprompt", handleInstallPrompt);
 }
 
@@ -326,6 +369,7 @@ function renderStorageState() {
     document.querySelectorAll("[data-open-form]").forEach((button) => {
       button.disabled = false;
     });
+    elements.editDailyPlan.disabled = false;
     return;
   }
 
@@ -334,6 +378,14 @@ function renderStorageState() {
     elements.storageAlertTitle.textContent = "检测到异常本地数据，已停止写入";
     elements.storageAlertMessage.textContent = "原始内容仍保留在浏览器中。请先下载保存，再处理或恢复数据。";
     elements.downloadRaw.hidden = false;
+  } else if (storageState.status === "legacy-corrupt") {
+    elements.storageAlertTitle.textContent = "旧版数据无法迁移，已停止写入";
+    elements.storageAlertMessage.textContent = "schema v3 原始内容仍保留。请先下载保存，再恢复有效备份。";
+    elements.downloadRaw.hidden = false;
+  } else if (storageState.status === "migration-failed") {
+    elements.storageAlertTitle.textContent = "新版数据保存失败";
+    elements.storageAlertMessage.textContent = "schema v3 原始内容仍保留，当前未覆盖旧数据。请检查浏览器存储设置。";
+    elements.downloadRaw.hidden = false;
   } else {
     elements.storageAlertTitle.textContent = "浏览器本地存储不可用";
     elements.storageAlertMessage.textContent = "当前无法安全读取或保存健康记录，请检查浏览器隐私设置。";
@@ -341,6 +393,7 @@ function renderStorageState() {
   document.querySelectorAll("[data-open-form]").forEach((button) => {
     button.disabled = true;
   });
+  elements.editDailyPlan.disabled = true;
 }
 
 function renderAll() {
@@ -381,6 +434,7 @@ function renderToday() {
   elements.hydrationAmountLabel.textContent = dateContext.hydrationLabel;
   elements.returnToday.hidden = selectedDate === today;
   renderCalendar();
+  renderDailyPlan();
 
   if (!data) {
     for (const element of [
@@ -421,6 +475,30 @@ function renderToday() {
   const streak = calculateRecordingStreak(data, today);
   elements.streakDays.textContent = `${streak.days} 天`;
   elements.streakDays.title = streak.todayRecorded ? "今天已有记录" : "今天尚未记录，连续天数截至昨天";
+}
+
+function renderDailyPlan() {
+  if (!data) {
+    elements.planWorkdayBadge.textContent = "数据不可用";
+    elements.planStatusBadge.textContent = "—";
+    elements.planHeadline.textContent = "无法读取当天计划";
+    elements.planDetail.textContent = "";
+    elements.planMealReminder.hidden = true;
+    return;
+  }
+  const advice = createDailyAdvice(data.trainingPlan, selectedDate);
+  const dailyPlan = findDailyPlan(data.trainingPlan, selectedDate);
+  elements.planWorkdayBadge.textContent = advice.workdayType
+    ? WORKDAY_LABELS[advice.workdayType]
+    : "工作安排未设置";
+  elements.planStatusBadge.textContent = advice.status === "rescheduled" && dailyPlan?.rescheduledToDate
+    ? `已改至 ${formatDisplayDate(dailyPlan.rescheduledToDate)}`
+    : PLAN_STATUS_LABELS[advice.status];
+  elements.planHeadline.textContent = advice.headline;
+  elements.planDetail.textContent = advice.detail;
+  elements.planMealReminder.textContent = advice.mealReminder ?? "";
+  elements.planMealReminder.hidden = !advice.mealReminder;
+  elements.editDailyPlan.textContent = advice.workdayType ? "调整安排" : "设置安排";
 }
 
 function renderCalendar() {
@@ -811,6 +889,104 @@ function setSelectedDate(value) {
   selectedDate = value;
   calendarAnchor = value;
   renderToday();
+}
+
+function populateWeeklyPlanOptions() {
+  for (const select of elements.weeklyPlanForm.querySelectorAll("select")) {
+    select.replaceChildren();
+    for (const [value, label] of Object.entries(TRAINING_PLAN_LABELS)) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      select.append(option);
+    }
+  }
+}
+
+function renderWeeklyPlanForm() {
+  if (!data) return;
+  data.trainingPlan.weeklyTraining.forEach((type, index) => {
+    elements.weeklyPlanForm.elements[`day${index}`].value = type;
+  });
+  setInlineError(elements.weeklyPlanError, "");
+}
+
+function openDailyPlanDialog() {
+  if (!data) return;
+  const existing = findDailyPlan(data.trainingPlan, selectedDate);
+  const form = elements.dailyPlanForm;
+  form.reset();
+  elements.planDateLabel.textContent = formatDisplayDate(selectedDate);
+  form.elements.workdayType.value = existing?.workdayType ?? defaultWorkdayType(selectedDate);
+  form.elements.trainingOverride.value = existing?.trainingOverride ?? "";
+  form.elements.status.value = existing?.status ?? "planned";
+  form.elements.rescheduledToDate.value = existing?.rescheduledToDate ?? "";
+  form.elements.rescheduledToDate.min = selectedDate;
+  setInlineError(elements.planFormError, "");
+  syncRescheduledDateField();
+  elements.planDialog.showModal();
+  form.elements.workdayType.focus();
+}
+
+function syncRescheduledDateField() {
+  const rescheduled = elements.dailyPlanForm.elements.status.value === "rescheduled";
+  elements.rescheduledDateField.hidden = !rescheduled;
+  elements.dailyPlanForm.elements.rescheduledToDate.required = rescheduled;
+  if (!rescheduled) elements.dailyPlanForm.elements.rescheduledToDate.value = "";
+}
+
+function handleDailyPlanSubmit(event) {
+  event.preventDefault();
+  if (!data) return;
+  const existing = findDailyPlan(data.trainingPlan, selectedDate);
+  const form = event.currentTarget;
+  const now = new Date().toISOString();
+  try {
+    const plan = {
+      id: existing?.id ?? createId(),
+      date: selectedDate,
+      workdayType: form.elements.workdayType.value,
+      trainingOverride: form.elements.trainingOverride.value || null,
+      status: form.elements.status.value,
+      rescheduledToDate: form.elements.status.value === "rescheduled"
+        ? form.elements.rescheduledToDate.value
+        : null,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    const next = saveDailyPlan(data, plan);
+    saveData(next);
+    data = next;
+    elements.planDialog.close();
+    renderAll();
+    showToast("当天安排已保存");
+  } catch (error) {
+    setInlineError(elements.planFormError, error.message || "当天安排保存失败");
+  }
+}
+
+function handleWeeklyPlanSubmit(event) {
+  event.preventDefault();
+  if (!data) return;
+  const weeklyTraining = Array.from(
+    { length: 7 },
+    (_, index) => event.currentTarget.elements[`day${index}`].value,
+  );
+  try {
+    const next = updateWeeklyTraining(data, weeklyTraining);
+    saveData(next);
+    data = next;
+    renderAll();
+    renderWeeklyPlanForm();
+    showToast("每周训练模板已保存");
+  } catch (error) {
+    setInlineError(elements.weeklyPlanError, error.message || "每周模板保存失败");
+  }
+}
+
+function defaultWorkdayType(date) {
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return weekday === 0 || weekday === 6 ? "rest" : "normal";
 }
 
 function openForm(type, explicitRecord = null) {
@@ -1409,6 +1585,7 @@ function openDataDialog() {
   elements.importPreview.hidden = true;
   setImportError("");
   renderBackupState();
+  renderWeeklyPlanForm();
   elements.dataDialog.showModal();
   elements.closeDataDialog.focus();
 }

@@ -1,9 +1,10 @@
 import { assertValidData, calculateSleepMinutes } from "./model.js";
 import { sumNutrition } from "./nutrition.js";
 import { calculatePaceSecondsPerKilometer } from "./interaction.js";
+import { findDailyPlan, getEffectiveTraining } from "./planning.js";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
-export const ANALYSIS_VERSION = 1;
+export const ANALYSIS_VERSION = 2;
 
 export function createAnalysisExport(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);
@@ -34,8 +35,15 @@ function createDay(data, date) {
   const sleep = data.sleepRecords.find((record) => record.date === date) ?? null;
   const weight = data.weights.find((record) => record.date === date) ?? null;
   const hydration = data.hydration.find((record) => record.date === date) ?? null;
+  const dailyPlan = findDailyPlan(data.trainingPlan, date);
   return {
     date,
+    plan: {
+      workdayType: dailyPlan?.workdayType ?? null,
+      plannedTraining: getEffectiveTraining(data.trainingPlan, date),
+      status: dailyPlan?.status ?? "planned",
+      rescheduledToDate: dailyPlan?.rescheduledToDate ?? null,
+    },
     weight: weight
       ? { weightGrams: weight.weightGrams, bodyFatBasisPoints: weight.bodyFatBasisPoints }
       : null,
@@ -102,6 +110,7 @@ function allDates(data) {
     ...data.sleepRecords,
     ...data.weights,
     ...data.hydration,
+    ...data.trainingPlan.dailyPlans,
   ].map((record) => record.date))].sort();
 }
 

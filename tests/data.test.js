@@ -7,10 +7,12 @@ import {
   findDailyRecord,
   recordsForDate,
   saveCustomFood,
+  saveDailyPlan,
   saveRecipe,
   saveRecord,
   updateEggGramsPerPiece,
   updateFoodPreferences,
+  updateWeeklyTraining,
 } from "../docs/data.js";
 import { createEmptyData } from "../docs/model.js";
 
@@ -160,4 +162,35 @@ test("鸡蛋单个克数设置以不可变方式保存", () => {
   assert.equal(original.settings.eggGramsPerPiece, 50);
   assert.equal(updated.settings.eggGramsPerPiece, 55);
   assert.throws(() => updateEggGramsPerPiece(updated, 101), /eggGramsPerPiece/);
+});
+
+test("每周模板和每日计划以不可变方式保存", () => {
+  const original = createEmptyData();
+  const weekly = [...original.trainingPlan.weeklyTraining];
+  weekly[0] = "walking";
+  const withWeekly = updateWeeklyTraining(original, weekly);
+  assert.equal(original.trainingPlan.weeklyTraining[0], "rest");
+  assert.equal(withWeekly.trainingPlan.weeklyTraining[0], "walking");
+
+  const plan = {
+    id: "e0000000-0000-4000-8000-000000000001",
+    date: "2026-07-28",
+    workdayType: "normal",
+    trainingOverride: null,
+    status: "planned",
+    rescheduledToDate: null,
+    createdAt: CREATED_AT,
+    updatedAt: CREATED_AT,
+  };
+  const withPlan = saveDailyPlan(withWeekly, plan);
+  assert.equal(withWeekly.trainingPlan.dailyPlans.length, 0);
+  assert.equal(withPlan.trainingPlan.dailyPlans[0].workdayType, "normal");
+
+  const edited = saveDailyPlan(withPlan, {
+    ...plan,
+    status: "completed",
+    updatedAt: "2026-07-22T09:00:00.000Z",
+  });
+  assert.equal(edited.trainingPlan.dailyPlans.length, 1);
+  assert.equal(edited.trainingPlan.dailyPlans[0].status, "completed");
 });

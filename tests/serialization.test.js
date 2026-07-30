@@ -7,7 +7,7 @@ import {
   serializeData,
 } from "../docs/model.js";
 
-test("schema v3 数据可以完整序列化并往返恢复", () => {
+test("schema v4 数据可以完整序列化并往返恢复", () => {
   const data = createEmptyData();
   data.weights.push({
     id: "70000000-0000-4000-8000-000000000001",

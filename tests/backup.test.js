@@ -52,9 +52,9 @@ test("完整备份可以严格往返并生成摘要", () => {
 test("完整备份拒绝损坏 JSON、未知版本、未知字段和无效数据", () => {
   assert.throws(() => parseCompleteBackup("{broken"), /有效 JSON/);
   const valid = JSON.parse(serializeCompleteBackup(dataWithWeight(), EXPORTED_AT));
-  valid.backupVersion = 4;
+  valid.backupVersion = 5;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /backupVersion/);
-  valid.backupVersion = 3;
+  valid.backupVersion = 4;
   valid.extra = true;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /未知字段/);
   delete valid.extra;
@@ -85,5 +85,7 @@ test("虚构演示备份通过应用自身校验", async () => {
   const result = parseCompleteBackup(text);
   assert.equal(result.summary.totalRecords, 9);
   assert.equal(result.summary.counts.weights, 2);
+  assert.equal(result.backup.backupVersion, 4);
+  assert.equal(result.backup.data.schemaVersion, 4);
   assert.equal(summarizeData(result.backup.data).totalRecords, 9);
 });

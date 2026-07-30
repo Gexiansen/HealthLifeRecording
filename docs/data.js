@@ -110,6 +110,22 @@ export function updateEggGramsPerPiece(data, grams) {
   return next;
 }
 
+export function updateWeeklyTraining(data, weeklyTraining) {
+  const next = cloneData(data);
+  next.trainingPlan.weeklyTraining = structuredClone(weeklyTraining);
+  assertValidData(next);
+  return next;
+}
+
+export function saveDailyPlan(data, plan) {
+  const next = cloneData(data);
+  const index = next.trainingPlan.dailyPlans.findIndex((item) => item.date === plan.date);
+  if (index === -1) next.trainingPlan.dailyPlans.push(structuredClone(plan));
+  else next.trainingPlan.dailyPlans[index] = structuredClone(plan);
+  assertValidData(next);
+  return next;
+}
+
 function cloneData(data) {
   assertValidData(data);
   return JSON.parse(serializeData(data));

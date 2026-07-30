@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const WORKOUT_TYPES = Object.freeze([
   "strength",
@@ -23,10 +23,34 @@ export const NUTRITION_CONFIDENCE = Object.freeze(["high", "medium", "low"]);
 export const MEAL_TRACKING_MODES = Object.freeze(["precise", "estimated"]);
 export const RECORD_SOURCES = Object.freeze(["manual", "appleWatch"]);
 export const FOOD_INPUT_UNITS = Object.freeze(["grams", "piece"]);
+export const WORKDAY_TYPES = Object.freeze([
+  "normal",
+  "overtime25",
+  "overtime30",
+  "overtime35",
+  "weekendOvertime",
+  "rest",
+]);
+export const TRAINING_PLAN_TYPES = Object.freeze([
+  "strengthA",
+  "strengthB",
+  "runWalk",
+  "walking",
+  "mobility",
+  "rest",
+]);
+export const PLAN_STATUSES = Object.freeze([
+  "planned",
+  "completed",
+  "shortened",
+  "rescheduled",
+  "rest",
+]);
 
 const ROOT_KEYS = Object.freeze([
   "schemaVersion",
   "settings",
+  "trainingPlan",
   "foodPreferences",
   "customFoods",
   "recipes",
@@ -37,6 +61,8 @@ const ROOT_KEYS = Object.freeze([
   "weights",
   "hydration",
 ]);
+
+const V3_ROOT_KEYS = Object.freeze(ROOT_KEYS.filter((key) => key !== "trainingPlan"));
 
 const BASE_RECORD_KEYS = Object.freeze([
   "id",
@@ -56,6 +82,18 @@ export function createEmptyData() {
       weightUnit: "kg",
       goalWeightGrams: null,
       eggGramsPerPiece: 50,
+    },
+    trainingPlan: {
+      weeklyTraining: [
+        "rest",
+        "strengthA",
+        "rest",
+        "strengthB",
+        "rest",
+        "runWalk",
+        "rest",
+      ],
+      dailyPlans: [],
     },
     foodPreferences: {
       favoriteRefs: [],
@@ -126,6 +164,7 @@ export function assertValidData(data) {
   }
 
   validateSettings(data.settings);
+  validateTrainingPlan(data.trainingPlan);
   validateFoodPreferences(data.foodPreferences);
   validateCustomFoods(data.customFoods);
   validateRecipes(data.recipes);
@@ -140,7 +179,21 @@ export function assertValidData(data) {
   assertUniqueDates(data.weights, "weights");
   assertUniqueDates(data.hydration, "hydration");
   assertUniqueDates(data.dailyActivities, "dailyActivities");
+  assertUniqueDates(data.trainingPlan.dailyPlans, "trainingPlan.dailyPlans");
   return true;
+}
+
+export function migrateV3Data(value) {
+  assertPlainObject(value, "data");
+  assertExactKeys(value, V3_ROOT_KEYS, "data");
+  if (value.schemaVersion !== 3) {
+    throw new TypeError(`不支持迁移的 schemaVersion：${String(value.schemaVersion)}`);
+  }
+  const next = structuredClone(value);
+  next.schemaVersion = SCHEMA_VERSION;
+  next.trainingPlan = createEmptyData().trainingPlan;
+  assertValidData(next);
+  return next;
 }
 
 export function serializeData(data) {
@@ -179,6 +232,47 @@ function validateSettings(settings) {
     "settings.goalWeightGrams",
   );
   assertIntegerInRange(settings.eggGramsPerPiece, 20, 100, "settings.eggGramsPerPiece");
+}
+
+function validateTrainingPlan(trainingPlan) {
+  assertPlainObject(trainingPlan, "trainingPlan");
+  assertExactKeys(trainingPlan, ["weeklyTraining", "dailyPlans"], "trainingPlan");
+  if (!Array.isArray(trainingPlan.weeklyTraining) || trainingPlan.weeklyTraining.length !== 7) {
+    throw new TypeError("trainingPlan.weeklyTraining 必须包含周一至周日 7 项");
+  }
+  trainingPlan.weeklyTraining.forEach((type, index) => {
+    assertEnum(type, TRAINING_PLAN_TYPES, `trainingPlan.weeklyTraining[${index}]`);
+  });
+  if (!Array.isArray(trainingPlan.dailyPlans) || trainingPlan.dailyPlans.length > 3_650) {
+    throw new TypeError("trainingPlan.dailyPlans 必须是最多 3650 项的数组");
+  }
+  trainingPlan.dailyPlans.forEach((plan, index) => {
+    const path = `trainingPlan.dailyPlans[${index}]`;
+    validateBaseRecord(
+      plan,
+      [
+        ...BASE_RECORD_KEYS,
+        "workdayType",
+        "trainingOverride",
+        "status",
+        "rescheduledToDate",
+      ],
+      path,
+    );
+    assertEnum(plan.workdayType, WORKDAY_TYPES, `${path}.workdayType`);
+    if (plan.trainingOverride !== null) {
+      assertEnum(plan.trainingOverride, TRAINING_PLAN_TYPES, `${path}.trainingOverride`);
+    }
+    assertEnum(plan.status, PLAN_STATUSES, `${path}.status`);
+    if (plan.status === "rescheduled") {
+      assertDate(plan.rescheduledToDate, `${path}.rescheduledToDate`);
+      if (plan.rescheduledToDate === plan.date) {
+        throw new TypeError(`${path}.rescheduledToDate 不能与原日期相同`);
+      }
+    } else if (plan.rescheduledToDate !== null) {
+      throw new TypeError(`${path}.rescheduledToDate 仅在改期时填写`);
+    }
+  });
 }
 
 function validateFoodPreferences(preferences) {
@@ -458,6 +552,7 @@ function assertGlobalUniqueIds(data) {
       }
     }
   }
+  for (const plan of data.trainingPlan.dailyPlans) collect(plan.id);
 }
 
 function assertUniqueDates(records, path) {

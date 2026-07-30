@@ -6,6 +6,7 @@ import {
   calculateSleepMinutes,
   calculateWeightMovingAverage,
   createEmptyData,
+  migrateV3Data,
 } from "../docs/model.js";
 
 const CREATED_AT = "2026-07-22T08:00:00.000Z";
@@ -86,14 +87,34 @@ function validData() {
   return data;
 }
 
-test("空数据和完整 schema v3 数据通过校验", () => {
+test("空数据和完整 schema v4 数据通过校验", () => {
   assert.equal(assertValidData(createEmptyData()), true);
   assert.equal(assertValidData(validData()), true);
 });
 
+test("schema v3 数据只增加默认训练计划并迁移为 v4", () => {
+  const legacy = validData();
+  legacy.schemaVersion = 3;
+  delete legacy.trainingPlan;
+  const migrated = migrateV3Data(legacy);
+  assert.equal(migrated.schemaVersion, 4);
+  assert.deepEqual(migrated.trainingPlan.weeklyTraining, [
+    "rest",
+    "strengthA",
+    "rest",
+    "strengthB",
+    "rest",
+    "runWalk",
+    "rest",
+  ]);
+  assert.deepEqual(migrated.trainingPlan.dailyPlans, []);
+  assert.equal(assertValidData(migrated), true);
+  assert.equal("trainingPlan" in legacy, false);
+});
+
 test("拒绝未知版本、未知字段和不存在的日期", () => {
   const unknownVersion = validData();
-  unknownVersion.schemaVersion = 4;
+  unknownVersion.schemaVersion = 5;
   assert.throws(() => assertValidData(unknownVersion), /schemaVersion/);
 
   const unknownField = validData();
@@ -137,6 +158,38 @@ test("运动、饮食和设置字段执行严格范围校验", () => {
   const invalidServing = validData();
   invalidServing.meals[0].items[0].grams = 149;
   assert.throws(() => assertValidData(invalidServing), /换算不一致/);
+
+  const invalidWeeklyPlan = validData();
+  invalidWeeklyPlan.trainingPlan.weeklyTraining[0] = "hardRun";
+  assert.throws(() => assertValidData(invalidWeeklyPlan), /weeklyTraining/);
+});
+
+test("每日计划严格校验状态、改期日期和日期唯一性", () => {
+  const data = validData();
+  const plan = {
+    ...baseRecord("52000000-0000-4000-8000-000000000001", "2026-07-21"),
+    workdayType: "overtime35",
+    trainingOverride: null,
+    status: "rescheduled",
+    rescheduledToDate: "2026-07-22",
+  };
+  data.trainingPlan.dailyPlans.push(plan);
+  assert.equal(assertValidData(data), true);
+
+  const invalidStatus = structuredClone(data);
+  invalidStatus.trainingPlan.dailyPlans[0].status = "skipped";
+  assert.throws(() => assertValidData(invalidStatus), /status/);
+
+  const invalidReschedule = structuredClone(data);
+  invalidReschedule.trainingPlan.dailyPlans[0].rescheduledToDate = "2026-07-21";
+  assert.throws(() => assertValidData(invalidReschedule), /不能与原日期相同/);
+
+  const duplicateDate = structuredClone(data);
+  duplicateDate.trainingPlan.dailyPlans.push({
+    ...plan,
+    id: "52000000-0000-4000-8000-000000000002",
+  });
+  assert.throws(() => assertValidData(duplicateDate), /dailyPlans 的日期重复/);
 });
 
 test("跨日和同日睡眠时长计算正确，并拒绝相同时间", () => {
