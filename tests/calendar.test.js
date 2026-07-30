@@ -66,6 +66,7 @@ test("每日状态按六类记录计算且同类多条只计一次", () => {
     averageHeartRateBpm: null,
     maxHeartRateBpm: null,
     distanceMeters: null,
+    guidedSession: null,
     note: "",
     createdAt: timestamp,
     updatedAt: timestamp,

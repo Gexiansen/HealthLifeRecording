@@ -54,6 +54,7 @@ test("分析导出按日期汇总餐食营养并保留可信度", () => {
     averageHeartRateBpm: 145,
     maxHeartRateBpm: 168,
     distanceMeters: 5_000,
+    guidedSession: null,
     note: "",
     createdAt: "2026-07-29T08:00:00.000Z",
     updatedAt: "2026-07-29T08:00:00.000Z",
@@ -70,8 +71,8 @@ test("分析导出按日期汇总餐食营养并保留可信度", () => {
     updatedAt: "2026-07-29T08:00:00.000Z",
   });
   const result = createAnalysisExport(data, "2026-07-29T09:00:00.000Z");
-  assert.equal(result.analysisVersion, 3);
-  assert.equal(result.schemaVersion, 5);
+  assert.equal(result.analysisVersion, 4);
+  assert.equal(result.schemaVersion, 6);
   assert.deepEqual(result.dateRange, {
     firstDate: "2026-07-29",
     lastDate: "2026-07-29",
@@ -86,6 +87,7 @@ test("分析导出按日期汇总餐食营养并保留可信度", () => {
   assert.equal(result.days[0].meals[0].confidence, "high");
   assert.equal(result.days[0].dailyActivity.steps, 8_500);
   assert.equal(result.days[0].workouts[0].paceSecondsPerKilometer, 360);
+  assert.equal(result.days[0].workouts[0].guidedSession, null);
   assert.equal(result.days[0].meals[0].items[0].inputUnit, "grams");
   assert.deepEqual(result.days[0].plan, {
     workdayType: "overtime35",

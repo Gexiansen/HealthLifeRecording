@@ -4,7 +4,7 @@ import { calculatePaceSecondsPerKilometer } from "./interaction.js";
 import { findDailyPlan, getEffectiveTraining } from "./planning.js";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
-export const ANALYSIS_VERSION = 3;
+export const ANALYSIS_VERSION = 4;
 
 export function createAnalysisExport(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);
@@ -69,6 +69,9 @@ function createDay(data, date) {
       paceSecondsPerKilometer: record.distanceMeters === null
         ? null
         : calculatePaceSecondsPerKilometer(record.durationMinutes, record.distanceMeters),
+      guidedSession: record.guidedSession === null
+        ? null
+        : structuredClone(record.guidedSession),
       note: record.note,
     })),
     dailyActivity: dailyActivity

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const WORKOUT_TYPES = Object.freeze([
   "strength",
@@ -46,6 +46,8 @@ export const PLAN_STATUSES = Object.freeze([
   "rescheduled",
   "rest",
 ]);
+export const GUIDED_EXERCISE_UNITS = Object.freeze(["reps", "repsEachSide", "floors"]);
+export const GUIDED_EXERCISE_STATUSES = Object.freeze(["completed", "shortened", "skipped"]);
 
 const ROOT_KEYS = Object.freeze([
   "schemaVersion",
@@ -200,6 +202,30 @@ export function parseData(text) {
 
   assertValidData(data);
   return data;
+}
+
+export function migrateV5Data(value) {
+  assertPlainObject(value, "data");
+  if (value.schemaVersion !== 5) {
+    throw new TypeError(`只能迁移 schemaVersion 5，收到：${String(value.schemaVersion)}`);
+  }
+  if (!Array.isArray(value.workouts)) throw new TypeError("workouts 必须是数组");
+  value.workouts.forEach((workout, index) => {
+    assertPlainObject(workout, `workouts[${index}]`);
+    if (Object.hasOwn(workout, "guidedSession")) {
+      throw new TypeError(`workouts[${index}] 包含 schema v5 未知字段 guidedSession`);
+    }
+  });
+  const migrated = {
+    ...value,
+    schemaVersion: SCHEMA_VERSION,
+    workouts: value.workouts.map((workout) => ({
+      ...workout,
+      guidedSession: null,
+    })),
+  };
+  assertValidData(migrated);
+  return migrated;
 }
 
 function validateSettings(settings) {
@@ -359,6 +385,7 @@ function validateWorkout(record, path) {
       "averageHeartRateBpm",
       "maxHeartRateBpm",
       "distanceMeters",
+      "guidedSession",
       "note",
     ],
     path,
@@ -389,7 +416,71 @@ function validateWorkout(record, path) {
   ) {
     throw new TypeError(`${path}.distanceMeters 只适用于跑步、步行或有氧`);
   }
+  validateGuidedSession(record.guidedSession, `${path}.guidedSession`);
   assertStringLength(record.note, 0, 500, `${path}.note`);
+}
+
+function validateGuidedSession(session, path) {
+  if (session === null) return;
+  assertPlainObject(session, path);
+  assertExactKeys(session, [
+    "id",
+    "templateId",
+    "templateName",
+    "startedAt",
+    "completedAt",
+    "perceivedEffort",
+    "exercises",
+  ], path);
+  assertUuid(session.id, `${path}.id`);
+  assertStringLength(session.templateId, 1, 60, `${path}.templateId`);
+  assertStringLength(session.templateName, 1, 80, `${path}.templateName`);
+  assertIsoTimestamp(session.startedAt, `${path}.startedAt`);
+  assertIsoTimestamp(session.completedAt, `${path}.completedAt`);
+  if (session.completedAt < session.startedAt) {
+    throw new TypeError(`${path}.completedAt 不能早于 startedAt`);
+  }
+  assertIntegerInRange(session.perceivedEffort, 1, 3, `${path}.perceivedEffort`);
+  if (!Array.isArray(session.exercises) || session.exercises.length < 1 || session.exercises.length > 20) {
+    throw new TypeError(`${path}.exercises 必须包含 1～20 项`);
+  }
+  const exerciseIds = new Set();
+  session.exercises.forEach((exercise, index) => {
+    const exercisePath = `${path}.exercises[${index}]`;
+    assertPlainObject(exercise, exercisePath);
+    assertExactKeys(exercise, [
+      "exerciseId",
+      "name",
+      "unit",
+      "status",
+      "sets",
+    ], exercisePath);
+    assertStringLength(exercise.exerciseId, 1, 60, `${exercisePath}.exerciseId`);
+    if (exerciseIds.has(exercise.exerciseId)) {
+      throw new TypeError(`${exercisePath}.exerciseId 重复`);
+    }
+    exerciseIds.add(exercise.exerciseId);
+    assertStringLength(exercise.name, 1, 80, `${exercisePath}.name`);
+    assertEnum(exercise.unit, GUIDED_EXERCISE_UNITS, `${exercisePath}.unit`);
+    assertEnum(exercise.status, GUIDED_EXERCISE_STATUSES, `${exercisePath}.status`);
+    if (!Array.isArray(exercise.sets) || exercise.sets.length > 20) {
+      throw new TypeError(`${exercisePath}.sets 必须是最多 20 项的数组`);
+    }
+    if (exercise.status === "skipped" && exercise.sets.length !== 0) {
+      throw new TypeError(`${exercisePath}.sets 跳过动作时必须为空`);
+    }
+    if (exercise.status !== "skipped" && exercise.sets.length === 0) {
+      throw new TypeError(`${exercisePath}.sets 完成动作时不能为空`);
+    }
+    exercise.sets.forEach((set, setIndex) => {
+      const setPath = `${exercisePath}.sets[${setIndex}]`;
+      assertPlainObject(set, setPath);
+      assertExactKeys(set, ["targetValue", "completedValue", "weightGrams"], setPath);
+      assertIntegerInRange(set.targetValue, 1, 1_000, `${setPath}.targetValue`);
+      assertIntegerInRange(set.completedValue, 1, 1_000, `${setPath}.completedValue`);
+      assertNullableIntegerInRange(set.weightGrams, 100, 200_000, `${setPath}.weightGrams`);
+    });
+  });
 }
 
 function validateDailyActivity(record, path) {
@@ -561,6 +652,9 @@ function assertGlobalUniqueIds(data) {
   ]) {
     for (const record of data[collectionName]) {
       collect(record.id);
+      if (collectionName === "workouts" && record.guidedSession !== null) {
+        collect(record.guidedSession.id);
+      }
       if (collectionName === "meals") {
         record.items.forEach((entry) => collect(entry.id));
       }

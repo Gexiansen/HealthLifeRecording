@@ -3,19 +3,26 @@ import assert from "node:assert/strict";
 
 import {
   BACKUP_META_KEY,
+  clearWorkoutDraft,
   loadBackupMetadata,
   loadData,
+  loadWorkoutDraft,
+  PREVIOUS_STORAGE_KEY,
   saveBackupMetadata,
   saveData,
+  saveWorkoutDraft,
   STORAGE_KEY,
   StorageWriteError,
+  WORKOUT_DRAFT_KEY,
 } from "../docs/storage.js";
 import { createBackupMetadata } from "../docs/backup.js";
 import { createEmptyData } from "../docs/model.js";
+import { createWorkoutDraft } from "../docs/guided-workout.js";
 
-test("schema v5 使用独立存储键且不读取旧版本", () => {
-  assert.equal(STORAGE_KEY, "healthlife:data:v5");
-  assert.equal(BACKUP_META_KEY, "healthlife:backup-meta:v5");
+test("schema v6 使用独立存储键并保留 v5 迁移来源", () => {
+  assert.equal(STORAGE_KEY, "healthlife:data:v6");
+  assert.equal(PREVIOUS_STORAGE_KEY, "healthlife:data:v5");
+  assert.equal(BACKUP_META_KEY, "healthlife:backup-meta:v6");
 });
 
 function memoryStorage(initial = null) {
@@ -33,7 +40,7 @@ function memoryStorage(initial = null) {
   };
 }
 
-test("空存储返回新的 schema v5 数据但不立即写入", () => {
+test("空存储返回新的 schema v6 数据但不立即写入", () => {
   const storage = memoryStorage();
   const result = loadData(storage);
   assert.equal(result.status, "empty");
@@ -52,6 +59,21 @@ test("有效内容保存后可以重新读取", () => {
     raw: serialized,
     error: null,
   });
+});
+
+test("没有 v6 数据时自动迁移有效 v5 数据且保留旧键", () => {
+  const v5 = createEmptyData();
+  v5.schemaVersion = 5;
+  const values = new Map([[PREVIOUS_STORAGE_KEY, JSON.stringify(v5)]]);
+  const storage = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, value); },
+  };
+  const result = loadData(storage);
+  assert.equal(result.status, "ready");
+  assert.equal(result.data.schemaVersion, 6);
+  assert.equal(values.has(STORAGE_KEY), true);
+  assert.equal(values.has(PREVIOUS_STORAGE_KEY), true);
 });
 
 test("损坏内容保留原文并进入写入锁定状态", () => {
@@ -96,4 +118,32 @@ test("备份提醒元数据使用独立版本化键并容忍损坏内容", () =>
   assert.deepEqual(loadBackupMetadata(storage), metadata);
   values.set(BACKUP_META_KEY, "{broken");
   assert.equal(loadBackupMetadata(storage), null);
+});
+
+test("引导式训练草稿可以保存、恢复和清除", () => {
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, value); },
+    removeItem(key) { values.delete(key); },
+  };
+  const draft = createWorkoutDraft({
+    templateId: "squatAdaptation",
+    date: "2026-07-31",
+    id: "10000000-0000-4000-8000-000000000001",
+    now: "2026-07-31T10:00:00.000Z",
+  });
+  saveWorkoutDraft(draft, storage);
+  assert.equal(values.has(WORKOUT_DRAFT_KEY), true);
+  assert.deepEqual(loadWorkoutDraft(storage), {
+    status: "ready",
+    draft,
+    error: null,
+  });
+  clearWorkoutDraft(storage);
+  assert.deepEqual(loadWorkoutDraft(storage), {
+    status: "empty",
+    draft: null,
+    error: null,
+  });
 });

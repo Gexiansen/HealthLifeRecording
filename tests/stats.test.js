@@ -61,6 +61,7 @@ function sampleData() {
       averageHeartRateBpm: 102,
       maxHeartRateBpm: 118,
       distanceMeters: 2_500,
+      guidedSession: null,
       note: "",
     },
     {
@@ -73,6 +74,7 @@ function sampleData() {
       averageHeartRateBpm: null,
       maxHeartRateBpm: null,
       distanceMeters: null,
+      guidedSession: null,
       note: "",
     },
     {
@@ -85,6 +87,7 @@ function sampleData() {
       averageHeartRateBpm: 110,
       maxHeartRateBpm: 138,
       distanceMeters: null,
+      guidedSession: null,
       note: "",
     },
   );
@@ -194,6 +197,7 @@ test("趋势比较使用紧邻的等长上一周期且数据不足时不推断",
       averageHeartRateBpm: null,
       maxHeartRateBpm: null,
       distanceMeters: null,
+      guidedSession: null,
       note: "",
     },
   );

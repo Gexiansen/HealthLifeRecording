@@ -31,6 +31,7 @@ test("计划趋势和匹配运动记录保持计划与事实分离", () => {
     averageHeartRateBpm: null,
     maxHeartRateBpm: null,
     distanceMeters: null,
+    guidedSession: null,
     note: "",
     createdAt: "2026-07-28T00:00:00.000Z",
     updatedAt: "2026-07-28T00:00:00.000Z",

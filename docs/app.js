@@ -16,10 +16,13 @@ import {
   updateWeeklyTraining,
 } from "./data.js";
 import {
+  clearWorkoutDraft,
   loadBackupMetadata,
   loadData,
+  loadWorkoutDraft,
   saveBackupMetadata,
   saveData,
+  saveWorkoutDraft,
 } from "./storage.js";
 import {
   calculateRecordingStreak,
@@ -62,6 +65,18 @@ import {
   TRAINING_PLAN_LABELS,
   WORKDAY_LABELS,
 } from "./planning.js";
+import {
+  completeWorkoutSet,
+  createGuidedSessionSnapshot,
+  createWorkoutDraft,
+  estimateWorkoutDurationMinutes,
+  EXERCISE_LIBRARY,
+  getWorkoutStep,
+  GUIDED_TEMPLATES,
+  recommendedTemplateId,
+  skipWorkoutExercise,
+  workoutDraftProgress,
+} from "./guided-workout.js";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -115,6 +130,10 @@ let weeklyPlanBaseline = null;
 let customFoodBaseline = null;
 let recipeBaseline = null;
 let pendingPlanConflict = null;
+let workoutDraftState = loadWorkoutDraft();
+let workoutDraft = workoutDraftState.draft;
+let workoutRestTimer = null;
+let workoutRestEndsAt = null;
 
 const elements = {
   storageAlert: document.querySelector("#storage-alert"),
@@ -142,6 +161,7 @@ const elements = {
   planDetail: document.querySelector("#plan-detail"),
   planMealReminder: document.querySelector("#plan-meal-reminder"),
   planLinkDetail: document.querySelector("#plan-link-detail"),
+  startGuidedWorkout: document.querySelector("#start-guided-workout"),
   workoutSummary: document.querySelector("#workout-summary"),
   activitySummary: document.querySelector("#activity-summary"),
   mealSummary: document.querySelector("#meal-summary"),
@@ -255,6 +275,38 @@ const elements = {
   planConflictMessage: document.querySelector("#plan-conflict-message"),
   cancelPlanConflict: document.querySelector("#cancel-plan-conflict"),
   confirmPlanConflict: document.querySelector("#confirm-plan-conflict"),
+  guidedWorkoutDialog: document.querySelector("#guided-workout-dialog"),
+  guidedWorkoutTitle: document.querySelector("#guided-workout-title"),
+  closeGuidedWorkout: document.querySelector("#close-guided-workout"),
+  workoutTemplateChooser: document.querySelector("#workout-template-chooser"),
+  workoutTemplateList: document.querySelector("#workout-template-list"),
+  workoutActiveStage: document.querySelector("#workout-active-stage"),
+  workoutExerciseProgress: document.querySelector("#workout-exercise-progress"),
+  workoutSetProgress: document.querySelector("#workout-set-progress"),
+  workoutProgress: document.querySelector("#workout-progress"),
+  workoutEquipment: document.querySelector("#workout-equipment"),
+  workoutExerciseName: document.querySelector("#workout-exercise-name"),
+  workoutSetup: document.querySelector("#workout-setup"),
+  workoutCues: document.querySelector("#workout-cues"),
+  workoutMistakes: document.querySelector("#workout-mistakes"),
+  workoutStopCondition: document.querySelector("#workout-stop-condition"),
+  workoutCompletedValueLabel: document.querySelector("#workout-completed-value-label"),
+  workoutCompletedValue: document.querySelector("#workout-completed-value"),
+  workoutWeightField: document.querySelector("#workout-weight-field"),
+  workoutWeight: document.querySelector("#workout-weight"),
+  workoutStageError: document.querySelector("#workout-stage-error"),
+  completeWorkoutSet: document.querySelector("#complete-workout-set"),
+  skipWorkoutExercise: document.querySelector("#skip-workout-exercise"),
+  finishWorkoutEarly: document.querySelector("#finish-workout-early"),
+  workoutRestStage: document.querySelector("#workout-rest-stage"),
+  workoutRestCountdown: document.querySelector("#workout-rest-countdown"),
+  workoutNextStep: document.querySelector("#workout-next-step"),
+  skipWorkoutRest: document.querySelector("#skip-workout-rest"),
+  workoutSummaryStage: document.querySelector("#workout-summary-stage"),
+  workoutSummaryList: document.querySelector("#workout-summary-list"),
+  workoutPerceivedEffort: document.querySelector("#workout-perceived-effort"),
+  workoutSummaryError: document.querySelector("#workout-summary-error"),
+  confirmGuidedWorkout: document.querySelector("#confirm-guided-workout"),
 };
 
 initialize();
@@ -268,6 +320,7 @@ function initialize() {
   bindEvents();
   renderStorageState();
   renderAll();
+  reconcileWorkoutDraft();
   registerServiceWorker();
 }
 
@@ -373,6 +426,17 @@ function bindEvents() {
     elements.planConflictDialog.close();
   });
   elements.confirmPlanConflict.addEventListener("click", confirmPlanConflict);
+  elements.startGuidedWorkout.addEventListener("click", openGuidedWorkout);
+  elements.closeGuidedWorkout.addEventListener("click", closeGuidedWorkout);
+  elements.completeWorkoutSet.addEventListener("click", handleCompleteWorkoutSet);
+  elements.skipWorkoutExercise.addEventListener("click", handleSkipWorkoutExercise);
+  elements.finishWorkoutEarly.addEventListener("click", finishWorkoutEarly);
+  elements.skipWorkoutRest.addEventListener("click", finishWorkoutRest);
+  elements.confirmGuidedWorkout.addEventListener("click", confirmGuidedWorkout);
+  elements.guidedWorkoutDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeGuidedWorkout();
+  });
   bindGuardedDialog(elements.planDialog, requestClosePlanDialog);
   bindGuardedDialog(elements.dataDialog, requestCloseDataDialog);
   bindGuardedDialog(elements.customFoodDialog, requestCloseCustomFoodDialog);
@@ -450,6 +514,8 @@ function renderToday() {
     button.disabled = isFuture || !data;
     button.title = isFuture ? "未来日期只能设置计划" : "";
   });
+  elements.startGuidedWorkout.disabled = (!workoutDraft && isFuture) || !data;
+  elements.startGuidedWorkout.title = !workoutDraft && isFuture ? "未来日期不能开始训练" : "";
 
   if (!data) {
     for (const element of [
@@ -510,6 +576,8 @@ function renderDailyPlan() {
     elements.planDetail.textContent = "";
     elements.planMealReminder.hidden = true;
     elements.planLinkDetail.hidden = true;
+    elements.startGuidedWorkout.textContent = "训练不可用";
+    elements.startGuidedWorkout.disabled = true;
     return;
   }
   const advice = createDailyAdvice(data.trainingPlan, selectedDate);
@@ -541,6 +609,318 @@ function renderDailyPlan() {
   elements.planMealReminder.textContent = advice.mealReminder ?? "";
   elements.planMealReminder.hidden = !advice.mealReminder;
   elements.editDailyPlan.textContent = advice.workdayType ? "调整安排" : "设置安排";
+  elements.startGuidedWorkout.textContent = workoutDraft
+    ? `继续${GUIDED_TEMPLATES[workoutDraft.templateId].name}`
+    : recommendedTemplateId(advice.recommendedTraining)
+      ? "开始推荐训练"
+      : "选择训练";
+}
+
+function reconcileWorkoutDraft() {
+  if (workoutDraft && data?.workouts.some(
+    (record) => record.guidedSession?.id === workoutDraft.id,
+  )) {
+    try {
+      clearWorkoutDraft();
+      workoutDraft = null;
+      workoutDraftState = { status: "empty", draft: null, error: null };
+    } catch {
+      showToast("训练记录已存在，但旧训练草稿清理失败");
+    }
+  } else if (workoutDraftState.status === "corrupt") {
+    showToast("上次训练草稿已损坏，无法继续；开始新训练后会覆盖该草稿");
+  } else if (workoutDraftState.status === "unavailable") {
+    showToast("训练进度存储不可用，暂时不能开始引导训练");
+  }
+  renderToday();
+}
+
+function openGuidedWorkout() {
+  if (!data || workoutDraftState.status === "unavailable") return;
+  stopWorkoutRestTimer();
+  elements.guidedWorkoutDialog.showModal();
+  if (workoutDraft) {
+    renderWorkoutStep();
+  } else {
+    renderWorkoutTemplateChooser();
+  }
+}
+
+function closeGuidedWorkout() {
+  stopWorkoutRestTimer();
+  elements.guidedWorkoutDialog.close();
+  renderToday();
+}
+
+function renderWorkoutTemplateChooser() {
+  showWorkoutStage("chooser");
+  elements.guidedWorkoutTitle.textContent = "选择训练";
+  elements.workoutTemplateList.replaceChildren();
+  const plannedType = getEffectiveTraining(data.trainingPlan, selectedDate);
+  const recommendedId = recommendedTemplateId(plannedType);
+  for (const template of Object.values(GUIDED_TEMPLATES)) {
+    const card = document.createElement("article");
+    card.className = "workout-template-card";
+    if (template.id === recommendedId) card.classList.add("recommended");
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = template.name;
+    const description = document.createElement("span");
+    description.textContent = template.description;
+    content.append(title, description);
+    if (template.id === recommendedId) {
+      const badge = document.createElement("span");
+      badge.className = "workout-template-badge";
+      badge.textContent = "符合当天计划";
+      content.append(badge);
+    }
+    const start = document.createElement("button");
+    start.type = "button";
+    start.textContent = "开始";
+    start.addEventListener("click", () => startWorkoutTemplate(template.id));
+    card.append(content, start);
+    elements.workoutTemplateList.append(card);
+  }
+}
+
+function startWorkoutTemplate(templateId) {
+  try {
+    const now = new Date().toISOString();
+    const next = createWorkoutDraft({
+      templateId,
+      date: selectedDate,
+      id: createId(),
+      now,
+    });
+    saveWorkoutDraft(next);
+    workoutDraft = next;
+    workoutDraftState = { status: "ready", draft: next, error: null };
+    renderWorkoutStep();
+    renderToday();
+  } catch (error) {
+    showToast(error.message || "训练无法开始");
+  }
+}
+
+function renderWorkoutStep() {
+  if (!workoutDraft) return renderWorkoutTemplateChooser();
+  const step = getWorkoutStep(workoutDraft);
+  if (step.complete) {
+    renderWorkoutSummary();
+    return;
+  }
+  showWorkoutStage("active");
+  elements.guidedWorkoutTitle.textContent = step.template.name;
+  const progress = workoutDraftProgress(workoutDraft);
+  elements.workoutExerciseProgress.textContent =
+    `动作 ${progress.currentExercise}/${progress.totalExercises}`;
+  elements.workoutSetProgress.textContent =
+    `第 ${workoutDraft.currentSetIndex + 1}/${step.prescription.sets} 组`;
+  elements.workoutProgress.max = progress.totalSets;
+  elements.workoutProgress.value = progress.completedSets;
+  elements.workoutEquipment.textContent = `器材：${step.exercise.equipment}`;
+  elements.workoutExerciseName.textContent = step.exercise.name;
+  elements.workoutSetup.textContent = step.exercise.setup;
+  replaceTextList(elements.workoutCues, step.exercise.cues);
+  replaceTextList(elements.workoutMistakes, step.exercise.mistakes);
+  elements.workoutStopCondition.textContent = step.exercise.stopCondition;
+  elements.workoutCompletedValueLabel.textContent =
+    `本组完成${step.exercise.unitLabel}（目标 ${step.prescription.targetValue}）`;
+  elements.workoutCompletedValue.value = String(step.prescription.targetValue);
+  elements.workoutWeightField.hidden = !step.exercise.weightEnabled;
+  elements.workoutWeight.value = latestExerciseWeightKg(step.exercise.id);
+  setInlineError(elements.workoutStageError, "");
+}
+
+function replaceTextList(element, values) {
+  element.replaceChildren();
+  for (const value of values) {
+    const item = document.createElement("li");
+    item.textContent = value;
+    element.append(item);
+  }
+}
+
+function latestExerciseWeightKg(exerciseId) {
+  const latest = [...workoutDraft.completedSets].reverse().find(
+    (set) => set.exerciseId === exerciseId && set.weightGrams !== null,
+  );
+  return latest ? formatDecimal(latest.weightGrams / 1_000, 1) : "";
+}
+
+function handleCompleteWorkoutSet() {
+  if (!workoutDraft) return;
+  try {
+    const currentStep = getWorkoutStep(workoutDraft);
+    const completedValue = Number(elements.workoutCompletedValue.value);
+    const weightGrams = elements.workoutWeightField.hidden || elements.workoutWeight.value === ""
+      ? null
+      : Math.round(Number(elements.workoutWeight.value) * 1_000);
+    const next = completeWorkoutSet(workoutDraft, {
+      completedValue,
+      weightGrams,
+      now: new Date().toISOString(),
+    });
+    saveWorkoutDraft(next);
+    workoutDraft = next;
+    setInlineError(elements.workoutStageError, "");
+    if (getWorkoutStep(next).complete) {
+      renderWorkoutSummary();
+    } else {
+      startWorkoutRest(currentStep.prescription.restSeconds);
+    }
+  } catch (error) {
+    setInlineError(elements.workoutStageError, error.message || "本组保存失败");
+  }
+}
+
+function handleSkipWorkoutExercise() {
+  if (!workoutDraft) return;
+  try {
+    const next = skipWorkoutExercise(workoutDraft, new Date().toISOString());
+    saveWorkoutDraft(next);
+    workoutDraft = next;
+    renderWorkoutStep();
+  } catch (error) {
+    setInlineError(elements.workoutStageError, error.message || "动作无法跳过");
+  }
+}
+
+function finishWorkoutEarly() {
+  if (!workoutDraft) return;
+  try {
+    let next = workoutDraft;
+    const now = new Date().toISOString();
+    while (!getWorkoutStep(next).complete) {
+      next = skipWorkoutExercise(next, now);
+    }
+    saveWorkoutDraft(next);
+    workoutDraft = next;
+    renderWorkoutSummary();
+  } catch (error) {
+    setInlineError(elements.workoutStageError, error.message || "无法结束训练");
+  }
+}
+
+function startWorkoutRest(seconds) {
+  stopWorkoutRestTimer();
+  showWorkoutStage("rest");
+  const nextStep = getWorkoutStep(workoutDraft);
+  elements.workoutNextStep.textContent =
+    `接下来：${nextStep.exercise.name}，第 ${workoutDraft.currentSetIndex + 1} 组`;
+  workoutRestEndsAt = Date.now() + seconds * 1_000;
+  updateWorkoutRestCountdown();
+  workoutRestTimer = setInterval(updateWorkoutRestCountdown, 1_000);
+}
+
+function updateWorkoutRestCountdown() {
+  const remaining = Math.max(0, Math.ceil((workoutRestEndsAt - Date.now()) / 1_000));
+  const minutes = String(Math.floor(remaining / 60)).padStart(2, "0");
+  const seconds = String(remaining % 60).padStart(2, "0");
+  elements.workoutRestCountdown.textContent = `${minutes}:${seconds}`;
+  if (remaining === 0) finishWorkoutRest();
+}
+
+function finishWorkoutRest() {
+  stopWorkoutRestTimer();
+  renderWorkoutStep();
+}
+
+function stopWorkoutRestTimer() {
+  if (workoutRestTimer !== null) clearInterval(workoutRestTimer);
+  workoutRestTimer = null;
+  workoutRestEndsAt = null;
+}
+
+function renderWorkoutSummary() {
+  stopWorkoutRestTimer();
+  showWorkoutStage("summary");
+  const snapshot = createGuidedSessionSnapshot(
+    workoutDraft,
+    Number(elements.workoutPerceivedEffort.value),
+    new Date().toISOString(),
+  );
+  elements.guidedWorkoutTitle.textContent = "训练总结";
+  elements.workoutSummaryList.replaceChildren();
+  for (const exercise of snapshot.exercises) {
+    const item = document.createElement("article");
+    item.className = "workout-summary-item";
+    const title = document.createElement("strong");
+    title.textContent = exercise.name;
+    const detail = document.createElement("span");
+    const unitLabel = EXERCISE_LIBRARY[exercise.exerciseId].unitLabel;
+    detail.textContent = exercise.sets.length
+      ? exercise.sets.map((set) =>
+        `${set.completedValue} ${unitLabel}${set.weightGrams === null ? "" : `，${formatDecimal(set.weightGrams / 1_000, 1)} kg`}`
+      ).join("；")
+      : "已跳过";
+    item.append(title, detail);
+    elements.workoutSummaryList.append(item);
+  }
+  setInlineError(
+    elements.workoutSummaryError,
+    workoutDraft.completedSets.length ? "" : "尚未完成任何一组，不能生成运动记录。",
+  );
+  elements.confirmGuidedWorkout.disabled = workoutDraft.completedSets.length === 0;
+}
+
+function confirmGuidedWorkout() {
+  if (!workoutDraft || !data) return;
+  const completedAt = new Date().toISOString();
+  try {
+    if (!workoutDraft.completedSets.length) throw new TypeError("请至少完成一组训练");
+    const perceivedEffort = Number(elements.workoutPerceivedEffort.value);
+    const guidedSession = createGuidedSessionSnapshot(
+      workoutDraft,
+      perceivedEffort,
+      completedAt,
+    );
+    const workout = {
+      id: createId(),
+      date: workoutDraft.date,
+      type: guidedSession.templateId === "stairBeginner" ? "cardio" : "strength",
+      durationMinutes: estimateWorkoutDurationMinutes(workoutDraft, completedAt),
+      intensity: perceivedEffort,
+      source: "manual",
+      activeEnergyKcal: null,
+      averageHeartRateBpm: null,
+      maxHeartRateBpm: null,
+      distanceMeters: null,
+      guidedSession,
+      note: "",
+      createdAt: completedAt,
+      updatedAt: completedAt,
+    };
+    const next = saveRecord(data, "workouts", workout);
+    saveData(next);
+    data = next;
+    try {
+      clearWorkoutDraft();
+    } catch {
+      showToast("运动记录已保存，但训练草稿清理失败");
+    }
+    workoutDraft = null;
+    workoutDraftState = { status: "empty", draft: null, error: null };
+    selectedDate = workout.date;
+    calendarAnchor = workout.date;
+    elements.guidedWorkoutDialog.close();
+    renderAll();
+    const matchingPlan = findDailyPlan(data.trainingPlan, workout.date);
+    showToast(
+      matchingPlan?.status === "planned"
+        ? "训练记录已保存；请确认当天计划状态"
+        : "训练记录已保存",
+    );
+  } catch (error) {
+    setInlineError(elements.workoutSummaryError, error.message || "训练记录保存失败");
+  }
+}
+
+function showWorkoutStage(name) {
+  elements.workoutTemplateChooser.hidden = name !== "chooser";
+  elements.workoutActiveStage.hidden = name !== "active";
+  elements.workoutRestStage.hidden = name !== "rest";
+  elements.workoutSummaryStage.hidden = name !== "summary";
 }
 
 function renderCalendar() {
@@ -976,6 +1356,12 @@ function describeRecord(collectionName, record) {
       record.distanceMeters === null
         ? null
         : `配速 ${formatPace(record.durationMinutes, record.distanceMeters)}`,
+      record.guidedSession === null
+        ? null
+        : `${record.guidedSession.templateName} · ${record.guidedSession.exercises
+          .filter((exercise) => exercise.status !== "skipped")
+          .map((exercise) => `${exercise.name} ${exercise.sets.length} 组`)
+          .join("、")}`,
     ];
     detail = metrics.filter(Boolean).join(" · ");
   } else if (collectionName === "dailyActivities") {
@@ -1793,6 +2179,7 @@ function buildRecord(type, form, base) {
       distanceMeters: form.elements.distanceKm.value === ""
         ? null
         : Math.round(Number(form.elements.distanceKm.value) * 1_000),
+      guidedSession: editing?.record?.guidedSession ?? null,
       note: form.elements.note.value.trim(),
     };
   }

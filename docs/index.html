@@ -77,6 +77,7 @@
           <p id="plan-detail" class="plan-detail"></p>
           <p id="plan-link-detail" class="plan-link-detail" hidden></p>
           <p id="plan-meal-reminder" class="plan-meal-reminder" hidden></p>
+          <button id="start-guided-workout" class="plan-start-button" type="button">开始训练</button>
         </article>
 
         <div class="summary-grid">
@@ -429,6 +430,76 @@
           <button id="cancel-plan-conflict" class="secondary-neutral-button" type="button">返回修改</button>
           <button id="confirm-plan-conflict" class="danger-button" type="button">确认覆盖</button>
         </div>
+      </div>
+    </dialog>
+
+    <dialog id="guided-workout-dialog" class="guided-workout-dialog" aria-labelledby="guided-workout-title">
+      <div class="guided-workout-shell">
+        <header class="guided-workout-header">
+          <div>
+            <p class="eyebrow">引导式训练</p>
+            <h2 id="guided-workout-title">选择训练</h2>
+          </div>
+          <button id="close-guided-workout" class="icon-button" type="button" aria-label="暂时退出训练">×</button>
+        </header>
+
+        <section id="workout-template-chooser" class="workout-stage">
+          <p class="workout-intro">动作按组逐项完成。每次完成都会保存在当前浏览器中，退出后可以继续。</p>
+          <div id="workout-template-list" class="workout-template-list"></div>
+        </section>
+
+        <section id="workout-active-stage" class="workout-stage" hidden>
+          <div class="workout-progress-heading">
+            <span id="workout-exercise-progress"></span>
+            <span id="workout-set-progress"></span>
+          </div>
+          <progress id="workout-progress" max="1" value="0"></progress>
+          <article class="exercise-guide">
+            <p id="workout-equipment" class="exercise-equipment"></p>
+            <h3 id="workout-exercise-name"></h3>
+            <p id="workout-setup" class="exercise-setup"></p>
+            <div class="exercise-cues">
+              <strong>训练时只记住这三点</strong>
+              <ol id="workout-cues"></ol>
+            </div>
+            <details class="exercise-more">
+              <summary>查看常见错误和停止条件</summary>
+              <strong>常见错误</strong>
+              <ul id="workout-mistakes"></ul>
+              <strong>停止条件</strong>
+              <p id="workout-stop-condition"></p>
+            </details>
+          </article>
+          <div class="workout-set-form">
+            <label class="field"><span id="workout-completed-value-label">本组完成次数</span><input id="workout-completed-value" type="number" min="1" max="1000" step="1" inputmode="numeric"></label>
+            <label id="workout-weight-field" class="field"><span>本组负重（kg，可选）</span><input id="workout-weight" type="number" min="0.1" max="200" step="0.1" inputmode="decimal"></label>
+          </div>
+          <p id="workout-stage-error" class="form-error inline-error" role="alert" hidden></p>
+          <button id="complete-workout-set" class="primary-button" type="button">完成本组</button>
+          <div class="workout-secondary-actions">
+            <button id="skip-workout-exercise" class="text-button" type="button">跳过这个动作</button>
+            <button id="finish-workout-early" class="text-button" type="button">提前结束并总结</button>
+          </div>
+        </section>
+
+        <section id="workout-rest-stage" class="workout-stage workout-rest-stage" hidden>
+          <p class="eyebrow">本组已完成</p>
+          <strong id="workout-rest-countdown" class="rest-countdown">01:30</strong>
+          <p id="workout-next-step"></p>
+          <button id="skip-workout-rest" class="primary-button" type="button">跳过休息</button>
+        </section>
+
+        <section id="workout-summary-stage" class="workout-stage" hidden>
+          <p class="workout-intro">先核对实际完成情况，确认后才会生成正式运动记录。</p>
+          <div id="workout-summary-list" class="workout-summary-list"></div>
+          <label class="field"><span>整体感受</span><select id="workout-perceived-effort">
+            <option value="1">轻松，还能完成很多</option>
+            <option value="2" selected>合适，保留约 2～3 次余力</option>
+            <option value="3">吃力，动作开始难以保持</option>
+          </select></label>
+          <p id="workout-summary-error" class="form-error inline-error" role="alert" hidden></p>
+          <button id="confirm-guided-workout" class="primary-button" type="button">确认并保存运动记录</button>
+        </section>
       </div>
     </dialog>
 

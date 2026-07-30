@@ -1,4 +1,4 @@
-const CACHE_NAME = "healthlife-shell-v13";
+const CACHE_NAME = "healthlife-shell-v14";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -13,6 +13,7 @@ const APP_SHELL = [
   "./nutrition.js",
   "./analysis.js",
   "./planning.js",
+  "./guided-workout.js",
   "./storage.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",

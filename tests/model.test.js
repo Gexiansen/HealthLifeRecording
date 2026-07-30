@@ -6,6 +6,7 @@ import {
   calculateSleepMinutes,
   calculateWeightMovingAverage,
   createEmptyData,
+  migrateV5Data,
 } from "../docs/model.js";
 
 const CREATED_AT = "2026-07-22T08:00:00.000Z";
@@ -31,6 +32,7 @@ function validData() {
     averageHeartRateBpm: 108,
     maxHeartRateBpm: 136,
     distanceMeters: null,
+    guidedSession: null,
     note: "虚构训练",
   });
   data.meals.push({
@@ -86,7 +88,7 @@ function validData() {
   return data;
 }
 
-test("空数据和完整 schema v5 数据通过校验", () => {
+test("空数据和完整 schema v6 数据通过校验", () => {
   assert.equal(assertValidData(createEmptyData()), true);
   assert.equal(assertValidData(validData()), true);
 });
@@ -141,6 +143,49 @@ test("运动、饮食和设置字段执行严格范围校验", () => {
   const invalidWeeklyPlan = validData();
   invalidWeeklyPlan.trainingPlan.weeklyTraining[0] = "hardRun";
   assert.throws(() => assertValidData(invalidWeeklyPlan), /weeklyTraining/);
+});
+
+test("引导式训练快照严格校验动作、组次和负重", () => {
+  const data = validData();
+  data.workouts[0].guidedSession = {
+    id: "11000000-0000-4000-8000-000000000001",
+    templateId: "squatAdaptation",
+    templateName: "动作适应：壶铃深蹲",
+    startedAt: "2026-07-20T08:00:00.000Z",
+    completedAt: "2026-07-20T08:15:00.000Z",
+    perceivedEffort: 2,
+    exercises: [{
+      exerciseId: "gobletSquat",
+      name: "壶铃杯式深蹲",
+      unit: "reps",
+      status: "completed",
+      sets: [{
+        targetValue: 8,
+        completedValue: 8,
+        weightGrams: 8_000,
+      }],
+    }],
+  };
+  assert.equal(assertValidData(data), true);
+
+  const invalid = structuredClone(data);
+  invalid.workouts[0].guidedSession.exercises[0].sets[0].completedValue = 0;
+  assert.throws(() => assertValidData(invalid), /completedValue/);
+
+  const skippedWithSets = structuredClone(data);
+  skippedWithSets.workouts[0].guidedSession.exercises[0].status = "skipped";
+  assert.throws(() => assertValidData(skippedWithSets), /必须为空/);
+});
+
+test("schema v5 迁移到 v6 时保留旧记录并补充空训练详情", () => {
+  const v5 = validData();
+  v5.schemaVersion = 5;
+  v5.workouts = v5.workouts.map(({ guidedSession, ...workout }) => workout);
+  const migrated = migrateV5Data(v5);
+  assert.equal(migrated.schemaVersion, 6);
+  assert.equal(migrated.workouts[0].guidedSession, null);
+  assert.equal(migrated.workouts[0].note, "虚构训练");
+  assert.equal(assertValidData(migrated), true);
 });
 
 test("每日计划严格校验状态、改期日期和日期唯一性", () => {

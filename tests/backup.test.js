@@ -62,12 +62,27 @@ test("完整备份拒绝损坏 JSON、未知版本、未知字段和无效数据
   const valid = JSON.parse(serializeCompleteBackup(dataWithWeight(), EXPORTED_AT));
   valid.backupVersion = 4;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /backupVersion/);
-  valid.backupVersion = 5;
+  valid.backupVersion = 6;
   valid.extra = true;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /未知字段/);
   delete valid.extra;
   valid.data.weights[0].weightGrams = 1;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /weightGrams/);
+});
+
+test("v5 完整备份导入时迁移为 schema v6", () => {
+  const v5Data = dataWithWeight();
+  v5Data.schemaVersion = 5;
+  const text = JSON.stringify({
+    format: "healthlife-complete-backup",
+    backupVersion: 5,
+    exportedAt: EXPORTED_AT,
+    data: v5Data,
+  });
+  const parsed = parseCompleteBackup(text);
+  assert.equal(parsed.backup.backupVersion, 6);
+  assert.equal(parsed.backup.data.schemaVersion, 6);
+  assert.equal(parsed.summary.totalRecords, 1);
 });
 
 test("备份提醒覆盖从未备份、过期、新增较多、计划变化和最新状态", () => {

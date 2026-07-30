@@ -1,4 +1,4 @@
-# HealthLife schema v5
+# HealthLife schema v6
 
 ## 根对象
 
@@ -6,7 +6,7 @@
 
 ```js
 {
-  schemaVersion: 5,
+  schemaVersion: 6,
   settings: {},
   trainingPlan: {
     weeklyTraining: [],
@@ -26,7 +26,7 @@
 
 日期统一使用本地自然日 `YYYY-MM-DD`，时间统一使用 `HH:mm`。记录 ID 使用 UUID，`createdAt` 和 `updatedAt` 使用标准 UTC ISO 8601 时间戳。
 
-schema v5 使用 `healthlife:data:v5` 独立存储键。当前尚无正式数据，因此不读取或迁移 v1／v2／v3／v4，旧键不会被主动删除。完整备份版本同步升级为 5，只接受严格有效的 v5 完整备份。
+schema v6 使用 `healthlife:data:v6` 独立存储键。当前键为空时会读取并严格迁移有效的 `healthlife:data:v5`，旧 v5 键不会被主动删除；v1／v2／v3／v4 继续不读取。完整备份版本同步升级为 6，并兼容导入后迁移有效的 v5 完整备份。
 
 ## 设置
 
@@ -123,11 +123,28 @@ schema v5 使用 `healthlife:data:v5` 独立存储键。当前尚无正式数据
 | `averageHeartRateBpm` | integer／null | 平均心率，30～240 bpm |
 | `maxHeartRateBpm` | integer／null | 最高心率，30～240 bpm，不能低于平均心率 |
 | `distanceMeters` | integer／null | 距离，1～1,000,000 米 |
+| `guidedSession` | object／null | 引导式训练完成快照；普通手动记录为 `null` |
 | `note` | string | 0～500 个字符 |
 | `createdAt` | string | UTC ISO 8601 时间戳 |
 | `updatedAt` | string | 不早于 `createdAt` |
 
 平均配速由 `durationMinutes ÷ distanceMeters` 计算，只在存在距离时展示，不单独持久化。上述设备指标都是可选摘要，`source: appleWatch` 表示由用户从 Apple Watch 手动抄录，不代表网页已直接连接 HealthKit。
+
+### 引导式训练快照
+
+`guidedSession` 保存一次已确认训练的历史快照：
+
+| 字段 | 类型 | 规则 |
+| --- | --- | --- |
+| `id` | string | 本次引导训练 UUID，全数据唯一 |
+| `templateId`、`templateName` | string | 完成时使用的模板标识和名称快照 |
+| `startedAt`、`completedAt` | string | UTC ISO 8601 时间戳，完成时间不得早于开始时间 |
+| `perceivedEffort` | integer | 1～3，分别表示轻松、合适、吃力 |
+| `exercises` | array | 1～20 个动作完成快照 |
+
+每个动作保存 `exerciseId`、`name`、计量单位、完成状态和实际组次。计量单位为 `reps`、`repsEachSide` 或 `floors`；状态为 `completed`、`shortened` 或 `skipped`。每组保存目标值、实际值和可选整数克负重，跳过动作不得包含已完成组。
+
+进行中的训练不进入根对象，而是使用 `healthlife:workout-draft:v1` 独立保存。草稿包含模板、日期、当前位置、已完成组和跳过动作；每次完成一组后先写入草稿，成功后界面才前进。结束页确认生成正式运动记录后再清除草稿。
 
 ## 每日活动
 
@@ -191,7 +208,7 @@ schema v5 使用 `healthlife:data:v5` 独立存储键。当前尚无正式数据
 - 自定义食品、菜谱、菜谱原料、业务记录和餐食明细的 ID 在整个根对象中唯一。
 - 睡眠、体重、饮水和每日活动分别按日期唯一；运动和饮食允许同日多条。
 - 重量和其他整数单位字段必须是整数；每 100 克营养值最多一位小数，不能使用字符串或隐式转换。
-- schema v5 不接受未知字段，不静默丢弃无效项。
+- schema v6 不接受未知字段，不静默丢弃无效项。
 - `serializeData` 和 `parseData` 在输出或返回数据前都会执行整体校验。
-- v5 完整备份保留训练模板、双向改期关系、每日计划、食物库、菜谱、偏好、所有历史营养快照、运动摘要和每日步数。
-- 分析 JSON 按自然日汇总计划状态、体重、睡眠、运动、每日步数、餐食明细、每日营养和饮水，供后续趋势分析使用。
+- v6 完整备份保留训练模板、双向改期关系、每日计划、食物库、菜谱、偏好、所有历史营养快照、运动摘要、引导式训练快照和每日步数。
+- 分析 JSON 按自然日汇总计划状态、体重、睡眠、运动、引导式训练动作、每日步数、餐食明细、每日营养和饮水，供后续趋势分析使用。
