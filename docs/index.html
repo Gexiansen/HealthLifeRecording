@@ -470,9 +470,20 @@
               <p id="workout-stop-condition"></p>
             </details>
           </article>
+          <section class="workout-context" aria-label="动作历史与建议">
+            <label id="workout-replacement-field" class="field" hidden>
+              <span>本次动作选择</span>
+              <select id="workout-exercise-replacement"></select>
+            </label>
+            <div>
+              <strong>同动作最近记录</strong>
+              <div id="workout-history" class="workout-history"></div>
+            </div>
+            <p id="workout-progression-advice" class="workout-progression-advice"></p>
+          </section>
           <div class="workout-set-form">
             <label class="field"><span id="workout-completed-value-label">本组完成次数</span><input id="workout-completed-value" type="number" min="1" max="1000" step="1" inputmode="numeric"></label>
-            <label id="workout-weight-field" class="field"><span>本组负重（kg，可选）</span><input id="workout-weight" type="number" min="0.1" max="200" step="0.1" inputmode="decimal"></label>
+            <label id="workout-weight-field" class="field"><span id="workout-weight-label">本组负重（kg，可选）</span><input id="workout-weight" type="number" min="0.1" max="200" step="0.1" inputmode="decimal"></label>
           </div>
           <p id="workout-stage-error" class="form-error inline-error" role="alert" hidden></p>
           <button id="complete-workout-set" class="primary-button" type="button">完成本组</button>

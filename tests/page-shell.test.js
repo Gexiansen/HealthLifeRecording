@@ -30,6 +30,8 @@ test("页面包含三个一级导航和六类记录表单", () => {
   assert.match(html, /id="guided-workout-dialog"/);
   assert.match(html, /id="complete-workout-set"/);
   assert.match(html, /id="workout-rest-countdown"/);
+  assert.match(html, /id="workout-exercise-replacement"/);
+  assert.match(html, /id="workout-history"/);
   assert.match(html, /id="confirm-guided-workout"/);
   assert.match(html, /id="import-plans"/);
   assert.match(html, />设置<\/button>/);

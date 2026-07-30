@@ -62,7 +62,7 @@ test("完整备份拒绝损坏 JSON、未知版本、未知字段和无效数据
   const valid = JSON.parse(serializeCompleteBackup(dataWithWeight(), EXPORTED_AT));
   valid.backupVersion = 4;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /backupVersion/);
-  valid.backupVersion = 6;
+  valid.backupVersion = 7;
   valid.extra = true;
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /未知字段/);
   delete valid.extra;
@@ -70,7 +70,7 @@ test("完整备份拒绝损坏 JSON、未知版本、未知字段和无效数据
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /weightGrams/);
 });
 
-test("v5 完整备份导入时迁移为 schema v6", () => {
+test("v5 完整备份导入时迁移为 schema v7", () => {
   const v5Data = dataWithWeight();
   v5Data.schemaVersion = 5;
   const text = JSON.stringify({
@@ -80,8 +80,8 @@ test("v5 完整备份导入时迁移为 schema v6", () => {
     data: v5Data,
   });
   const parsed = parseCompleteBackup(text);
-  assert.equal(parsed.backup.backupVersion, 6);
-  assert.equal(parsed.backup.data.schemaVersion, 6);
+  assert.equal(parsed.backup.backupVersion, 7);
+  assert.equal(parsed.backup.data.schemaVersion, 7);
   assert.equal(parsed.summary.totalRecords, 1);
 });
 

@@ -1,16 +1,22 @@
 import {
   createEmptyData,
   migrateV5Data,
+  migrateV6Data,
   parseData,
   serializeData,
 } from "./model.js";
 import { parseBackupMetadata } from "./backup.js";
-import { assertValidWorkoutDraft } from "./guided-workout.js";
+import {
+  assertValidWorkoutDraft,
+  migrateWorkoutDraftV1,
+} from "./guided-workout.js";
 
-export const STORAGE_KEY = "healthlife:data:v6";
-export const PREVIOUS_STORAGE_KEY = "healthlife:data:v5";
-export const BACKUP_META_KEY = "healthlife:backup-meta:v6";
-export const WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v1";
+export const STORAGE_KEY = "healthlife:data:v7";
+export const PREVIOUS_STORAGE_KEY = "healthlife:data:v6";
+export const LEGACY_STORAGE_KEY = "healthlife:data:v5";
+export const BACKUP_META_KEY = "healthlife:backup-meta:v7";
+export const WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v2";
+export const PREVIOUS_WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v1";
 
 export class StorageWriteError extends Error {
   constructor(cause) {
@@ -35,14 +41,23 @@ export function loadData(storage = globalThis.localStorage) {
 
   if (raw === null) {
     let previousRaw;
+    let previousVersion;
     try {
       previousRaw = storage.getItem(PREVIOUS_STORAGE_KEY);
+      previousVersion = 6;
+      if (previousRaw === null) {
+        previousRaw = storage.getItem(LEGACY_STORAGE_KEY);
+        previousVersion = 5;
+      }
     } catch (error) {
       return { status: "unavailable", data: null, raw: null, error };
     }
     if (previousRaw !== null) {
       try {
-        const migrated = migrateV5Data(JSON.parse(previousRaw));
+        const previous = JSON.parse(previousRaw);
+        const migrated = previousVersion === 6
+          ? migrateV6Data(previous)
+          : migrateV5Data(previous);
         const serialized = serializeData(migrated);
         storage.setItem(STORAGE_KEY, serialized);
         return {
@@ -113,15 +128,24 @@ export function saveBackupMetadata(metadata, storage = globalThis.localStorage) 
 
 export function loadWorkoutDraft(storage = globalThis.localStorage) {
   let raw;
+  let isPreviousVersion = false;
   try {
     raw = storage.getItem(WORKOUT_DRAFT_KEY);
+    if (raw === null) {
+      raw = storage.getItem(PREVIOUS_WORKOUT_DRAFT_KEY);
+      isPreviousVersion = raw !== null;
+    }
   } catch (error) {
     return { status: "unavailable", draft: null, error };
   }
   if (raw === null) return { status: "empty", draft: null, error: null };
   try {
-    const draft = JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    const draft = isPreviousVersion ? migrateWorkoutDraftV1(parsed) : parsed;
     assertValidWorkoutDraft(draft);
+    if (isPreviousVersion) {
+      storage.setItem(WORKOUT_DRAFT_KEY, JSON.stringify(draft));
+    }
     return { status: "ready", draft, error: null };
   } catch (error) {
     return { status: "corrupt", draft: null, error };

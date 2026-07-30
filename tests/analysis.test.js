@@ -71,8 +71,8 @@ test("分析导出按日期汇总餐食营养并保留可信度", () => {
     updatedAt: "2026-07-29T08:00:00.000Z",
   });
   const result = createAnalysisExport(data, "2026-07-29T09:00:00.000Z");
-  assert.equal(result.analysisVersion, 4);
-  assert.equal(result.schemaVersion, 6);
+  assert.equal(result.analysisVersion, 5);
+  assert.equal(result.schemaVersion, 7);
   assert.deepEqual(result.dateRange, {
     firstDate: "2026-07-29",
     lastDate: "2026-07-29",

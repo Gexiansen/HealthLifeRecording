@@ -69,14 +69,22 @@ import {
   completeWorkoutSet,
   createGuidedSessionSnapshot,
   createWorkoutDraft,
+  DISCOMFORT_BODY_PART_LABELS,
   estimateWorkoutDurationMinutes,
   EXERCISE_LIBRARY,
+  EXERCISE_REPLACEMENTS,
   getWorkoutStep,
   GUIDED_TEMPLATES,
   recommendedTemplateId,
+  replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
 } from "./guided-workout.js";
+import {
+  createProgressionAdvice,
+  getExerciseHistory,
+  summarizeWorkoutDiscomfort,
+} from "./training-insights.js";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -290,9 +298,14 @@ const elements = {
   workoutCues: document.querySelector("#workout-cues"),
   workoutMistakes: document.querySelector("#workout-mistakes"),
   workoutStopCondition: document.querySelector("#workout-stop-condition"),
+  workoutReplacementField: document.querySelector("#workout-replacement-field"),
+  workoutExerciseReplacement: document.querySelector("#workout-exercise-replacement"),
+  workoutHistory: document.querySelector("#workout-history"),
+  workoutProgressionAdvice: document.querySelector("#workout-progression-advice"),
   workoutCompletedValueLabel: document.querySelector("#workout-completed-value-label"),
   workoutCompletedValue: document.querySelector("#workout-completed-value"),
   workoutWeightField: document.querySelector("#workout-weight-field"),
+  workoutWeightLabel: document.querySelector("#workout-weight-label"),
   workoutWeight: document.querySelector("#workout-weight"),
   workoutStageError: document.querySelector("#workout-stage-error"),
   completeWorkoutSet: document.querySelector("#complete-workout-set"),
@@ -429,6 +442,7 @@ function bindEvents() {
   elements.startGuidedWorkout.addEventListener("click", openGuidedWorkout);
   elements.closeGuidedWorkout.addEventListener("click", closeGuidedWorkout);
   elements.completeWorkoutSet.addEventListener("click", handleCompleteWorkoutSet);
+  elements.workoutExerciseReplacement.addEventListener("change", handleWorkoutReplacement);
   elements.skipWorkoutExercise.addEventListener("click", handleSkipWorkoutExercise);
   elements.finishWorkoutEarly.addEventListener("click", finishWorkoutEarly);
   elements.skipWorkoutRest.addEventListener("click", finishWorkoutRest);
@@ -724,12 +738,74 @@ function renderWorkoutStep() {
   replaceTextList(elements.workoutCues, step.exercise.cues);
   replaceTextList(elements.workoutMistakes, step.exercise.mistakes);
   elements.workoutStopCondition.textContent = step.exercise.stopCondition;
+  renderWorkoutReplacement(step);
+  renderExerciseHistory(step.exercise.id);
   elements.workoutCompletedValueLabel.textContent =
     `本组完成${step.exercise.unitLabel}（目标 ${step.prescription.targetValue}）`;
   elements.workoutCompletedValue.value = String(step.prescription.targetValue);
   elements.workoutWeightField.hidden = !step.exercise.weightEnabled;
+  elements.workoutWeightLabel.textContent = step.exercise.weightLabel ?? "本组负重（kg，可选）";
   elements.workoutWeight.value = latestExerciseWeightKg(step.exercise.id);
   setInlineError(elements.workoutStageError, "");
+}
+
+function renderWorkoutReplacement(step) {
+  const replacementIds = EXERCISE_REPLACEMENTS[step.plannedExercise.id] ?? [];
+  const canReplace = workoutDraft.currentSetIndex === 0 && replacementIds.length > 0;
+  elements.workoutReplacementField.hidden = !canReplace;
+  elements.workoutExerciseReplacement.replaceChildren();
+  if (!canReplace) return;
+  for (const exerciseId of [step.plannedExercise.id, ...replacementIds]) {
+    const option = document.createElement("option");
+    option.value = exerciseId;
+    option.textContent = exerciseId === step.plannedExercise.id
+      ? `${EXERCISE_LIBRARY[exerciseId].name}（原计划）`
+      : `${EXERCISE_LIBRARY[exerciseId].name}（替代）`;
+    option.selected = exerciseId === step.exercise.id;
+    elements.workoutExerciseReplacement.append(option);
+  }
+}
+
+function renderExerciseHistory(exerciseId) {
+  const history = getExerciseHistory(data.workouts, exerciseId, 3);
+  elements.workoutHistory.replaceChildren();
+  if (history.length === 0) {
+    elements.workoutHistory.textContent = "暂无同动作记录。";
+  } else {
+    for (const item of history) {
+      const line = document.createElement("span");
+      const exercise = EXERCISE_LIBRARY[exerciseId];
+      const setSummary = item.sets.map((set) => {
+        const weight = set.weightGrams === null
+          ? ""
+          : `，${formatDecimal(set.weightGrams / 1_000, 1)} kg`;
+        return `${set.completedValue} ${exercise.unitLabel}${weight}`;
+      }).join("；");
+      const discomfort = item.discomfort === null
+        ? ""
+        : ` · ${DISCOMFORT_BODY_PART_LABELS[item.discomfort.bodyPart]}不适 ${item.discomfort.severity}/3`;
+      line.textContent = `${formatDisplayDate(item.date)} · ${setSummary}${discomfort}`;
+      elements.workoutHistory.append(line);
+    }
+  }
+  elements.workoutProgressionAdvice.textContent =
+    createProgressionAdvice(history, exerciseId).text;
+}
+
+function handleWorkoutReplacement() {
+  if (!workoutDraft) return;
+  try {
+    const next = replaceWorkoutExercise(
+      workoutDraft,
+      elements.workoutExerciseReplacement.value,
+      new Date().toISOString(),
+    );
+    saveWorkoutDraft(next);
+    workoutDraft = next;
+    renderWorkoutStep();
+  } catch (error) {
+    setInlineError(elements.workoutStageError, error.message || "动作替换失败");
+  }
 }
 
 function replaceTextList(element, values) {
@@ -855,6 +931,9 @@ function renderWorkoutSummary() {
       ).join("；")
       : "已跳过";
     item.append(title, detail);
+    if (exercise.status !== "skipped") {
+      item.append(createWorkoutFeedbackControls(exercise.plannedExerciseId));
+    }
     elements.workoutSummaryList.append(item);
   }
   setInlineError(
@@ -862,6 +941,66 @@ function renderWorkoutSummary() {
     workoutDraft.completedSets.length ? "" : "尚未完成任何一组，不能生成运动记录。",
   );
   elements.confirmGuidedWorkout.disabled = workoutDraft.completedSets.length === 0;
+}
+
+function createWorkoutFeedbackControls(plannedExerciseId) {
+  const container = document.createElement("div");
+  container.className = "workout-feedback";
+  container.dataset.plannedExerciseId = plannedExerciseId;
+  const partLabel = document.createElement("label");
+  partLabel.textContent = "动作后不适（可选）";
+  const partSelect = document.createElement("select");
+  partSelect.dataset.feedbackPart = plannedExerciseId;
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "未记录";
+  partSelect.append(none);
+  const noDiscomfort = document.createElement("option");
+  noDiscomfort.value = "none";
+  noDiscomfort.textContent = "没有不适";
+  partSelect.append(noDiscomfort);
+  for (const [value, label] of Object.entries(DISCOMFORT_BODY_PART_LABELS)) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    partSelect.append(option);
+  }
+  partLabel.append(partSelect);
+  const severityLabel = document.createElement("label");
+  severityLabel.textContent = "程度";
+  severityLabel.hidden = true;
+  const severitySelect = document.createElement("select");
+  severitySelect.dataset.feedbackSeverity = plannedExerciseId;
+  for (const [value, label] of [["1", "轻微"], ["2", "明显"], ["3", "严重"]]) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = `${value}/3 · ${label}`;
+    severitySelect.append(option);
+  }
+  severityLabel.append(severitySelect);
+  partSelect.addEventListener("change", () => {
+    severityLabel.hidden = partSelect.value === "" || partSelect.value === "none";
+  });
+  container.append(partLabel, severityLabel);
+  return container;
+}
+
+function collectWorkoutFeedback() {
+  const feedback = {};
+  elements.workoutSummaryList.querySelectorAll("[data-planned-exercise-id]").forEach((container) => {
+    const plannedExerciseId = container.dataset.plannedExerciseId;
+    const bodyPart = container.querySelector("[data-feedback-part]").value;
+    if (bodyPart === "") return;
+    if (bodyPart === "none") {
+      feedback[plannedExerciseId] = "none";
+      return;
+    }
+    feedback[plannedExerciseId] = {
+      bodyPart,
+      severity: Number(container.querySelector("[data-feedback-severity]").value),
+    };
+  });
+  return feedback;
 }
 
 function confirmGuidedWorkout() {
@@ -874,6 +1013,7 @@ function confirmGuidedWorkout() {
       workoutDraft,
       perceivedEffort,
       completedAt,
+      collectWorkoutFeedback(),
     );
     const workout = {
       id: createId(),
@@ -1116,6 +1256,18 @@ function renderTrends() {
     ? `共 ${summary.workout.totalMinutes} 分钟`
     : "暂无足够数据";
   if (summary.workout.count) {
+    const discomfort = summarizeWorkoutDiscomfort(
+      data.workouts,
+      summary.period.startDate,
+      summary.period.endDate,
+    );
+    const discomfortDetail = discomfort.count
+      ? `已记录动作后不适 ${discomfort.count} 次（明显及以上 ${discomfort.moderateOrHigher} 次）：${
+        Object.entries(discomfort.byBodyPart).map(
+          ([bodyPart, count]) => `${DISCOMFORT_BODY_PART_LABELS[bodyPart]} ${count} 次`,
+        ).join(" · ")
+      }`
+      : "已记录动作后不适 0 次；未填写不代表没有不适";
     renderExpandableTrendMeta(
       elements.workoutTrendMeta,
       joinComparison(
@@ -1136,6 +1288,7 @@ function renderTrends() {
           ? null
           : `距离 ${formatDistance(summary.workout.totalDistanceMeters)}`,
         summary.workout.appleWatchCount ? `Apple Watch ${summary.workout.appleWatchCount} 次` : null,
+        discomfortDetail,
       ].filter(Boolean).join(" · "),
     );
   } else {

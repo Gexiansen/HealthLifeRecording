@@ -7,6 +7,7 @@ import {
   calculateWeightMovingAverage,
   createEmptyData,
   migrateV5Data,
+  migrateV6Data,
 } from "../docs/model.js";
 
 const CREATED_AT = "2026-07-22T08:00:00.000Z";
@@ -88,7 +89,7 @@ function validData() {
   return data;
 }
 
-test("空数据和完整 schema v6 数据通过校验", () => {
+test("空数据和完整 schema v7 数据通过校验", () => {
   assert.equal(assertValidData(createEmptyData()), true);
   assert.equal(assertValidData(validData()), true);
 });
@@ -155,6 +156,7 @@ test("引导式训练快照严格校验动作、组次和负重", () => {
     completedAt: "2026-07-20T08:15:00.000Z",
     perceivedEffort: 2,
     exercises: [{
+      plannedExerciseId: "gobletSquat",
       exerciseId: "gobletSquat",
       name: "壶铃杯式深蹲",
       unit: "reps",
@@ -164,6 +166,11 @@ test("引导式训练快照严格校验动作、组次和负重", () => {
         completedValue: 8,
         weightGrams: 8_000,
       }],
+      feedbackRecorded: true,
+      discomfort: {
+        bodyPart: "knee",
+        severity: 1,
+      },
     }],
   };
   assert.equal(assertValidData(data), true);
@@ -177,14 +184,40 @@ test("引导式训练快照严格校验动作、组次和负重", () => {
   assert.throws(() => assertValidData(skippedWithSets), /必须为空/);
 });
 
-test("schema v5 迁移到 v6 时保留旧记录并补充空训练详情", () => {
+test("schema v5 迁移到 v7 时保留旧记录并补充空训练详情", () => {
   const v5 = validData();
   v5.schemaVersion = 5;
   v5.workouts = v5.workouts.map(({ guidedSession, ...workout }) => workout);
   const migrated = migrateV5Data(v5);
-  assert.equal(migrated.schemaVersion, 6);
+  assert.equal(migrated.schemaVersion, 7);
   assert.equal(migrated.workouts[0].guidedSession, null);
   assert.equal(migrated.workouts[0].note, "虚构训练");
+  assert.equal(assertValidData(migrated), true);
+});
+
+test("schema v6 迁移到 v7 时补充计划动作和空不适反馈", () => {
+  const v6 = validData();
+  v6.schemaVersion = 6;
+  v6.workouts[0].guidedSession = {
+    id: "11000000-0000-4000-8000-000000000001",
+    templateId: "squatAdaptation",
+    templateName: "动作适应：壶铃深蹲",
+    startedAt: "2026-07-20T08:00:00.000Z",
+    completedAt: "2026-07-20T08:15:00.000Z",
+    perceivedEffort: 2,
+    exercises: [{
+      exerciseId: "gobletSquat",
+      name: "壶铃杯式深蹲",
+      unit: "reps",
+      status: "completed",
+      sets: [{ targetValue: 8, completedValue: 8, weightGrams: 8_000 }],
+    }],
+  };
+  const migrated = migrateV6Data(v6);
+  assert.equal(migrated.schemaVersion, 7);
+  assert.equal(migrated.workouts[0].guidedSession.exercises[0].plannedExerciseId, "gobletSquat");
+  assert.equal(migrated.workouts[0].guidedSession.exercises[0].feedbackRecorded, false);
+  assert.equal(migrated.workouts[0].guidedSession.exercises[0].discomfort, null);
   assert.equal(assertValidData(migrated), true);
 });
 

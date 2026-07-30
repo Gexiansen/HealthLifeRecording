@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export const WORKOUT_TYPES = Object.freeze([
   "strength",
@@ -46,8 +46,23 @@ export const PLAN_STATUSES = Object.freeze([
   "rescheduled",
   "rest",
 ]);
-export const GUIDED_EXERCISE_UNITS = Object.freeze(["reps", "repsEachSide", "floors"]);
+export const GUIDED_EXERCISE_UNITS = Object.freeze([
+  "reps",
+  "repsEachSide",
+  "floors",
+  "minutes",
+]);
 export const GUIDED_EXERCISE_STATUSES = Object.freeze(["completed", "shortened", "skipped"]);
+export const DISCOMFORT_BODY_PARTS = Object.freeze([
+  "knee",
+  "lowerBack",
+  "shoulder",
+  "elbow",
+  "wrist",
+  "hip",
+  "ankle",
+  "other",
+]);
 
 const ROOT_KEYS = Object.freeze([
   "schemaVersion",
@@ -216,13 +231,56 @@ export function migrateV5Data(value) {
       throw new TypeError(`workouts[${index}] 包含 schema v5 未知字段 guidedSession`);
     }
   });
-  const migrated = {
+  const migratedV6 = {
     ...value,
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: 6,
     workouts: value.workouts.map((workout) => ({
       ...workout,
       guidedSession: null,
     })),
+  };
+  return migrateV6Data(migratedV6);
+}
+
+export function migrateV6Data(value) {
+  assertPlainObject(value, "data");
+  if (value.schemaVersion !== 6) {
+    throw new TypeError(`只能迁移 schemaVersion 6，收到：${String(value.schemaVersion)}`);
+  }
+  if (!Array.isArray(value.workouts)) throw new TypeError("workouts 必须是数组");
+  const migrated = {
+    ...value,
+    schemaVersion: SCHEMA_VERSION,
+    workouts: value.workouts.map((workout, workoutIndex) => {
+      assertPlainObject(workout, `workouts[${workoutIndex}]`);
+      if (workout.guidedSession === null) return structuredClone(workout);
+      assertPlainObject(workout.guidedSession, `workouts[${workoutIndex}].guidedSession`);
+      if (!Array.isArray(workout.guidedSession.exercises)) {
+        throw new TypeError(`workouts[${workoutIndex}].guidedSession.exercises 必须是数组`);
+      }
+      return {
+        ...structuredClone(workout),
+        guidedSession: {
+          ...structuredClone(workout.guidedSession),
+          exercises: workout.guidedSession.exercises.map((exercise, exerciseIndex) => {
+            const path = `workouts[${workoutIndex}].guidedSession.exercises[${exerciseIndex}]`;
+            assertPlainObject(exercise, path);
+            if (
+              Object.hasOwn(exercise, "plannedExerciseId")
+              || Object.hasOwn(exercise, "discomfort")
+            ) {
+              throw new TypeError(`${path} 包含 schema v6 未知字段`);
+            }
+            return {
+              ...structuredClone(exercise),
+              plannedExerciseId: exercise.exerciseId,
+              feedbackRecorded: false,
+              discomfort: null,
+            };
+          }),
+        },
+      };
+    }),
   };
   assertValidData(migrated);
   return migrated;
@@ -449,12 +507,16 @@ function validateGuidedSession(session, path) {
     const exercisePath = `${path}.exercises[${index}]`;
     assertPlainObject(exercise, exercisePath);
     assertExactKeys(exercise, [
+      "plannedExerciseId",
       "exerciseId",
       "name",
       "unit",
       "status",
       "sets",
+      "feedbackRecorded",
+      "discomfort",
     ], exercisePath);
+    assertStringLength(exercise.plannedExerciseId, 1, 60, `${exercisePath}.plannedExerciseId`);
     assertStringLength(exercise.exerciseId, 1, 60, `${exercisePath}.exerciseId`);
     if (exerciseIds.has(exercise.exerciseId)) {
       throw new TypeError(`${exercisePath}.exerciseId 重复`);
@@ -480,7 +542,22 @@ function validateGuidedSession(session, path) {
       assertIntegerInRange(set.completedValue, 1, 1_000, `${setPath}.completedValue`);
       assertNullableIntegerInRange(set.weightGrams, 100, 200_000, `${setPath}.weightGrams`);
     });
+    if (typeof exercise.feedbackRecorded !== "boolean") {
+      throw new TypeError(`${exercisePath}.feedbackRecorded 必须是布尔值`);
+    }
+    if (!exercise.feedbackRecorded && exercise.discomfort !== null) {
+      throw new TypeError(`${exercisePath}.discomfort 未反馈时必须为 null`);
+    }
+    validateExerciseDiscomfort(exercise.discomfort, `${exercisePath}.discomfort`);
   });
+}
+
+function validateExerciseDiscomfort(discomfort, path) {
+  if (discomfort === null) return;
+  assertPlainObject(discomfort, path);
+  assertExactKeys(discomfort, ["bodyPart", "severity"], path);
+  assertEnum(discomfort.bodyPart, DISCOMFORT_BODY_PARTS, `${path}.bodyPart`);
+  assertIntegerInRange(discomfort.severity, 1, 3, `${path}.severity`);
 }
 
 function validateDailyActivity(record, path) {

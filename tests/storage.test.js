@@ -4,10 +4,12 @@ import assert from "node:assert/strict";
 import {
   BACKUP_META_KEY,
   clearWorkoutDraft,
+  LEGACY_STORAGE_KEY,
   loadBackupMetadata,
   loadData,
   loadWorkoutDraft,
   PREVIOUS_STORAGE_KEY,
+  PREVIOUS_WORKOUT_DRAFT_KEY,
   saveBackupMetadata,
   saveData,
   saveWorkoutDraft,
@@ -19,10 +21,11 @@ import { createBackupMetadata } from "../docs/backup.js";
 import { createEmptyData } from "../docs/model.js";
 import { createWorkoutDraft } from "../docs/guided-workout.js";
 
-test("schema v6 使用独立存储键并保留 v5 迁移来源", () => {
-  assert.equal(STORAGE_KEY, "healthlife:data:v6");
-  assert.equal(PREVIOUS_STORAGE_KEY, "healthlife:data:v5");
-  assert.equal(BACKUP_META_KEY, "healthlife:backup-meta:v6");
+test("schema v7 使用独立存储键并保留 v6 与 v5 迁移来源", () => {
+  assert.equal(STORAGE_KEY, "healthlife:data:v7");
+  assert.equal(PREVIOUS_STORAGE_KEY, "healthlife:data:v6");
+  assert.equal(LEGACY_STORAGE_KEY, "healthlife:data:v5");
+  assert.equal(BACKUP_META_KEY, "healthlife:backup-meta:v7");
 });
 
 function memoryStorage(initial = null) {
@@ -40,7 +43,7 @@ function memoryStorage(initial = null) {
   };
 }
 
-test("空存储返回新的 schema v6 数据但不立即写入", () => {
+test("空存储返回新的 schema v7 数据但不立即写入", () => {
   const storage = memoryStorage();
   const result = loadData(storage);
   assert.equal(result.status, "empty");
@@ -61,19 +64,34 @@ test("有效内容保存后可以重新读取", () => {
   });
 });
 
-test("没有 v6 数据时自动迁移有效 v5 数据且保留旧键", () => {
-  const v5 = createEmptyData();
-  v5.schemaVersion = 5;
-  const values = new Map([[PREVIOUS_STORAGE_KEY, JSON.stringify(v5)]]);
+test("没有 v7 数据时自动迁移有效 v6 数据且保留旧键", () => {
+  const v6 = createEmptyData();
+  v6.schemaVersion = 6;
+  const values = new Map([[PREVIOUS_STORAGE_KEY, JSON.stringify(v6)]]);
   const storage = {
     getItem(key) { return values.get(key) ?? null; },
     setItem(key, value) { values.set(key, value); },
   };
   const result = loadData(storage);
   assert.equal(result.status, "ready");
-  assert.equal(result.data.schemaVersion, 6);
+  assert.equal(result.data.schemaVersion, 7);
   assert.equal(values.has(STORAGE_KEY), true);
   assert.equal(values.has(PREVIOUS_STORAGE_KEY), true);
+});
+
+test("没有 v7 或 v6 数据时自动迁移有效 v5 数据且保留旧键", () => {
+  const v5 = createEmptyData();
+  v5.schemaVersion = 5;
+  const values = new Map([[LEGACY_STORAGE_KEY, JSON.stringify(v5)]]);
+  const storage = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, value); },
+  };
+  const result = loadData(storage);
+  assert.equal(result.status, "ready");
+  assert.equal(result.data.schemaVersion, 7);
+  assert.equal(values.has(STORAGE_KEY), true);
+  assert.equal(values.has(LEGACY_STORAGE_KEY), true);
 });
 
 test("损坏内容保留原文并进入写入锁定状态", () => {
@@ -146,4 +164,25 @@ test("引导式训练草稿可以保存、恢复和清除", () => {
     draft: null,
     error: null,
   });
+});
+
+test("v1 引导式训练草稿会迁移到 v2 且保留旧键", () => {
+  const draft = createWorkoutDraft({
+    templateId: "squatAdaptation",
+    date: "2026-07-31",
+    id: "10000000-0000-4000-8000-000000000001",
+    now: "2026-07-31T10:00:00.000Z",
+  });
+  const { exerciseReplacements, ...v1 } = draft;
+  v1.draftVersion = 1;
+  const values = new Map([[PREVIOUS_WORKOUT_DRAFT_KEY, JSON.stringify(v1)]]);
+  const storage = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, value); },
+  };
+  const result = loadWorkoutDraft(storage);
+  assert.equal(result.status, "ready");
+  assert.equal(result.draft.draftVersion, 2);
+  assert.equal(values.has(WORKOUT_DRAFT_KEY), true);
+  assert.equal(values.has(PREVIOUS_WORKOUT_DRAFT_KEY), true);
 });

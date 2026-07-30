@@ -4,7 +4,7 @@ import { calculatePaceSecondsPerKilometer } from "./interaction.js";
 import { findDailyPlan, getEffectiveTraining } from "./planning.js";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
-export const ANALYSIS_VERSION = 4;
+export const ANALYSIS_VERSION = 5;
 
 export function createAnalysisExport(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);

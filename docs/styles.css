@@ -368,6 +368,11 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .exercise-more summary { min-height: 44px; color: var(--primary); font-weight: 800; cursor: pointer; }
 .exercise-more ul { margin-top: 6px; padding-left: 20px; }
 .exercise-more p { margin: 6px 0 0; }
+.workout-context { display: grid; gap: 12px; margin-top: 14px; border: 1px solid var(--line); border-radius: 16px; background: white; padding: 14px; }
+.workout-context .field { margin-bottom: 0; }
+.workout-context strong { font-size: 14px; }
+.workout-history { display: grid; gap: 5px; margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.workout-progression-advice { margin: 0; border-radius: 12px; background: #f0f5f2; color: var(--primary-dark); padding: 10px 12px; font-size: 13px; font-weight: 700; line-height: 1.55; }
 .workout-set-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
 .workout-set-form .field { margin-bottom: 0; }
 .workout-secondary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
@@ -380,6 +385,9 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .workout-summary-item { border: 1px solid var(--line); border-radius: 14px; background: white; padding: 12px; }
 .workout-summary-item strong, .workout-summary-item span { display: block; }
 .workout-summary-item span { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.workout-feedback { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 10px; }
+.workout-feedback label { color: var(--muted); font-size: 12px; font-weight: 700; }
+.workout-feedback select { width: 100%; min-height: 44px; margin-top: 5px; border: 1px solid var(--line); border-radius: 10px; background: white; padding: 0 9px; font-size: 16px; }
 
 .toast { position: fixed; z-index: 30; right: 16px; bottom: 88px; left: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 480px; min-height: 52px; margin: 0 auto; border-radius: 15px; background: var(--primary-dark); color: white; padding: 12px 14px; box-shadow: var(--shadow); }
 .toast button { min-width: 64px; min-height: 44px; border: 1px solid rgba(255,255,255,.34); border-radius: 10px; background: transparent; color: white; font-weight: 800; }
@@ -401,4 +409,5 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
   .weekly-plan-form { grid-template-columns: 1fr; }
   .weekly-plan-form .primary-button, .weekly-plan-form .form-error { grid-column: auto; }
   .workout-set-form { grid-template-columns: 1fr; }
+  .workout-feedback { grid-template-columns: 1fr; }
 }
