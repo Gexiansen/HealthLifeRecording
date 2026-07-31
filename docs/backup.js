@@ -3,8 +3,8 @@ import {
   createEmptyData,
   parseData,
   serializeData,
-} from "./model.js?v=16";
-import { COLLECTIONS } from "./data.js?v=16";
+} from "./model.js?v=17";
+import { COLLECTIONS } from "./data.js?v=17";
 
 export const BACKUP_FORMAT = "healthlife-complete-backup";
 export const BACKUP_VERSION = 8;

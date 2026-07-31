@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=16">
+    <link rel="manifest" href="./manifest.webmanifest?v=17">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=16">
+    <link rel="stylesheet" href="./styles.css?v=17">
   </head>
   <body>
     <header class="app-header">
@@ -324,6 +324,11 @@
           <button id="close-guided-workout" class="icon-button" type="button" aria-label="暂时退出训练">×</button>
         </header>
 
+        <div id="workout-draft-actions" class="workout-draft-actions" hidden>
+          <button id="undo-workout-action" class="secondary-neutral-button" type="button" hidden>撤销上一步</button>
+          <button id="abandon-workout" class="text-button danger-text-button" type="button">放弃本次训练</button>
+        </div>
+
         <section id="workout-template-chooser" class="workout-stage">
           <p class="workout-intro">动作按组逐项完成。每次完成都会保存在当前浏览器中，退出后可以继续。</p>
           <div id="workout-template-list" class="workout-template-list"></div>
@@ -395,6 +400,28 @@
       </div>
     </dialog>
 
+    <dialog id="finish-workout-dialog" aria-labelledby="finish-workout-dialog-title">
+      <div class="confirm-dialog-body">
+        <h2 id="finish-workout-dialog-title">提前结束训练？</h2>
+        <p>剩余动作会标记为跳过，并进入训练总结。之后仍可以返回修改。</p>
+        <div>
+          <button id="cancel-finish-workout" class="secondary-neutral-button" type="button">继续训练</button>
+          <button id="confirm-finish-workout" class="danger-button" type="button">提前结束并总结</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="abandon-workout-dialog" aria-labelledby="abandon-workout-dialog-title">
+      <div class="confirm-dialog-body">
+        <h2 id="abandon-workout-dialog-title">放弃本次训练？</h2>
+        <p>当前训练进度和撤销历史会被清除，已经保存的正式健康记录不会受影响。</p>
+        <div>
+          <button id="cancel-abandon-workout" class="secondary-neutral-button" type="button">继续训练</button>
+          <button id="confirm-abandon-workout" class="danger-button" type="button">确认放弃</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="data-dialog" aria-labelledby="data-dialog-title">
       <div class="dialog-header">
         <div>
@@ -455,6 +482,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=16"></script>
+    <script type="module" src="./app.js?v=17"></script>
   </body>
 </html>

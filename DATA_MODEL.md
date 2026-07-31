@@ -19,6 +19,8 @@
 
 schema v8 使用 `healthlife:data:v8` 独立存储键。应用不读取、不迁移 v1 至 v7 数据；旧键不主动删除。完整备份只接受 `backupVersion: 8`。
 
+进行中的引导训练继续使用 `healthlife:workout-draft:v2`，撤销历史使用独立的 `healthlife:workout-undo:v1`。撤销历史保存同一训练草稿的最近状态快照，最多 50 项；每个快照必须通过完整草稿校验并与当前草稿 UUID 匹配。它们都不是正式健康记录，不进入完整备份或分析导出。
+
 ## 通用规则
 
 - 所有业务记录使用 UUID，日期为本地自然日 `YYYY-MM-DD`，时间为 `HH:mm`。

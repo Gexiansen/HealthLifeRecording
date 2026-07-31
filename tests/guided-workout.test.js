@@ -5,11 +5,14 @@ import {
   completeWorkoutSet,
   createGuidedSessionSnapshot,
   createWorkoutDraft,
+  createWorkoutUndoHistory,
   estimateWorkoutDurationMinutes,
   EXERCISE_LIBRARY,
   getWorkoutStep,
   GUIDED_TEMPLATES,
   migrateWorkoutDraftV1,
+  popWorkoutUndoSnapshot,
+  pushWorkoutUndoSnapshot,
   recommendedTemplateId,
   replaceWorkoutExercise,
   skipWorkoutExercise,
@@ -198,5 +201,35 @@ test("训练过程拒绝无效次数和给徒手动作填写负重", () => {
       now: "2026-07-31T10:02:00.000Z",
     }),
     /不记录负重/,
+  );
+});
+
+test("训练撤销历史可以连续恢复完成组、跳过和提前结束前的草稿", () => {
+  const initial = createWorkoutDraft({
+    templateId: "strengthA",
+    date: "2026-07-31",
+    id: SESSION_ID,
+    now: STARTED_AT,
+  });
+  let history = createWorkoutUndoHistory(initial);
+  history = pushWorkoutUndoSnapshot(history, initial);
+  const afterSet = completeWorkoutSet(initial, {
+    completedValue: 8,
+    weightGrams: 6_000,
+    now: "2026-07-31T10:01:00.000Z",
+  });
+  history = pushWorkoutUndoSnapshot(history, afterSet);
+  const afterSkip = skipWorkoutExercise(afterSet, "2026-07-31T10:02:00.000Z");
+
+  const firstUndo = popWorkoutUndoSnapshot(history, afterSkip);
+  assert.deepEqual(firstUndo.draft, afterSet);
+  assert.equal(firstUndo.history.snapshots.length, 1);
+
+  const secondUndo = popWorkoutUndoSnapshot(firstUndo.history, firstUndo.draft);
+  assert.deepEqual(secondUndo.draft, initial);
+  assert.equal(secondUndo.history.snapshots.length, 0);
+  assert.throws(
+    () => popWorkoutUndoSnapshot(secondUndo.history, secondUndo.draft),
+    /没有可以撤销/,
   );
 });

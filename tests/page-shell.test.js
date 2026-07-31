@@ -24,3 +24,14 @@ test("表单移除健康评分、活动热量和最高心率，饱腹感可选",
   assert.match(html, /value="">未记录/);
   assert.doesNotMatch(html, /onclick=/);
 });
+
+test("引导训练提供持久撤销、返回修改和两类高风险操作确认", () => {
+  for (const id of [
+    "undo-workout-action",
+    "abandon-workout",
+    "abandon-workout-dialog",
+    "finish-workout-dialog",
+  ]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(html, /放弃本次训练？/);
+  assert.match(html, /提前结束训练？/);
+});

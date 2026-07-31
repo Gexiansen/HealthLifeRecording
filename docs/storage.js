@@ -2,17 +2,19 @@ import {
   createEmptyData,
   parseData,
   serializeData,
-} from "./model.js?v=16";
-import { parseBackupMetadata } from "./backup.js?v=16";
+} from "./model.js?v=17";
+import { parseBackupMetadata } from "./backup.js?v=17";
 import {
+  assertValidWorkoutUndoHistory,
   assertValidWorkoutDraft,
   migrateWorkoutDraftV1,
-} from "./guided-workout.js?v=16";
+} from "./guided-workout.js?v=17";
 
 export const STORAGE_KEY = "healthlife:data:v8";
 export const BACKUP_META_KEY = "healthlife:backup-meta:v8";
 export const WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v2";
 export const PREVIOUS_WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v1";
+export const WORKOUT_UNDO_KEY = "healthlife:workout-undo:v1";
 
 export class StorageWriteError extends Error {
   constructor(cause) {
@@ -125,6 +127,41 @@ export function saveWorkoutDraft(draft, storage = globalThis.localStorage) {
 export function clearWorkoutDraft(storage = globalThis.localStorage) {
   try {
     storage.removeItem(WORKOUT_DRAFT_KEY);
+  } catch (error) {
+    throw new StorageWriteError(error);
+  }
+}
+
+export function loadWorkoutUndoHistory(currentDraft, storage = globalThis.localStorage) {
+  if (currentDraft === null) return { status: "empty", history: null, error: null };
+  let raw;
+  try {
+    raw = storage.getItem(WORKOUT_UNDO_KEY);
+  } catch (error) {
+    return { status: "unavailable", history: null, error };
+  }
+  if (raw === null) return { status: "empty", history: null, error: null };
+  try {
+    const history = JSON.parse(raw);
+    assertValidWorkoutUndoHistory(history, currentDraft);
+    return { status: "ready", history, error: null };
+  } catch (error) {
+    return { status: "corrupt", history: null, error };
+  }
+}
+
+export function saveWorkoutUndoHistory(history, storage = globalThis.localStorage) {
+  assertValidWorkoutUndoHistory(history);
+  try {
+    storage.setItem(WORKOUT_UNDO_KEY, JSON.stringify(history));
+  } catch (error) {
+    throw new StorageWriteError(error);
+  }
+}
+
+export function clearWorkoutUndoHistory(storage = globalThis.localStorage) {
+  try {
+    storage.removeItem(WORKOUT_UNDO_KEY);
   } catch (error) {
     throw new StorageWriteError(error);
   }

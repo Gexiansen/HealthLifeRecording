@@ -1,6 +1,6 @@
-import { assertValidData, calculateSleepMinutes } from "./model.js?v=16";
-import { sumNutrition } from "./nutrition.js?v=16";
-import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=16";
+import { assertValidData, calculateSleepMinutes } from "./model.js?v=17";
+import { sumNutrition } from "./nutrition.js?v=17";
+import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=17";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
 export const ANALYSIS_VERSION = 6;

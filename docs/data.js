@@ -1,4 +1,4 @@
-import { assertValidData, serializeData } from "./model.js?v=16";
+import { assertValidData, serializeData } from "./model.js?v=17";
 
 export const COLLECTIONS = Object.freeze([
   "workouts",

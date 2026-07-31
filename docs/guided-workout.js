@@ -1,4 +1,6 @@
 export const WORKOUT_DRAFT_VERSION = 2;
+export const WORKOUT_UNDO_VERSION = 1;
+const MAX_WORKOUT_UNDO_SNAPSHOTS = 50;
 export const DISCOMFORT_BODY_PARTS = Object.freeze([
   "knee",
   "lowerBack",
@@ -241,6 +243,59 @@ export function createWorkoutDraft({ templateId, date, id, now }) {
     skippedExerciseIds: [],
     exerciseReplacements: [],
   };
+}
+
+export function createWorkoutUndoHistory(draft) {
+  assertValidWorkoutDraft(draft);
+  return {
+    undoVersion: WORKOUT_UNDO_VERSION,
+    draftId: draft.id,
+    snapshots: [],
+  };
+}
+
+export function assertValidWorkoutUndoHistory(history, currentDraft = null) {
+  assertPlainObject(history, "undoHistory");
+  assertExactKeys(history, ["undoVersion", "draftId", "snapshots"], "undoHistory");
+  if (history.undoVersion !== WORKOUT_UNDO_VERSION) {
+    throw new TypeError(`不支持的 undoVersion：${String(history.undoVersion)}`);
+  }
+  assertUuid(history.draftId, "undoHistory.draftId");
+  if (!Array.isArray(history.snapshots) || history.snapshots.length > MAX_WORKOUT_UNDO_SNAPSHOTS) {
+    throw new TypeError(`undoHistory.snapshots 必须是最多 ${MAX_WORKOUT_UNDO_SNAPSHOTS} 项的数组`);
+  }
+  history.snapshots.forEach((snapshot, index) => {
+    assertValidWorkoutDraft(snapshot);
+    if (snapshot.id !== history.draftId) {
+      throw new TypeError(`undoHistory.snapshots[${index}] 不属于当前训练`);
+    }
+  });
+  if (currentDraft !== null) {
+    assertValidWorkoutDraft(currentDraft);
+    if (history.draftId !== currentDraft.id) {
+      throw new TypeError("undoHistory 与当前训练草稿不匹配");
+    }
+  }
+  return true;
+}
+
+export function pushWorkoutUndoSnapshot(history, draft) {
+  assertValidWorkoutUndoHistory(history, draft);
+  const next = structuredClone(history);
+  next.snapshots.push(structuredClone(draft));
+  next.snapshots = next.snapshots.slice(-MAX_WORKOUT_UNDO_SNAPSHOTS);
+  assertValidWorkoutUndoHistory(next, draft);
+  return next;
+}
+
+export function popWorkoutUndoSnapshot(history, currentDraft) {
+  assertValidWorkoutUndoHistory(history, currentDraft);
+  if (history.snapshots.length === 0) throw new TypeError("没有可以撤销的训练操作");
+  const next = structuredClone(history);
+  const draft = next.snapshots.pop();
+  assertValidWorkoutDraft(draft);
+  assertValidWorkoutUndoHistory(next, draft);
+  return { history: next, draft };
 }
 
 export function migrateWorkoutDraftV1(value) {

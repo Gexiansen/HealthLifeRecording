@@ -1,7 +1,7 @@
 import {
   calculateSleepMinutes,
   createId,
-} from "./model.js?v=16";
+} from "./model.js?v=17";
 import {
   allRecordsByDate,
   deleteRecord,
@@ -12,48 +12,52 @@ import {
   updateEggGramsPerPiece,
   updateFoodPreferences,
   updateWeeklyTraining,
-} from "./data.js?v=16";
+} from "./data.js?v=17";
 import {
+  clearWorkoutUndoHistory,
   clearWorkoutDraft,
   loadBackupMetadata,
   loadData,
   loadWorkoutDraft,
+  loadWorkoutUndoHistory,
   saveBackupMetadata,
   saveData,
   saveWorkoutDraft,
-} from "./storage.js?v=16";
+  saveWorkoutUndoHistory,
+} from "./storage.js?v=17";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=16";
-import { calculateTrendComparison } from "./stats.js?v=16";
+} from "./calendar.js?v=17";
+import { calculateTrendComparison } from "./stats.js?v=17";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=16";
+} from "./backup.js?v=17";
 import {
   calculatePaceSecondsPerKilometer,
   filterRecordItems,
   getDateContext,
   getDefaultMealType,
   getRestoreLabel,
-} from "./interaction.js?v=16";
+} from "./interaction.js?v=17";
 import {
   calculateRecipeNutrition,
   createFoodEntry,
   formatNutrition,
   getFoodCatalog,
   sumNutrition,
-} from "./nutrition.js?v=16";
-import { serializeAnalysisExport } from "./analysis.js?v=16";
+} from "./nutrition.js?v=17";
+import { serializeAnalysisExport } from "./analysis.js?v=17";
 import {
   completeWorkoutSet,
+  createWorkoutUndoHistory,
   createGuidedSessionSnapshot,
   createWorkoutDraft,
   DISCOMFORT_BODY_PART_LABELS,
@@ -62,16 +66,18 @@ import {
   EXERCISE_REPLACEMENTS,
   getWorkoutStep,
   GUIDED_TEMPLATES,
+  popWorkoutUndoSnapshot,
+  pushWorkoutUndoSnapshot,
   recommendedTemplateId,
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=16";
+} from "./guided-workout.js?v=17";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=16";
+} from "./training-insights.js?v=17";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -132,6 +138,9 @@ let customFoodBaseline = null;
 let recipeBaseline = null;
 let workoutDraftState = loadWorkoutDraft();
 let workoutDraft = workoutDraftState.draft;
+let workoutUndoState = loadWorkoutUndoHistory(workoutDraft);
+let workoutUndoHistory = workoutUndoState.history
+  ?? (workoutDraft ? createWorkoutUndoHistory(workoutDraft) : null);
 let workoutRestTimer = null;
 let workoutRestEndsAt = null;
 
@@ -246,6 +255,15 @@ const elements = {
   guidedWorkoutDialog: document.querySelector("#guided-workout-dialog"),
   guidedWorkoutTitle: document.querySelector("#guided-workout-title"),
   closeGuidedWorkout: document.querySelector("#close-guided-workout"),
+  workoutDraftActions: document.querySelector("#workout-draft-actions"),
+  undoWorkoutAction: document.querySelector("#undo-workout-action"),
+  abandonWorkout: document.querySelector("#abandon-workout"),
+  abandonWorkoutDialog: document.querySelector("#abandon-workout-dialog"),
+  cancelAbandonWorkout: document.querySelector("#cancel-abandon-workout"),
+  confirmAbandonWorkout: document.querySelector("#confirm-abandon-workout"),
+  finishWorkoutDialog: document.querySelector("#finish-workout-dialog"),
+  cancelFinishWorkout: document.querySelector("#cancel-finish-workout"),
+  confirmFinishWorkout: document.querySelector("#confirm-finish-workout"),
   workoutTemplateChooser: document.querySelector("#workout-template-chooser"),
   workoutTemplateList: document.querySelector("#workout-template-list"),
   workoutActiveStage: document.querySelector("#workout-active-stage"),
@@ -304,7 +322,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=16").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=17").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -385,10 +403,16 @@ function bindEvents() {
   elements.weeklyPlanForm.addEventListener("submit", handleWeeklyPlanSubmit);
   elements.startGuidedWorkout.addEventListener("click", openGuidedWorkout);
   elements.closeGuidedWorkout.addEventListener("click", closeGuidedWorkout);
+  elements.undoWorkoutAction.addEventListener("click", undoWorkoutAction);
+  elements.abandonWorkout.addEventListener("click", requestAbandonWorkout);
+  elements.cancelAbandonWorkout.addEventListener("click", () => elements.abandonWorkoutDialog.close());
+  elements.confirmAbandonWorkout.addEventListener("click", confirmAbandonWorkout);
+  elements.cancelFinishWorkout.addEventListener("click", () => elements.finishWorkoutDialog.close());
+  elements.confirmFinishWorkout.addEventListener("click", finishWorkoutEarly);
   elements.completeWorkoutSet.addEventListener("click", handleCompleteWorkoutSet);
   elements.workoutExerciseReplacement.addEventListener("change", handleWorkoutReplacement);
   elements.skipWorkoutExercise.addEventListener("click", handleSkipWorkoutExercise);
-  elements.finishWorkoutEarly.addEventListener("click", finishWorkoutEarly);
+  elements.finishWorkoutEarly.addEventListener("click", requestFinishWorkoutEarly);
   elements.skipWorkoutRest.addEventListener("click", finishWorkoutRest);
   elements.confirmGuidedWorkout.addEventListener("click", confirmGuidedWorkout);
   elements.guidedWorkoutDialog.addEventListener("cancel", (event) => {
@@ -535,7 +559,9 @@ function reconcileWorkoutDraft() {
   )) {
     try {
       clearWorkoutDraft();
+      clearWorkoutUndoHistory();
       workoutDraft = null;
+      workoutUndoHistory = null;
       workoutDraftState = { status: "empty", draft: null, error: null };
     } catch {
       showToast("训练记录已存在，但旧训练草稿清理失败");
@@ -544,6 +570,12 @@ function reconcileWorkoutDraft() {
     showToast("上次训练草稿已损坏，无法继续；开始新训练后会覆盖该草稿");
   } else if (workoutDraftState.status === "unavailable") {
     showToast("训练进度存储不可用，暂时不能开始引导训练");
+  } else if (workoutUndoState.status === "corrupt") {
+    workoutUndoHistory = workoutDraft ? createWorkoutUndoHistory(workoutDraft) : null;
+    showToast("训练进度可以继续，但旧撤销历史已损坏，无法恢复上一步");
+  } else if (workoutUndoState.status === "unavailable") {
+    workoutUndoHistory = workoutDraft ? createWorkoutUndoHistory(workoutDraft) : null;
+    showToast("训练进度可以继续，但当前无法保存撤销历史");
   }
   renderToday();
 }
@@ -563,6 +595,77 @@ function closeGuidedWorkout() {
   stopWorkoutRestTimer();
   elements.guidedWorkoutDialog.close();
   renderToday();
+}
+
+function persistWorkoutDraftTransition(nextDraft) {
+  if (!workoutDraft) throw new TypeError("当前没有进行中的训练");
+  const previousHistory = workoutUndoHistory ?? createWorkoutUndoHistory(workoutDraft);
+  const nextHistory = pushWorkoutUndoSnapshot(previousHistory, workoutDraft);
+  saveWorkoutUndoHistory(nextHistory);
+  try {
+    saveWorkoutDraft(nextDraft);
+  } catch (error) {
+    try {
+      saveWorkoutUndoHistory(previousHistory);
+    } catch {}
+    throw error;
+  }
+  workoutDraft = nextDraft;
+  workoutUndoHistory = nextHistory;
+  workoutUndoState = { status: "ready", history: nextHistory, error: null };
+}
+
+function undoWorkoutAction() {
+  if (!workoutDraft || !workoutUndoHistory?.snapshots.length) return;
+  const previousHistory = workoutUndoHistory;
+  try {
+    const result = popWorkoutUndoSnapshot(workoutUndoHistory, workoutDraft);
+    saveWorkoutUndoHistory(result.history);
+    try {
+      saveWorkoutDraft(result.draft);
+    } catch (error) {
+      try {
+        saveWorkoutUndoHistory(previousHistory);
+      } catch {}
+      throw error;
+    }
+    workoutDraft = result.draft;
+    workoutUndoHistory = result.history;
+    workoutUndoState = { status: "ready", history: result.history, error: null };
+    elements.finishWorkoutDialog.close();
+    stopWorkoutRestTimer();
+    renderWorkoutStep();
+    renderToday();
+    showToast("已撤销上一步训练操作");
+  } catch (error) {
+    setInlineError(elements.workoutStageError, error.message || "无法撤销上一步");
+  }
+}
+
+function requestAbandonWorkout() {
+  if (!workoutDraft) return;
+  elements.abandonWorkoutDialog.showModal();
+}
+
+function confirmAbandonWorkout() {
+  if (!workoutDraft) return;
+  try {
+    clearWorkoutDraft();
+    try {
+      clearWorkoutUndoHistory();
+    } catch {}
+    workoutDraft = null;
+    workoutUndoHistory = null;
+    workoutDraftState = { status: "empty", draft: null, error: null };
+    workoutUndoState = { status: "empty", history: null, error: null };
+    elements.abandonWorkoutDialog.close();
+    elements.guidedWorkoutDialog.close();
+    stopWorkoutRestTimer();
+    renderToday();
+    showToast("本次训练已放弃，正式记录未受影响");
+  } catch (error) {
+    showToast(error.message || "无法放弃本次训练");
+  }
 }
 
 function renderWorkoutTemplateChooser() {
@@ -606,8 +709,11 @@ function startWorkoutTemplate(templateId) {
       id: createId(),
       now,
     });
+    clearWorkoutUndoHistory();
     saveWorkoutDraft(next);
     workoutDraft = next;
+    workoutUndoHistory = createWorkoutUndoHistory(next);
+    workoutUndoState = { status: "ready", history: workoutUndoHistory, error: null };
     workoutDraftState = { status: "ready", draft: next, error: null };
     renderWorkoutStep();
     renderToday();
@@ -737,8 +843,7 @@ function handleCompleteWorkoutSet() {
       weightGrams,
       now: new Date().toISOString(),
     });
-    saveWorkoutDraft(next);
-    workoutDraft = next;
+    persistWorkoutDraftTransition(next);
     setInlineError(elements.workoutStageError, "");
     if (getWorkoutStep(next).complete) {
       renderWorkoutSummary();
@@ -754,12 +859,16 @@ function handleSkipWorkoutExercise() {
   if (!workoutDraft) return;
   try {
     const next = skipWorkoutExercise(workoutDraft, new Date().toISOString());
-    saveWorkoutDraft(next);
-    workoutDraft = next;
+    persistWorkoutDraftTransition(next);
     renderWorkoutStep();
   } catch (error) {
     setInlineError(elements.workoutStageError, error.message || "动作无法跳过");
   }
+}
+
+function requestFinishWorkoutEarly() {
+  if (!workoutDraft) return;
+  elements.finishWorkoutDialog.showModal();
 }
 
 function finishWorkoutEarly() {
@@ -770,8 +879,8 @@ function finishWorkoutEarly() {
     while (!getWorkoutStep(next).complete) {
       next = skipWorkoutExercise(next, now);
     }
-    saveWorkoutDraft(next);
-    workoutDraft = next;
+    persistWorkoutDraftTransition(next);
+    elements.finishWorkoutDialog.close();
     renderWorkoutSummary();
   } catch (error) {
     setInlineError(elements.workoutStageError, error.message || "无法结束训练");
@@ -934,11 +1043,14 @@ function confirmGuidedWorkout() {
     data = next;
     try {
       clearWorkoutDraft();
+      clearWorkoutUndoHistory();
     } catch {
-      showToast("运动记录已保存，但训练草稿清理失败");
+      showToast("运动记录已保存，但训练草稿或撤销历史清理失败");
     }
     workoutDraft = null;
+    workoutUndoHistory = null;
     workoutDraftState = { status: "empty", draft: null, error: null };
+    workoutUndoState = { status: "empty", history: null, error: null };
     selectedDate = workout.date;
     calendarAnchor = workout.date;
     elements.guidedWorkoutDialog.close();
@@ -954,6 +1066,10 @@ function showWorkoutStage(name) {
   elements.workoutActiveStage.hidden = name !== "active";
   elements.workoutRestStage.hidden = name !== "rest";
   elements.workoutSummaryStage.hidden = name !== "summary";
+  elements.workoutDraftActions.hidden = !workoutDraft;
+  elements.undoWorkoutAction.hidden = !workoutDraft
+    || !workoutUndoHistory?.snapshots.length;
+  elements.undoWorkoutAction.textContent = name === "summary" ? "返回修改" : "撤销上一步";
 }
 
 function renderCalendar() {

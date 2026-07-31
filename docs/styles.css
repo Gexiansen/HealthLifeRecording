@@ -339,6 +339,9 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .guided-workout-shell { min-height: 100%; padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .guided-workout-header { position: sticky; z-index: 3; top: 0; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: var(--primary-dark); color: white; padding: max(16px, env(safe-area-inset-top, 0px)) 18px 14px; }
 .guided-workout-header .icon-button { border-color: rgba(255,255,255,.3); background: transparent; color: white; }
+.workout-draft-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid var(--line); background: white; padding: 10px 18px; }
+.workout-draft-actions button { min-height: 44px; }
+.danger-text-button { color: var(--danger); }
 .workout-stage { padding: 18px; }
 .workout-intro { color: var(--muted); font-size: 14px; line-height: 1.6; }
 .workout-template-list { display: grid; gap: 10px; }
