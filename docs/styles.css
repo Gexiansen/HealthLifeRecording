@@ -79,9 +79,6 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 .date-panel .eyebrow, .section-heading .eyebrow { color: var(--muted); }
 .text-button { min-height: 44px; border: 0; background: transparent; color: var(--primary); font-weight: 700; }
 
-.streak-badge { display: grid; justify-items: end; }
-.streak-badge strong { color: var(--primary); font-size: 19px; }
-.streak-badge span { color: var(--muted); font-size: 11px; }
 
 .calendar-toolbar {
   grid-column: 1 / -1;
@@ -122,7 +119,6 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px s
 .calendar-day .day-number { display: block; font-size: 14px; font-weight: 800; }
 .calendar-day .day-status { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
 .calendar-day.has-record { background: #e7f1eb; color: var(--primary-dark); }
-.calendar-day.has-plan:not(.selected) { border-color: #94b9aa; }
 .calendar-day.selected { border-color: var(--primary); background: var(--primary); color: white; }
 .calendar-day.selected .day-status { color: rgba(255,255,255,.8); }
 .calendar-day.outside-month { opacity: .42; }
@@ -160,11 +156,9 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px s
 .card-heading { display: flex; align-items: center; gap: 10px; }
 .card-icon { display: grid; flex: 0 0 auto; place-items: center; width: 34px; height: 34px; border-radius: 11px; font-size: 13px; font-weight: 800; }
 .workout-card .card-icon { background: #e7f4ec; color: #256746; }
-.activity-card .card-icon { background: #eef4df; color: #5b742e; }
 .meal-card .card-icon { background: #fff1d8; color: #8a5b13; }
 .sleep-card .card-icon { background: #ecebfd; color: #54519b; }
 .weight-card .card-icon { background: #e3f1f7; color: #316982; }
-.water-card .card-icon { background: #e5f3fb; color: #287298; }
 .card-value { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
 
 .summary-card > button, .primary-button, .secondary-button {
@@ -243,8 +237,6 @@ input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px s
 .record-detail { margin: 8px 0 0 17px; color: var(--muted); font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
 .record-actions { display: flex; gap: 4px; }
 .record-actions button { min-width: 44px; min-height: 44px; border: 0; border-radius: 12px; background: #f0f3ef; color: var(--ink); }
-.plan-record-card .record-top > button { min-width: 52px; min-height: 44px; border: 0; border-radius: 12px; background: #f0f3ef; color: var(--ink); }
-.plan-record-card .record-type-dot { background: #d19b37; }
 .record-more { position: relative; }
 .record-more summary { display: grid; min-width: 44px; min-height: 44px; place-items: center; border-radius: 12px; background: #f0f3ef; color: var(--ink); cursor: pointer; list-style: none; }
 .record-more summary::-webkit-details-marker { display: none; }
@@ -396,7 +388,6 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 
 @media (min-width: 560px) {
   .summary-grid { grid-template-columns: 1fr 1fr; }
-  .water-card { grid-column: 1 / -1; }
   .trend-grid { grid-template-columns: 1fr 1fr; }
 }
 

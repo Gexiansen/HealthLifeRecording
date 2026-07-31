@@ -1,10 +1,9 @@
-import { assertValidData, calculateSleepMinutes } from "./model.js";
-import { sumNutrition } from "./nutrition.js";
-import { calculatePaceSecondsPerKilometer } from "./interaction.js";
-import { findDailyPlan, getEffectiveTraining } from "./planning.js";
+import { assertValidData, calculateSleepMinutes } from "./model.js?v=16";
+import { sumNutrition } from "./nutrition.js?v=16";
+import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=16";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
-export const ANALYSIS_VERSION = 5;
+export const ANALYSIS_VERSION = 6;
 
 export function createAnalysisExport(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);
@@ -31,20 +30,10 @@ export function serializeAnalysisExport(data, exportedAt) {
 function createDay(data, date) {
   const meals = data.meals.filter((record) => record.date === date);
   const workouts = data.workouts.filter((record) => record.date === date);
-  const dailyActivity = data.dailyActivities.find((record) => record.date === date) ?? null;
   const sleep = data.sleepRecords.find((record) => record.date === date) ?? null;
   const weight = data.weights.find((record) => record.date === date) ?? null;
-  const hydration = data.hydration.find((record) => record.date === date) ?? null;
-  const dailyPlan = findDailyPlan(data.trainingPlan, date);
   return {
     date,
-    plan: {
-      workdayType: dailyPlan?.workdayType ?? null,
-      plannedTraining: getEffectiveTraining(data.trainingPlan, date),
-      status: dailyPlan?.status ?? "planned",
-      rescheduledToDate: dailyPlan?.rescheduledToDate ?? null,
-      rescheduledFromDate: dailyPlan?.rescheduledFromDate ?? null,
-    },
     weight: weight
       ? { weightGrams: weight.weightGrams, bodyFatBasisPoints: weight.bodyFatBasisPoints }
       : null,
@@ -62,9 +51,7 @@ function createDay(data, date) {
       durationMinutes: record.durationMinutes,
       intensity: record.intensity,
       source: record.source,
-      activeEnergyKcal: record.activeEnergyKcal,
       averageHeartRateBpm: record.averageHeartRateBpm,
-      maxHeartRateBpm: record.maxHeartRateBpm,
       distanceMeters: record.distanceMeters,
       paceSecondsPerKilometer: record.distanceMeters === null
         ? null
@@ -74,13 +61,6 @@ function createDay(data, date) {
         : structuredClone(record.guidedSession),
       note: record.note,
     })),
-    dailyActivity: dailyActivity
-      ? {
-        steps: dailyActivity.steps,
-        source: dailyActivity.source,
-        note: dailyActivity.note,
-      }
-      : null,
     meals: meals.map((record) => ({
       mealType: record.mealType,
       trackingMode: record.trackingMode,
@@ -97,24 +77,19 @@ function createDay(data, date) {
         confidence: item.confidence,
         nutrition: sumNutrition([item]),
       })),
-      healthScore: record.healthScore,
       fullnessScore: record.fullnessScore,
       note: record.note,
     })),
     dailyNutrition: sumNutrition(meals.flatMap((record) => record.items)),
-    hydrationMilliliters: hydration?.milliliters ?? null,
   };
 }
 
 function allDates(data) {
   return [...new Set([
     ...data.workouts,
-    ...data.dailyActivities,
     ...data.meals,
     ...data.sleepRecords,
     ...data.weights,
-    ...data.hydration,
-    ...data.trainingPlan.dailyPlans,
   ].map((record) => record.date))].sort();
 }
 

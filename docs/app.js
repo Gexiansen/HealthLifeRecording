@@ -1,20 +1,18 @@
 import {
   calculateSleepMinutes,
   createId,
-} from "./model.js";
+} from "./model.js?v=16";
 import {
   allRecordsByDate,
   deleteRecord,
   findDailyRecord,
   saveCustomFood,
-  saveDailyPlan,
-  saveRescheduledPlan,
   saveRecipe,
   saveRecord,
   updateEggGramsPerPiece,
   updateFoodPreferences,
   updateWeeklyTraining,
-} from "./data.js";
+} from "./data.js?v=16";
 import {
   clearWorkoutDraft,
   loadBackupMetadata,
@@ -23,48 +21,37 @@ import {
   saveBackupMetadata,
   saveData,
   saveWorkoutDraft,
-} from "./storage.js";
+} from "./storage.js?v=16";
 import {
-  calculateRecordingStreak,
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js";
-import { calculateTrendComparison } from "./stats.js";
+} from "./calendar.js?v=16";
+import { calculateTrendComparison } from "./stats.js?v=16";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js";
+} from "./backup.js?v=16";
 import {
-  addHydrationAmount,
   calculatePaceSecondsPerKilometer,
   filterRecordItems,
   getDateContext,
   getDefaultMealType,
   getRestoreLabel,
-} from "./interaction.js";
+} from "./interaction.js?v=16";
 import {
   calculateRecipeNutrition,
   createFoodEntry,
   formatNutrition,
   getFoodCatalog,
   sumNutrition,
-} from "./nutrition.js";
-import { serializeAnalysisExport } from "./analysis.js";
-import {
-  createDailyAdvice,
-  findDailyPlan,
-  findWorkoutPlanMatches,
-  getEffectiveTraining,
-  PLAN_STATUS_LABELS,
-  TRAINING_PLAN_LABELS,
-  WORKDAY_LABELS,
-} from "./planning.js";
+} from "./nutrition.js?v=16";
+import { serializeAnalysisExport } from "./analysis.js?v=16";
 import {
   completeWorkoutSet,
   createGuidedSessionSnapshot,
@@ -79,20 +66,18 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js";
+} from "./guided-workout.js?v=16";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js";
+} from "./training-insights.js?v=16";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
-  activity: { collectionName: "dailyActivities", label: "每日活动" },
   meal: { collectionName: "meals", label: "饮食" },
   sleep: { collectionName: "sleepRecords", label: "睡眠" },
   weight: { collectionName: "weights", label: "体重" },
-  hydration: { collectionName: "hydration", label: "饮水" },
 });
 
 const COLLECTION_TO_TYPE = Object.freeze(
@@ -116,6 +101,15 @@ const MEAL_LABELS = Object.freeze({
   snack: "加餐",
 });
 
+const TRAINING_PLAN_LABELS = Object.freeze({
+  strengthA: "力量 A",
+  strengthB: "力量 B",
+  runWalk: "跑走结合",
+  walking: "步行",
+  mobility: "拉伸放松",
+  rest: "休息",
+});
+
 let storageState = loadData();
 let data = storageState.data;
 let backupMetadata = loadBackupMetadata();
@@ -133,11 +127,9 @@ let installPromptEvent = null;
 let mealItemsDraft = [];
 let recipeIngredientsDraft = [];
 let pendingDiscardAction = null;
-let planFormBaseline = null;
 let weeklyPlanBaseline = null;
 let customFoodBaseline = null;
 let recipeBaseline = null;
-let pendingPlanConflict = null;
 let workoutDraftState = loadWorkoutDraft();
 let workoutDraft = workoutDraftState.draft;
 let workoutRestTimer = null;
@@ -161,25 +153,15 @@ const elements = {
   calendarLabel: document.querySelector("#calendar-label"),
   calendarGrid: document.querySelector("#calendar-grid"),
   toggleCalendar: document.querySelector("#toggle-calendar"),
-  streakDays: document.querySelector("#streak-days"),
-  editDailyPlan: document.querySelector("#edit-daily-plan"),
-  planWorkdayBadge: document.querySelector("#plan-workday-badge"),
-  planStatusBadge: document.querySelector("#plan-status-badge"),
   planHeadline: document.querySelector("#plan-headline"),
   planDetail: document.querySelector("#plan-detail"),
-  planMealReminder: document.querySelector("#plan-meal-reminder"),
-  planLinkDetail: document.querySelector("#plan-link-detail"),
   startGuidedWorkout: document.querySelector("#start-guided-workout"),
   workoutSummary: document.querySelector("#workout-summary"),
-  activitySummary: document.querySelector("#activity-summary"),
   mealSummary: document.querySelector("#meal-summary"),
   sleepSummary: document.querySelector("#sleep-summary"),
   weightSummary: document.querySelector("#weight-summary"),
-  hydrationSummary: document.querySelector("#hydration-summary"),
   sleepAction: document.querySelector("#sleep-action"),
   weightAction: document.querySelector("#weight-action"),
-  hydrationAction: document.querySelector("#hydration-action"),
-  activityAction: document.querySelector("#activity-action"),
   trendPeriodLabel: document.querySelector("#trend-period-label"),
   trendEmpty: document.querySelector("#trend-empty"),
   trendGrid: document.querySelector(".trend-grid"),
@@ -196,18 +178,9 @@ const elements = {
   workoutTrendSamples: document.querySelector("#workout-trend-samples"),
   workoutTrendValue: document.querySelector("#workout-trend-value"),
   workoutTrendMeta: document.querySelector("#workout-trend-meta"),
-  activityTrendSamples: document.querySelector("#activity-trend-samples"),
-  activityTrendValue: document.querySelector("#activity-trend-value"),
-  activityTrendMeta: document.querySelector("#activity-trend-meta"),
   mealTrendSamples: document.querySelector("#meal-trend-samples"),
   mealTrendValue: document.querySelector("#meal-trend-value"),
   mealTrendMeta: document.querySelector("#meal-trend-meta"),
-  hydrationTrendSamples: document.querySelector("#hydration-trend-samples"),
-  hydrationTrendValue: document.querySelector("#hydration-trend-value"),
-  hydrationTrendMeta: document.querySelector("#hydration-trend-meta"),
-  planTrendSamples: document.querySelector("#plan-trend-samples"),
-  planTrendValue: document.querySelector("#plan-trend-value"),
-  planTrendMeta: document.querySelector("#plan-trend-meta"),
   recordsList: document.querySelector("#records-list"),
   recordCount: document.querySelector("#record-count"),
   recordTypeFilter: document.querySelector("#record-type-filter"),
@@ -217,7 +190,6 @@ const elements = {
   dialogTitle: document.querySelector("#dialog-title"),
   closeDialog: document.querySelector("#close-dialog"),
   recordDate: document.querySelector("#record-date"),
-  hydrationAmountLabel: document.querySelector("#hydration-amount-label"),
   sleepDurationPreview: document.querySelector("#sleep-duration-preview"),
   mealFoodSelect: document.querySelector("#meal-food-select"),
   mealFoodQuantity: document.querySelector("#meal-food-quantity"),
@@ -266,23 +238,11 @@ const elements = {
   importDateRange: document.querySelector("#import-date-range"),
   importTotal: document.querySelector("#import-total"),
   importCounts: document.querySelector("#import-counts"),
-  importPlans: document.querySelector("#import-plans"),
   importReplaceSummary: document.querySelector("#import-replace-summary"),
   confirmImport: document.querySelector("#confirm-import"),
   installApp: document.querySelector("#install-app"),
-  planDialog: document.querySelector("#plan-dialog"),
-  closePlanDialog: document.querySelector("#close-plan-dialog"),
-  dailyPlanForm: document.querySelector("#daily-plan-form"),
-  planDateLabel: document.querySelector("#plan-date-label"),
-  rescheduledDateField: document.querySelector("#rescheduled-date-field"),
-  planFormError: document.querySelector("#plan-form-error"),
-  planWorkoutLink: document.querySelector("#plan-workout-link"),
   weeklyPlanForm: document.querySelector("#weekly-plan-form"),
   weeklyPlanError: document.querySelector("#weekly-plan-error"),
-  planConflictDialog: document.querySelector("#plan-conflict-dialog"),
-  planConflictMessage: document.querySelector("#plan-conflict-message"),
-  cancelPlanConflict: document.querySelector("#cancel-plan-conflict"),
-  confirmPlanConflict: document.querySelector("#confirm-plan-conflict"),
   guidedWorkoutDialog: document.querySelector("#guided-workout-dialog"),
   guidedWorkoutTitle: document.querySelector("#guided-workout-title"),
   closeGuidedWorkout: document.querySelector("#close-guided-workout"),
@@ -344,7 +304,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=16").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -375,16 +335,9 @@ function bindEvents() {
   document.querySelectorAll("[data-quick-duration]").forEach((button) => {
     button.addEventListener("click", () => setQuickDuration(Number(button.dataset.quickDuration)));
   });
-  document.querySelectorAll("[data-form-water-add]").forEach((button) => {
-    button.addEventListener("click", () => addWaterInForm(Number(button.dataset.formWaterAdd)));
-  });
-  document.querySelectorAll("[data-quick-water]").forEach((button) => {
-    button.addEventListener("click", () => quickAddHydration(Number(button.dataset.quickWater)));
-  });
   elements.recordTypeFilter.addEventListener("change", renderRecords);
   elements.recordMonthFilter.addEventListener("change", renderRecords);
   elements.clearRecordFilters.addEventListener("click", clearRecordFilters);
-  elements.recordDate.addEventListener("input", handleSharedDateInput);
   elements.addMealFood.addEventListener("click", addMealFood);
   elements.mealFoodSelect.addEventListener("change", () => {
     syncFavoriteCheckbox();
@@ -429,16 +382,7 @@ function bindEvents() {
   elements.confirmImport.addEventListener("click", confirmImport);
   elements.installApp.addEventListener("click", installApp);
   elements.reloadApp.addEventListener("click", () => window.location.reload());
-  elements.editDailyPlan.addEventListener("click", openDailyPlanDialog);
-  elements.closePlanDialog.addEventListener("click", requestClosePlanDialog);
-  elements.dailyPlanForm.elements.status.addEventListener("change", syncRescheduledDateField);
-  elements.dailyPlanForm.addEventListener("submit", handleDailyPlanSubmit);
   elements.weeklyPlanForm.addEventListener("submit", handleWeeklyPlanSubmit);
-  elements.cancelPlanConflict.addEventListener("click", () => {
-    pendingPlanConflict = null;
-    elements.planConflictDialog.close();
-  });
-  elements.confirmPlanConflict.addEventListener("click", confirmPlanConflict);
   elements.startGuidedWorkout.addEventListener("click", openGuidedWorkout);
   elements.closeGuidedWorkout.addEventListener("click", closeGuidedWorkout);
   elements.completeWorkoutSet.addEventListener("click", handleCompleteWorkoutSet);
@@ -451,7 +395,6 @@ function bindEvents() {
     event.preventDefault();
     closeGuidedWorkout();
   });
-  bindGuardedDialog(elements.planDialog, requestClosePlanDialog);
   bindGuardedDialog(elements.dataDialog, requestCloseDataDialog);
   bindGuardedDialog(elements.customFoodDialog, requestCloseCustomFoodDialog);
   bindGuardedDialog(elements.recipeDialog, requestCloseRecipeDialog);
@@ -464,7 +407,6 @@ function renderStorageState() {
     document.querySelectorAll("[data-open-form]").forEach((button) => {
       button.disabled = false;
     });
-    elements.editDailyPlan.disabled = false;
     return;
   }
 
@@ -480,7 +422,6 @@ function renderStorageState() {
   document.querySelectorAll("[data-open-form]").forEach((button) => {
     button.disabled = true;
   });
-  elements.editDailyPlan.disabled = true;
 }
 
 function renderAll() {
@@ -507,12 +448,12 @@ function renderBackupState() {
     never: "当前数据从未导出完整备份。",
     stale: "上次备份已超过 14 天。",
     manyChanges: "上次备份后已新增至少 10 条记录。",
-    planChanges: "训练模板或当天计划在上次备份后发生了变化。",
+    templateChanges: "每周训练模板在上次备份后发生了变化。",
   };
   elements.backupReminderMessage.textContent = messages[reminder.reason] ?? "";
   elements.backupStatus.textContent = backupMetadata
-    ? `上次备份：${formatTimestamp(backupMetadata.lastBackupAt)} · 当时 ${backupMetadata.recordCount} 条；当前 ${summary.totalRecords} 条记录、${summary.dailyPlanCount} 天计划。`
-    : `尚未备份 · 当前 ${summary.totalRecords} 条记录、${summary.dailyPlanCount} 天计划。`;
+    ? `上次备份：${formatTimestamp(backupMetadata.lastBackupAt)} · 当时 ${backupMetadata.recordCount} 条；当前 ${summary.totalRecords} 条记录。`
+    : `尚未备份 · 当前 ${summary.totalRecords} 条记录。`;
 }
 
 function renderToday() {
@@ -520,13 +461,12 @@ function renderToday() {
   const isFuture = selectedDate > today;
   const dateContext = getDateContext(selectedDate, today);
   elements.todayTitle.textContent = dateContext.heading;
-  elements.hydrationAmountLabel.textContent = dateContext.hydrationLabel;
   elements.returnToday.hidden = selectedDate === today;
   renderCalendar();
-  renderDailyPlan();
-  document.querySelectorAll("[data-open-form], [data-quick-water]").forEach((button) => {
+  renderTrainingRecommendation();
+  document.querySelectorAll("[data-open-form]").forEach((button) => {
     button.disabled = isFuture || !data;
-    button.title = isFuture ? "未来日期只能设置计划" : "";
+    button.title = isFuture ? "未来日期不能记录健康数据" : "";
   });
   elements.startGuidedWorkout.disabled = (!workoutDraft && isFuture) || !data;
   elements.startGuidedWorkout.title = !workoutDraft && isFuture ? "未来日期不能开始训练" : "";
@@ -534,27 +474,21 @@ function renderToday() {
   if (!data) {
     for (const element of [
       elements.workoutSummary,
-      elements.activitySummary,
       elements.mealSummary,
       elements.sleepSummary,
       elements.weightSummary,
-      elements.hydrationSummary,
     ]) element.textContent = "数据不可用";
-    elements.streakDays.textContent = "—";
     return;
   }
 
   const workouts = data.workouts.filter((record) => record.date === selectedDate);
-  const activity = findDailyRecord(data, "dailyActivities", selectedDate);
   const meals = data.meals.filter((record) => record.date === selectedDate);
   const sleep = findDailyRecord(data, "sleepRecords", selectedDate);
   const weight = findDailyRecord(data, "weights", selectedDate);
-  const hydration = findDailyRecord(data, "hydration", selectedDate);
 
   elements.workoutSummary.textContent = workouts.length
     ? `${workouts.length} 次，共 ${workouts.reduce((sum, item) => sum + item.durationMinutes, 0)} 分钟`
     : "尚未记录";
-  elements.activitySummary.textContent = activity ? `${activity.steps.toLocaleString("zh-CN")} 步` : "尚未记录";
   elements.mealSummary.textContent = meals.length
     ? `${meals.length} 餐 · ${formatNutrition(sumNutrition(meals.flatMap((item) => item.items)))}`
     : "尚未记录";
@@ -562,70 +496,35 @@ function renderToday() {
     ? `${formatMinutes(calculateSleepMinutes(sleep.sleepTime, sleep.wakeTime))}，质量 ${sleep.qualityScore}/5`
     : "尚未记录";
   elements.weightSummary.textContent = weight ? `${formatWeight(weight.weightGrams)} kg` : "尚未记录";
-  elements.hydrationSummary.textContent = hydration ? `${hydration.milliliters} ml` : "尚未记录";
   if (isFuture) {
     for (const element of [
       elements.workoutSummary,
-      elements.activitySummary,
       elements.mealSummary,
       elements.sleepSummary,
       elements.weightSummary,
-      elements.hydrationSummary,
-    ]) element.textContent = "未来日期仅用于计划";
+    ]) element.textContent = "未来日期不能记录";
   }
   elements.sleepAction.textContent = sleep ? "编辑睡眠" : "记录睡眠";
   elements.weightAction.textContent = weight ? "编辑体重" : "记录体重";
-  elements.hydrationAction.textContent = hydration ? "编辑饮水" : "记录饮水";
-  elements.activityAction.textContent = activity ? "编辑步数" : "记录步数";
-  const streak = calculateRecordingStreak(data, today);
-  elements.streakDays.textContent = `${streak.days} 天`;
-  elements.streakDays.title = streak.todayRecorded ? "今天已有记录" : "今天尚未记录，连续天数截至昨天";
 }
 
-function renderDailyPlan() {
+function renderTrainingRecommendation() {
   if (!data) {
-    elements.planWorkdayBadge.textContent = "数据不可用";
-    elements.planStatusBadge.textContent = "—";
-    elements.planHeadline.textContent = "无法读取当天计划";
+    elements.planHeadline.textContent = "无法读取训练模板";
     elements.planDetail.textContent = "";
-    elements.planMealReminder.hidden = true;
-    elements.planLinkDetail.hidden = true;
     elements.startGuidedWorkout.textContent = "训练不可用";
     elements.startGuidedWorkout.disabled = true;
     return;
   }
-  const advice = createDailyAdvice(data.trainingPlan, selectedDate);
-  const dailyPlan = findDailyPlan(data.trainingPlan, selectedDate);
-  elements.planWorkdayBadge.textContent = advice.workdayType
-    ? WORKDAY_LABELS[advice.workdayType]
-    : "工作安排未设置";
-  elements.planStatusBadge.textContent = advice.status === "rescheduled" && dailyPlan?.rescheduledToDate
-    ? `已改至 ${formatDisplayDate(dailyPlan.rescheduledToDate)}`
-    : PLAN_STATUS_LABELS[advice.status];
-  elements.planHeadline.textContent = advice.headline;
-  elements.planDetail.textContent = advice.detail;
-  const matchingWorkouts = findWorkoutPlanMatches(data, selectedDate);
-  let linkDetail = "";
-  if (dailyPlan?.rescheduledFromDate) {
-    linkDetail = `由 ${formatDisplayDate(dailyPlan.rescheduledFromDate)} 改期至此`;
-  } else if (advice.status === "rescheduled" && dailyPlan?.rescheduledToDate) {
-    linkDetail = `目标日期：${formatDisplayDate(dailyPlan.rescheduledToDate)}`;
-  } else if (matchingWorkouts.length && advice.status === "planned") {
-    linkDetail = `已有 ${matchingWorkouts.length} 条匹配运动记录，请确认计划状态`;
-  } else if (
-    ["completed", "shortened"].includes(advice.status)
-    && matchingWorkouts.length === 0
-  ) {
-    linkDetail = "计划已标记完成，但尚无匹配的运动记录";
-  }
-  elements.planLinkDetail.textContent = linkDetail;
-  elements.planLinkDetail.hidden = !linkDetail;
-  elements.planMealReminder.textContent = advice.mealReminder ?? "";
-  elements.planMealReminder.hidden = !advice.mealReminder;
-  elements.editDailyPlan.textContent = advice.workdayType ? "调整安排" : "设置安排";
+  const dayIndex = (new Date(`${selectedDate}T00:00:00Z`).getUTCDay() + 6) % 7;
+  const plannedType = data.weeklyTraining[dayIndex];
+  elements.planHeadline.textContent = TRAINING_PLAN_LABELS[plannedType];
+  elements.planDetail.textContent = plannedType === "rest"
+    ? "今天按模板休息；如身体状态良好，也可以手动选择轻量训练。"
+    : "这是每周模板推荐，可根据当天状态缩短或改为休息。";
   elements.startGuidedWorkout.textContent = workoutDraft
     ? `继续${GUIDED_TEMPLATES[workoutDraft.templateId].name}`
-    : recommendedTemplateId(advice.recommendedTraining)
+    : recommendedTemplateId(plannedType)
       ? "开始推荐训练"
       : "选择训练";
 }
@@ -670,7 +569,8 @@ function renderWorkoutTemplateChooser() {
   showWorkoutStage("chooser");
   elements.guidedWorkoutTitle.textContent = "选择训练";
   elements.workoutTemplateList.replaceChildren();
-  const plannedType = getEffectiveTraining(data.trainingPlan, selectedDate);
+  const dayIndex = (new Date(`${selectedDate}T00:00:00Z`).getUTCDay() + 6) % 7;
+  const plannedType = data.weeklyTraining[dayIndex];
   const recommendedId = recommendedTemplateId(plannedType);
   for (const template of Object.values(GUIDED_TEMPLATES)) {
     const card = document.createElement("article");
@@ -1022,9 +922,7 @@ function confirmGuidedWorkout() {
       durationMinutes: estimateWorkoutDurationMinutes(workoutDraft, completedAt),
       intensity: perceivedEffort,
       source: "manual",
-      activeEnergyKcal: null,
       averageHeartRateBpm: null,
-      maxHeartRateBpm: null,
       distanceMeters: null,
       guidedSession,
       note: "",
@@ -1045,12 +943,7 @@ function confirmGuidedWorkout() {
     calendarAnchor = workout.date;
     elements.guidedWorkoutDialog.close();
     renderAll();
-    const matchingPlan = findDailyPlan(data.trainingPlan, workout.date);
-    showToast(
-      matchingPlan?.status === "planned"
-        ? "训练记录已保存；请确认当天计划状态"
-        : "训练记录已保存",
-    );
+    showToast("训练记录已保存");
   } catch (error) {
     setInlineError(elements.workoutSummaryError, error.message || "训练记录保存失败");
   }
@@ -1085,21 +978,17 @@ function renderCalendar() {
     if (entry.date === selectedDate) button.classList.add("selected");
     button.setAttribute("aria-pressed", String(entry.date === selectedDate));
     if (status.hasRecord) button.classList.add("has-record");
-    const dailyPlan = data ? findDailyPlan(data.trainingPlan, entry.date) : null;
-    if (dailyPlan) button.classList.add("has-plan");
     button.disabled = !data;
     button.setAttribute(
       "aria-label",
-      `${formatDisplayDate(entry.date)}，已完成 ${status.completedCount}/6 类记录${dailyPlan ? `，单日计划：${PLAN_STATUS_LABELS[dailyPlan.status]}` : "，无单日计划"}`,
+      `${formatDisplayDate(entry.date)}，已完成 ${status.completedCount}/4 类记录`,
     );
     const dayNumber = document.createElement("span");
     dayNumber.className = "day-number";
     dayNumber.textContent = String(Number(entry.date.slice(-2)));
     const dayStatus = document.createElement("span");
     dayStatus.className = "day-status";
-    dayStatus.textContent = status.hasRecord
-      ? `${status.completedCount}/6${dailyPlan ? " · 计" : ""}`
-      : dailyPlan ? "计划" : "—";
+    dayStatus.textContent = status.hasRecord ? `${status.completedCount}/4` : "—";
     button.append(dayNumber, dayStatus);
     button.addEventListener("click", () => setSelectedDate(entry.date));
     elements.calendarGrid.append(button);
@@ -1113,16 +1002,7 @@ function renderRecords() {
     return;
   }
 
-  const allItems = [
-    ...allRecordsByDate(data),
-    ...data.trainingPlan.dailyPlans.map((record) => ({
-      collectionName: "plans",
-      record,
-    })),
-  ].sort((left, right) => {
-    const dateOrder = right.record.date.localeCompare(left.record.date);
-    return dateOrder || right.record.updatedAt.localeCompare(left.record.updatedAt);
-  });
+  const allItems = allRecordsByDate(data);
   const items = filterRecordItems(
     allItems,
     elements.recordTypeFilter.value,
@@ -1151,50 +1031,8 @@ function renderRecords() {
       group.append(title);
       elements.recordsList.append(group);
     }
-    group.append(
-      item.collectionName === "plans"
-        ? createPlanRecordCard(item.record)
-        : createRecordCard(item.collectionName, item.record),
-    );
+    group.append(createRecordCard(item.collectionName, item.record));
   }
-}
-
-function createPlanRecordCard(plan) {
-  const card = document.createElement("article");
-  card.className = "record-card plan-record-card";
-  const top = document.createElement("div");
-  top.className = "record-top";
-  const label = document.createElement("div");
-  label.className = "record-label";
-  const dot = document.createElement("span");
-  dot.className = "record-type-dot";
-  const labelText = document.createElement("span");
-  labelText.textContent = "健康计划";
-  label.append(dot, labelText);
-  const editButton = document.createElement("button");
-  editButton.type = "button";
-  editButton.textContent = "查看";
-  editButton.addEventListener("click", () => {
-    setSelectedDate(plan.date);
-    switchView("today");
-    openDailyPlanDialog();
-  });
-  top.append(label, editButton);
-  const detail = document.createElement("p");
-  detail.className = "record-detail";
-  const training = TRAINING_PLAN_LABELS[
-    plan.trainingOverride ?? data.trainingPlan.weeklyTraining[
-      ((new Date(`${plan.date}T00:00:00Z`).getUTCDay() + 6) % 7)
-    ]
-  ];
-  const links = plan.rescheduledToDate
-    ? ` · 改至 ${formatDisplayDate(plan.rescheduledToDate)}`
-    : plan.rescheduledFromDate
-      ? ` · 由 ${formatDisplayDate(plan.rescheduledFromDate)} 改期`
-      : "";
-  detail.textContent = `${WORKDAY_LABELS[plan.workdayType]} · ${training} · ${PLAN_STATUS_LABELS[plan.status]}${links}`;
-  card.append(top, detail);
-  return card;
 }
 
 function renderTrends() {
@@ -1213,10 +1051,7 @@ function renderTrends() {
   const hasAnySamples = summary.weight.sampleCount
     + summary.sleep.sampleCount
     + summary.workout.count
-    + summary.dailyActivity.sampleCount
-    + summary.meal.count
-    + summary.hydration.sampleCount
-    + summary.plan.count > 0;
+    + summary.meal.count > 0;
   elements.trendEmpty.hidden = hasAnySamples;
   elements.trendGrid.hidden = !hasAnySamples;
   elements.trendBoundary.hidden = !hasAnySamples;
@@ -1278,9 +1113,6 @@ function renderTrends() {
         (value) => formatSignedUnit(value, "分钟"),
       ),
       [
-        summary.workout.totalActiveEnergyKcal === null
-          ? null
-          : `活动热量 ${summary.workout.totalActiveEnergyKcal} kcal`,
         summary.workout.averageHeartRateBpm === null
           ? null
           : `平均心率 ${summary.workout.averageHeartRateBpm} bpm`,
@@ -1294,18 +1126,6 @@ function renderTrends() {
   } else {
     elements.workoutTrendMeta.textContent = "记录运动后显示次数、时长和类型分布";
   }
-
-  elements.activityTrendSamples.textContent = `${summary.dailyActivity.sampleCount} 天`;
-  elements.activityTrendValue.textContent = summary.dailyActivity.sampleCount
-    ? `日均 ${summary.dailyActivity.averageSteps.toLocaleString("zh-CN")} 步`
-    : "暂无足够数据";
-  elements.activityTrendMeta.textContent = summary.dailyActivity.sampleCount
-    ? joinComparison(
-      `累计 ${summary.dailyActivity.totalSteps.toLocaleString("zh-CN")} 步，仅按有记录日期计算`,
-      comparison.changes.dailySteps,
-      (value) => formatSignedUnit(value, "步"),
-    )
-    : "记录 Apple Watch 当日步数后显示活动趋势";
 
   elements.mealTrendSamples.textContent = `${summary.meal.count} 餐`;
   elements.mealTrendValue.textContent = summary.meal.count
@@ -1325,25 +1145,6 @@ function renderTrends() {
     elements.mealTrendMeta.textContent = "按克记录食物后显示热量和宏量营养素";
   }
 
-  elements.hydrationTrendSamples.textContent = `${summary.hydration.sampleCount} 天`;
-  elements.hydrationTrendValue.textContent = summary.hydration.sampleCount
-    ? `日均 ${summary.hydration.averageMilliliters} ml`
-    : "暂无足够数据";
-  elements.hydrationTrendMeta.textContent = summary.hydration.sampleCount
-    ? joinComparison(
-      "仅使用有饮水记录的日期计算",
-      comparison.changes.hydrationMilliliters,
-      (value) => formatSignedUnit(value, "ml"),
-    )
-    : "记录饮水后显示有记录日期的平均值";
-
-  elements.planTrendSamples.textContent = `${summary.plan.count} 天`;
-  elements.planTrendValue.textContent = summary.plan.count
-    ? `完成 ${summary.plan.completed + summary.plan.shortened} 天`
-    : "暂无计划";
-  elements.planTrendMeta.textContent = summary.plan.count
-    ? `完整完成 ${summary.plan.completed} · 缩短完成 ${summary.plan.shortened} · 改期 ${summary.plan.rescheduled} · 休息 ${summary.plan.rest}；计划状态不等于实际运动量`
-    : "设置当天工作和训练安排后显示计划执行情况";
 }
 
 function renderWeightChart(points) {
@@ -1502,9 +1303,7 @@ function describeRecord(collectionName, record) {
     const metrics = [
       `${WORKOUT_LABELS[record.type]} · ${record.durationMinutes} 分钟 · 强度 ${record.intensity}/3`,
       record.source === "appleWatch" ? "Apple Watch" : "手动",
-      record.activeEnergyKcal === null ? null : `${record.activeEnergyKcal} kcal`,
       record.averageHeartRateBpm === null ? null : `平均心率 ${record.averageHeartRateBpm}`,
-      record.maxHeartRateBpm === null ? null : `最高心率 ${record.maxHeartRateBpm}`,
       record.distanceMeters === null ? null : formatDistance(record.distanceMeters),
       record.distanceMeters === null
         ? null
@@ -1517,17 +1316,14 @@ function describeRecord(collectionName, record) {
           .join("、")}`,
     ];
     detail = metrics.filter(Boolean).join(" · ");
-  } else if (collectionName === "dailyActivities") {
-    detail = `${record.steps.toLocaleString("zh-CN")} 步 · ${record.source === "appleWatch" ? "Apple Watch" : "手动"}`;
   } else if (collectionName === "meals") {
     const nutrition = sumNutrition(record.items);
-    detail = `${MEAL_LABELS[record.mealType]} · ${record.items.map((item) => `${item.name} ${formatFoodAmount(item)}`).join("、")} · ${formatNutrition(nutrition)} · ${record.trackingMode === "precise" ? "称重" : "估算"}／${confidenceLabel(record.confidence)}`;
+    const fullness = record.fullnessScore === null ? "" : ` · 饱腹感 ${record.fullnessScore}/5`;
+    detail = `${MEAL_LABELS[record.mealType]} · ${record.items.map((item) => `${item.name} ${formatFoodAmount(item)}`).join("、")} · ${formatNutrition(nutrition)} · ${record.trackingMode === "precise" ? "称重" : "估算"}／${confidenceLabel(record.confidence)}${fullness}`;
   } else if (collectionName === "sleepRecords") {
     detail = `${record.sleepTime}–${record.wakeTime} · ${formatMinutes(calculateSleepMinutes(record.sleepTime, record.wakeTime))} · 质量 ${record.qualityScore}/5`;
   } else if (collectionName === "weights") {
     detail = `${formatWeight(record.weightGrams)} kg${record.bodyFatBasisPoints === null ? "" : ` · 体脂 ${formatBodyFat(record.bodyFatBasisPoints)}％`}`;
-  } else {
-    detail = `${record.milliliters} ml`;
   }
   return record.note ? `${detail} · ${record.note}` : detail;
 }
@@ -1594,141 +1390,11 @@ function populateWeeklyPlanOptions() {
 
 function renderWeeklyPlanForm() {
   if (!data) return;
-  data.trainingPlan.weeklyTraining.forEach((type, index) => {
+  data.weeklyTraining.forEach((type, index) => {
     elements.weeklyPlanForm.elements[`day${index}`].value = type;
   });
   setInlineError(elements.weeklyPlanError, "");
   weeklyPlanBaseline = formSignature(elements.weeklyPlanForm);
-}
-
-function openDailyPlanDialog() {
-  if (!data) return;
-  const existing = findDailyPlan(data.trainingPlan, selectedDate);
-  const form = elements.dailyPlanForm;
-  form.reset();
-  elements.planDateLabel.textContent = formatDisplayDate(selectedDate);
-  form.elements.workdayType.value = existing?.workdayType ?? defaultWorkdayType(selectedDate);
-  form.elements.trainingOverride.value = existing?.trainingOverride ?? "";
-  form.elements.status.value = existing?.status ?? "planned";
-  form.elements.rescheduledToDate.value = existing?.rescheduledToDate ?? "";
-  const rescheduledOption = form.elements.status.querySelector('option[value="rescheduled"]');
-  rescheduledOption.disabled = Boolean(existing?.rescheduledFromDate);
-  elements.planWorkoutLink.textContent = planWorkoutLinkText(selectedDate, existing);
-  setInlineError(elements.planFormError, "");
-  syncRescheduledDateField();
-  planFormBaseline = formSignature(form);
-  elements.planDialog.showModal();
-  form.elements.workdayType.focus();
-}
-
-function syncRescheduledDateField() {
-  const rescheduled = elements.dailyPlanForm.elements.status.value === "rescheduled";
-  elements.rescheduledDateField.hidden = !rescheduled;
-  elements.dailyPlanForm.elements.rescheduledToDate.required = rescheduled;
-  if (!rescheduled) elements.dailyPlanForm.elements.rescheduledToDate.value = "";
-}
-
-function handleDailyPlanSubmit(event) {
-  event.preventDefault();
-  if (!data) return;
-  const form = event.currentTarget;
-  const now = new Date().toISOString();
-  try {
-    const plan = buildDailyPlan(form, now);
-    if (plan.status !== "rescheduled") {
-      persistDailyPlan(saveDailyPlan(data, plan));
-      return;
-    }
-    if (!plan.rescheduledToDate) throw new TypeError("请选择改期目标日期");
-    const sourceTraining = plan.trainingOverride
-      ?? getEffectiveTraining(data.trainingPlan, selectedDate);
-    if (sourceTraining === "rest") throw new TypeError("休息计划不需要改期");
-    const existingTarget = findDailyPlan(data.trainingPlan, plan.rescheduledToDate);
-    const targetTraining = getEffectiveTraining(data.trainingPlan, plan.rescheduledToDate);
-    const target = {
-      id: existingTarget?.id ?? createId(),
-      date: plan.rescheduledToDate,
-      workdayType: existingTarget?.workdayType ?? defaultWorkdayType(plan.rescheduledToDate),
-      trainingOverride: sourceTraining,
-      status: existingTarget?.status ?? "planned",
-      rescheduledToDate: null,
-      rescheduledFromDate: selectedDate,
-      createdAt: existingTarget?.createdAt ?? now,
-      updatedAt: now,
-    };
-    const hasConflict = Boolean(
-      existingTarget
-      || (targetTraining !== "rest" && targetTraining !== sourceTraining),
-    );
-    if (hasConflict) {
-      pendingPlanConflict = { source: plan, target };
-      elements.planConflictMessage.textContent =
-        `${formatDisplayDate(plan.rescheduledToDate)} 原安排为${TRAINING_PLAN_LABELS[targetTraining]}。确认后将改为${TRAINING_PLAN_LABELS[sourceTraining]}，并保留双向改期标记。`;
-      elements.planConflictDialog.showModal();
-      return;
-    }
-    persistDailyPlan(saveRescheduledPlan(data, plan, target));
-  } catch (error) {
-    setInlineError(elements.planFormError, error.message || "当天安排保存失败");
-  }
-}
-
-function buildDailyPlan(form, now) {
-  const existing = findDailyPlan(data.trainingPlan, selectedDate);
-  return {
-    id: existing?.id ?? createId(),
-    date: selectedDate,
-    workdayType: form.elements.workdayType.value,
-    trainingOverride: form.elements.trainingOverride.value || null,
-    status: form.elements.status.value,
-    rescheduledToDate: form.elements.status.value === "rescheduled"
-      ? form.elements.rescheduledToDate.value
-      : null,
-    rescheduledFromDate: existing?.rescheduledFromDate ?? null,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  };
-}
-
-function confirmPlanConflict() {
-  if (!pendingPlanConflict) return;
-  try {
-    const next = saveRescheduledPlan(
-      data,
-      pendingPlanConflict.source,
-      pendingPlanConflict.target,
-    );
-    pendingPlanConflict = null;
-    elements.planConflictDialog.close();
-    persistDailyPlan(next);
-  } catch (error) {
-    pendingPlanConflict = null;
-    elements.planConflictDialog.close();
-    setInlineError(elements.planFormError, error.message || "改期保存失败");
-  }
-}
-
-function persistDailyPlan(next) {
-  saveData(next);
-  data = next;
-  planFormBaseline = null;
-  elements.planDialog.close();
-  renderAll();
-  showToast("当天安排已保存");
-}
-
-function planWorkoutLinkText(date, plan) {
-  const matching = findWorkoutPlanMatches(data, date);
-  if (plan?.rescheduledFromDate) {
-    return `这是由 ${formatDisplayDate(plan.rescheduledFromDate)} 改期而来的计划。`;
-  }
-  if (matching.length && (plan?.status ?? "planned") === "planned") {
-    return `已有 ${matching.length} 条匹配运动记录，保存时请确认执行状态。`;
-  }
-  if (["completed", "shortened"].includes(plan?.status) && !matching.length) {
-    return "当前没有匹配的运动记录；计划状态不会自动生成运动数据。";
-  }
-  return "计划状态与实际运动记录分开保存。";
 }
 
 function handleWeeklyPlanSubmit(event) {
@@ -1751,16 +1417,11 @@ function handleWeeklyPlanSubmit(event) {
   }
 }
 
-function defaultWorkdayType(date) {
-  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
-  return weekday === 0 || weekday === 6 ? "rest" : "normal";
-}
-
 function openForm(type, explicitRecord = null) {
   if (!data) return;
   const config = TYPE_CONFIG[type];
   let record = explicitRecord;
-  if (!record && ["activity", "sleep", "weight", "hydration"].includes(type)) {
+  if (!record && ["sleep", "weight"].includes(type)) {
     record = findDailyRecord(data, config.collectionName, selectedDate);
   }
 
@@ -1782,7 +1443,6 @@ function openForm(type, explicitRecord = null) {
     syncFavoriteCheckbox();
     updateMealConfidenceState();
   }
-  updateFormContext();
   updateSleepDurationPreview();
   updateWorkoutFieldState(false);
   updateWorkoutPacePreview();
@@ -1802,8 +1462,6 @@ function fillForm(type, form, record) {
       form.elements.confidence.value = "medium";
     } else if (type === "workout") {
       form.elements.source.value = "manual";
-    } else if (type === "activity") {
-      form.elements.source.value = "appleWatch";
     }
     return;
   }
@@ -1832,7 +1490,6 @@ function handleFormInput(event) {
   if (editing?.type === "workout" && event?.target?.name === "type") {
     updateWorkoutFieldState(true);
   }
-  updateFormContext();
   updateSleepDurationPreview();
   updateWorkoutPacePreview();
 }
@@ -1845,18 +1502,6 @@ function updateMealConfidenceState() {
   if (isPrecise && activeForm.elements.confidence.value === "low") {
     activeForm.elements.confidence.value = "medium";
   }
-}
-
-function handleSharedDateInput() {
-  updateFormContext();
-}
-
-function updateFormContext() {
-  const value = elements.recordDate.value || selectedDate;
-  elements.hydrationAmountLabel.textContent = getDateContext(
-    value,
-    localDateString(new Date()),
-  ).hydrationLabel;
 }
 
 function updateSleepDurationPreview() {
@@ -1905,43 +1550,6 @@ function setQuickDuration(minutes) {
   if (editing?.type !== "workout" || !activeForm) return;
   activeForm.elements.durationMinutes.value = String(minutes);
   activeForm.elements.durationMinutes.focus();
-}
-
-function addWaterInForm(amount) {
-  if (editing?.type !== "hydration" || !activeForm) return;
-  try {
-    const current = Number(activeForm.elements.milliliters.value || 0);
-    activeForm.elements.milliliters.value = String(addHydrationAmount(current, amount));
-    activeForm.elements.milliliters.focus();
-    setFormError("");
-  } catch (error) {
-    setFormError(error.message || "无法增加饮水量");
-  }
-}
-
-function quickAddHydration(amount) {
-  if (!data) return;
-  const previousData = data;
-  const existing = findDailyRecord(data, "hydration", selectedDate);
-  const now = new Date().toISOString();
-  try {
-    const record = {
-      id: existing?.id ?? createId(),
-      date: selectedDate,
-      milliliters: addHydrationAmount(existing?.milliliters ?? 0, amount),
-      note: existing?.note ?? "",
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    };
-    const next = saveRecord(data, "hydration", record);
-    saveData(next);
-    data = next;
-    undoState = { previousData };
-    renderAll();
-    showToast(`饮水已增加 ${amount} ml`, true);
-  } catch (error) {
-    showToast(error.message || "饮水记录失败");
-  }
 }
 
 function populateFoodSelects(selectedMealRef = elements.mealFoodSelect.value) {
@@ -2229,17 +1837,6 @@ function requestDiscardConfirmation(action) {
   if (!elements.discardDialog.open) elements.discardDialog.showModal();
 }
 
-function requestClosePlanDialog() {
-  if (formSignature(elements.dailyPlanForm) === planFormBaseline) {
-    elements.planDialog.close();
-    return;
-  }
-  requestDiscardConfirmation(() => {
-    planFormBaseline = null;
-    elements.planDialog.close();
-  });
-}
-
 function requestCloseDataDialog() {
   if (formSignature(elements.weeklyPlanForm) === weeklyPlanBaseline) {
     elements.dataDialog.close();
@@ -2305,14 +1902,7 @@ function handleFormSubmit(event) {
     selectedDate = record.date;
     calendarAnchor = record.date;
     renderAll();
-    const matchingPlan = type === "workout"
-      ? findDailyPlan(data.trainingPlan, record.date)
-      : null;
-    showToast(
-      matchingPlan?.status === "planned"
-        ? `${TYPE_CONFIG[type].label}已保存；请确认当天计划状态`
-        : `${TYPE_CONFIG[type].label}已保存`,
-    );
+    showToast(`${TYPE_CONFIG[type].label}已保存`);
   } catch (error) {
     setFormError(error.message || "保存失败，请检查输入");
   }
@@ -2326,21 +1916,11 @@ function buildRecord(type, form, base) {
       durationMinutes: Number(form.elements.durationMinutes.value),
       intensity: Number(form.elements.intensity.value),
       source: form.elements.source.value,
-      activeEnergyKcal: nullableInteger(form.elements.activeEnergyKcal.value),
       averageHeartRateBpm: nullableInteger(form.elements.averageHeartRateBpm.value),
-      maxHeartRateBpm: nullableInteger(form.elements.maxHeartRateBpm.value),
       distanceMeters: form.elements.distanceKm.value === ""
         ? null
         : Math.round(Number(form.elements.distanceKm.value) * 1_000),
       guidedSession: editing?.record?.guidedSession ?? null,
-      note: form.elements.note.value.trim(),
-    };
-  }
-  if (type === "activity") {
-    return {
-      ...base,
-      steps: Number(form.elements.steps.value),
-      source: form.elements.source.value,
       note: form.elements.note.value.trim(),
     };
   }
@@ -2353,8 +1933,9 @@ function buildRecord(type, form, base) {
       trackingMode: form.elements.trackingMode.value,
       confidence,
       items: mealItemsDraft.map((item) => ({ ...item, confidence })),
-      healthScore: Number(form.elements.healthScore.value),
-      fullnessScore: Number(form.elements.fullnessScore.value),
+      fullnessScore: form.elements.fullnessScore.value === ""
+        ? null
+        : Number(form.elements.fullnessScore.value),
       note: form.elements.note.value.trim(),
     };
   }
@@ -2377,11 +1958,7 @@ function buildRecord(type, form, base) {
       note: form.elements.note.value.trim(),
     };
   }
-  return {
-    ...base,
-    milliliters: Number(form.elements.milliliters.value),
-    note: form.elements.note.value.trim(),
-  };
+  throw new TypeError("不支持的记录类型");
 }
 
 function handleDelete(collectionName, recordId) {
@@ -2505,13 +2082,10 @@ function renderImportPreview() {
     ? `${summary.firstDate} 至 ${summary.lastDate}`
     : "空账本";
   elements.importTotal.textContent = `${summary.totalRecords} 条`;
-  elements.importCounts.textContent = `运动 ${summary.counts.workouts}、每日活动 ${summary.counts.dailyActivities}、饮食 ${summary.counts.meals}、睡眠 ${summary.counts.sleepRecords}、体重 ${summary.counts.weights}、饮水 ${summary.counts.hydration}；自定义食品 ${backup.data.customFoods.length}、菜谱 ${backup.data.recipes.length}`;
-  elements.importPlans.textContent = `${summary.dailyPlanCount} 天单日计划；每周模板：${summary.weeklyTraining.map((type) => TRAINING_PLAN_LABELS[type]).join("、")}；工作类型：${formatWorkdayCounts(summary.workdayCounts)}`;
+  elements.importCounts.textContent = `运动 ${summary.counts.workouts}、饮食 ${summary.counts.meals}、睡眠 ${summary.counts.sleepRecords}、体重 ${summary.counts.weights}；自定义食品 ${backup.data.customFoods.length}、菜谱 ${backup.data.recipes.length}；每周模板：${summary.weeklyTraining.map((type) => TRAINING_PLAN_LABELS[type]).join("、")}`;
   const currentCount = data ? summarizeData(data).totalRecords : 0;
   const restoreLabel = getRestoreLabel(currentCount, summary.totalRecords);
-  const currentPlanCount = data?.trainingPlan.dailyPlans.length ?? 0;
-  elements.importReplaceSummary.textContent =
-    `${restoreLabel.summary} 当前 ${currentPlanCount} 天计划将替换为 ${summary.dailyPlanCount} 天计划。`;
+  elements.importReplaceSummary.textContent = restoreLabel.summary;
   elements.confirmImport.textContent = restoreLabel.action;
   elements.importPreview.hidden = false;
 }
@@ -2524,7 +2098,6 @@ function confirmImport() {
       data
       && (
         summarizeData(data).totalRecords > 0
-        || data.trainingPlan.dailyPlans.length > 0
         || data.customFoods.length > 0
         || data.recipes.length > 0
       )
@@ -2599,13 +2172,6 @@ function formatTimestamp(value) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
-}
-
-function formatWorkdayCounts(counts) {
-  const entries = Object.entries(counts);
-  return entries.length
-    ? entries.map(([type, count]) => `${WORKDAY_LABELS[type]} ${count}`).join("、")
-    : "尚无单日工作安排";
 }
 
 function formatMinutes(minutes) {

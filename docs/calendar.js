@@ -1,13 +1,9 @@
-import { COLLECTIONS } from "./data.js";
-
 export function getDailyStatus(data, date) {
   const categories = {
     workout: data.workouts.some((record) => record.date === date),
-    dailyActivity: data.dailyActivities.some((record) => record.date === date),
     meal: data.meals.some((record) => record.date === date),
     sleep: data.sleepRecords.some((record) => record.date === date),
     weight: data.weights.some((record) => record.date === date),
-    hydration: data.hydration.some((record) => record.date === date),
   };
   return {
     categories,
@@ -50,22 +46,6 @@ export function shiftCalendarAnchor(anchorDate, mode, direction) {
     anchor.getUTCMonth() + direction,
     1,
   )));
-}
-
-export function calculateRecordingStreak(data, todayDate) {
-  const recordedDates = new Set(
-    COLLECTIONS.flatMap((collectionName) => data[collectionName].map((record) => record.date)),
-  );
-  const todayRecorded = recordedDates.has(todayDate);
-  let cursor = parseDate(todayDate);
-  if (!todayRecorded) cursor = addDays(cursor, -1);
-
-  let days = 0;
-  while (recordedDates.has(formatDate(cursor))) {
-    days += 1;
-    cursor = addDays(cursor, -1);
-  }
-  return { days, todayRecorded };
 }
 
 export function getCalendarLabel(anchorDate, mode) {

@@ -2,9 +2,8 @@ import {
   assertValidData,
   calculateSleepMinutes,
   calculateWeightMovingAverage,
-} from "./model.js";
-import { roundNutrition, sumNutrition } from "./nutrition.js";
-import { summarizePlanWindow } from "./planning.js";
+} from "./model.js?v=16";
+import { roundNutrition, sumNutrition } from "./nutrition.js?v=16";
 
 export function calculateTrendSummary(data, endDate, days) {
   assertValidData(data);
@@ -22,11 +21,9 @@ export function calculateTrendSummary(data, endDate, days) {
   const sleepRecords = data.sleepRecords.filter(inRange);
   const sleepMinutes = sleepRecords.map((record) => calculateSleepMinutes(record.sleepTime, record.wakeTime));
   const workouts = data.workouts.filter(inRange);
-  const dailyActivities = data.dailyActivities.filter(inRange);
   const meals = data.meals.filter(inRange);
   const mealNutrition = sumNutrition(meals.flatMap((record) => record.items));
   const mealRecordedDays = new Set(meals.map((record) => record.date)).size;
-  const hydration = data.hydration.filter(inRange);
 
   return {
     period: { startDate, endDate, days },
@@ -46,8 +43,6 @@ export function calculateTrendSummary(data, endDate, days) {
       totalMinutes: workouts.reduce((sum, record) => sum + record.durationMinutes, 0),
       byType: sumBy(workouts, (record) => record.type, (record) => record.durationMinutes),
       appleWatchCount: workouts.filter((record) => record.source === "appleWatch").length,
-      activeEnergySampleCount: workouts.filter((record) => record.activeEnergyKcal !== null).length,
-      totalActiveEnergyKcal: sumNullable(workouts, (record) => record.activeEnergyKcal),
       heartRateSampleCount: workouts.filter((record) => record.averageHeartRateBpm !== null).length,
       averageHeartRateBpm: averageRounded(
         workouts
@@ -56,17 +51,13 @@ export function calculateTrendSummary(data, endDate, days) {
       ),
       totalDistanceMeters: sumNullable(workouts, (record) => record.distanceMeters),
     },
-    dailyActivity: {
-      sampleCount: dailyActivities.length,
-      averageSteps: averageRounded(dailyActivities.map((record) => record.steps)),
-      totalSteps: dailyActivities.reduce((sum, record) => sum + record.steps, 0),
-    },
     meal: {
       count: meals.length,
       recordedDays: mealRecordedDays,
       completionPercent: Math.round(mealRecordedDays / days * 100),
-      averageHealth: averageFixed(meals.map((record) => record.healthScore)),
-      averageFullness: averageFixed(meals.map((record) => record.fullnessScore)),
+      averageFullness: averageFixed(
+        meals.map((record) => record.fullnessScore).filter((value) => value !== null),
+      ),
       preciseCount: meals.filter((record) => record.trackingMode === "precise").length,
       estimatedCount: meals.filter((record) => record.trackingMode === "estimated").length,
       totalNutrition: mealNutrition,
@@ -79,11 +70,6 @@ export function calculateTrendSummary(data, endDate, days) {
         })
         : null,
     },
-    hydration: {
-      sampleCount: hydration.length,
-      averageMilliliters: averageRounded(hydration.map((record) => record.milliliters)),
-    },
-    plan: summarizePlanWindow(data.trainingPlan, startDate, endDate),
   };
 }
 
@@ -99,10 +85,6 @@ export function calculateTrendComparison(data, endDate, days) {
       workoutMinutes: previous.workout.count && current.workout.count
         ? current.workout.totalMinutes - previous.workout.totalMinutes
         : null,
-      dailySteps: difference(
-        current.dailyActivity.averageSteps,
-        previous.dailyActivity.averageSteps,
-      ),
       mealCompletionPoints: previous.meal.count && current.meal.count
         ? current.meal.completionPercent - previous.meal.completionPercent
         : null,
@@ -110,10 +92,6 @@ export function calculateTrendComparison(data, endDate, days) {
         ? current.meal.dailyAverageNutrition.proteinGrams
           - previous.meal.dailyAverageNutrition.proteinGrams
         : null,
-      hydrationMilliliters: difference(
-        current.hydration.averageMilliliters,
-        previous.hydration.averageMilliliters,
-      ),
     },
   };
 }

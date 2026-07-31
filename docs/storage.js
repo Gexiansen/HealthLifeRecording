@@ -1,20 +1,16 @@
 import {
   createEmptyData,
-  migrateV5Data,
-  migrateV6Data,
   parseData,
   serializeData,
-} from "./model.js";
-import { parseBackupMetadata } from "./backup.js";
+} from "./model.js?v=16";
+import { parseBackupMetadata } from "./backup.js?v=16";
 import {
   assertValidWorkoutDraft,
   migrateWorkoutDraftV1,
-} from "./guided-workout.js";
+} from "./guided-workout.js?v=16";
 
-export const STORAGE_KEY = "healthlife:data:v7";
-export const PREVIOUS_STORAGE_KEY = "healthlife:data:v6";
-export const LEGACY_STORAGE_KEY = "healthlife:data:v5";
-export const BACKUP_META_KEY = "healthlife:backup-meta:v7";
+export const STORAGE_KEY = "healthlife:data:v8";
+export const BACKUP_META_KEY = "healthlife:backup-meta:v8";
 export const WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v2";
 export const PREVIOUS_WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v1";
 
@@ -40,41 +36,6 @@ export function loadData(storage = globalThis.localStorage) {
   }
 
   if (raw === null) {
-    let previousRaw;
-    let previousVersion;
-    try {
-      previousRaw = storage.getItem(PREVIOUS_STORAGE_KEY);
-      previousVersion = 6;
-      if (previousRaw === null) {
-        previousRaw = storage.getItem(LEGACY_STORAGE_KEY);
-        previousVersion = 5;
-      }
-    } catch (error) {
-      return { status: "unavailable", data: null, raw: null, error };
-    }
-    if (previousRaw !== null) {
-      try {
-        const previous = JSON.parse(previousRaw);
-        const migrated = previousVersion === 6
-          ? migrateV6Data(previous)
-          : migrateV5Data(previous);
-        const serialized = serializeData(migrated);
-        storage.setItem(STORAGE_KEY, serialized);
-        return {
-          status: "ready",
-          data: migrated,
-          raw: serialized,
-          error: null,
-        };
-      } catch (error) {
-        return {
-          status: "corrupt",
-          data: null,
-          raw: previousRaw,
-          error,
-        };
-      }
-    }
     return {
       status: "empty",
       data: createEmptyData(),

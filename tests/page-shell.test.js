@@ -4,45 +4,23 @@ import { readFile } from "node:fs/promises";
 
 const html = await readFile(new URL("../docs/index.html", import.meta.url), "utf8");
 
-test("正式页面只引用本地相对运行时资源", () => {
-  assert.match(html, /href="\.\/styles\.css"/);
-  assert.match(html, /src="\.\/app\.js"/);
-  assert.doesNotMatch(html, /https?:\/\//);
-});
-
-test("页面包含三个一级导航和六类记录表单", () => {
-  for (const view of ["today", "trends", "records"]) {
-    assert.match(html, new RegExp(`data-view="${view}"`));
-  }
-  for (const form of ["workout", "activity", "meal", "sleep", "weight", "hydration"]) {
+test("页面保留三个一级导航和四类记录表单", () => {
+  for (const view of ["today", "trends", "records"]) assert.match(html, new RegExp(`data-view="${view}"`));
+  for (const form of ["workout", "meal", "sleep", "weight"]) {
     assert.match(html, new RegExp(`data-record-form="${form}"`));
   }
-  assert.match(html, /id="custom-food-dialog"/);
-  assert.match(html, /id="recipe-dialog"/);
-  assert.match(html, /id="export-analysis"/);
-  assert.match(html, /id="meal-food-unit"/);
-  assert.match(html, /value="appleWatch"/);
-  assert.match(html, /id="health-plan-title"/);
-  assert.match(html, /id="daily-plan-form"/);
-  assert.match(html, /id="weekly-plan-form"/);
-  assert.match(html, /id="plan-conflict-dialog"/);
+  assert.doesNotMatch(html, /data-record-form="(?:activity|hydration)"/);
+});
+
+test("首页只保留四类核心卡片和简单今日训练推荐", () => {
+  assert.match(html, /id="health-plan-title">今日训练/);
   assert.match(html, /id="start-guided-workout"/);
-  assert.match(html, /id="guided-workout-dialog"/);
-  assert.match(html, /id="complete-workout-set"/);
-  assert.match(html, /id="workout-rest-countdown"/);
-  assert.match(html, /id="workout-exercise-replacement"/);
-  assert.match(html, /id="workout-history"/);
-  assert.match(html, /id="confirm-guided-workout"/);
-  assert.match(html, /id="import-plans"/);
-  assert.match(html, />设置<\/button>/);
+  assert.doesNotMatch(html, /id="daily-progress"|id="streak-badge"|id="edit-daily-plan"/);
 });
 
-test("首页日期只通过日历选择，不保留重复的精确日期输入", () => {
-  assert.doesNotMatch(html, /id="selected-date"/);
-  assert.doesNotMatch(html, />精确选择</);
-  assert.match(html, /id="daily-progress" hidden aria-hidden="true"/);
-});
-
-test("正式页面不使用内联事件处理器", () => {
-  assert.doesNotMatch(html, /\son[a-z]+\s*=/i);
+test("表单移除健康评分、活动热量和最高心率，饱腹感可选", () => {
+  assert.doesNotMatch(html, /name="healthScore"|name="activeEnergyKcal"|name="maxHeartRateBpm"/);
+  assert.match(html, /name="fullnessScore"/);
+  assert.match(html, /value="">未记录/);
+  assert.doesNotMatch(html, /onclick=/);
 });

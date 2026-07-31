@@ -1,12 +1,10 @@
-import { assertValidData, serializeData } from "./model.js";
+import { assertValidData, serializeData } from "./model.js?v=16";
 
 export const COLLECTIONS = Object.freeze([
   "workouts",
-  "dailyActivities",
   "meals",
   "sleepRecords",
   "weights",
-  "hydration",
 ]);
 
 export function saveRecord(data, collectionName, record) {
@@ -43,7 +41,7 @@ export function findRecord(data, collectionName, recordId) {
 }
 
 export function findDailyRecord(data, collectionName, date) {
-  if (!["sleepRecords", "weights", "hydration", "dailyActivities"].includes(collectionName)) {
+  if (!["sleepRecords", "weights"].includes(collectionName)) {
     throw new TypeError(`${collectionName} 不支持每日唯一查询`);
   }
   return data[collectionName].find((item) => item.date === date) ?? null;
@@ -112,81 +110,9 @@ export function updateEggGramsPerPiece(data, grams) {
 
 export function updateWeeklyTraining(data, weeklyTraining) {
   const next = cloneData(data);
-  next.trainingPlan.weeklyTraining = structuredClone(weeklyTraining);
+  next.weeklyTraining = structuredClone(weeklyTraining);
   assertValidData(next);
   return next;
-}
-
-export function saveDailyPlan(data, plan) {
-  const next = cloneData(data);
-  const existing = next.trainingPlan.dailyPlans.find((item) => item.date === plan.date);
-  if (existing?.rescheduledToDate && existing.rescheduledToDate !== plan.rescheduledToDate) {
-    const previousTarget = next.trainingPlan.dailyPlans.find(
-      (item) => item.date === existing.rescheduledToDate,
-    );
-    if (previousTarget?.rescheduledFromDate === plan.date) {
-      previousTarget.rescheduledFromDate = null;
-      previousTarget.updatedAt = plan.updatedAt;
-    }
-  }
-  const index = next.trainingPlan.dailyPlans.findIndex((item) => item.date === plan.date);
-  if (index === -1) next.trainingPlan.dailyPlans.push(structuredClone(plan));
-  else next.trainingPlan.dailyPlans[index] = structuredClone(plan);
-  assertValidData(next);
-  return next;
-}
-
-export function saveRescheduledPlan(data, sourcePlan, targetPlan) {
-  const next = cloneData(data);
-  if (
-    sourcePlan.status !== "rescheduled"
-    || sourcePlan.rescheduledToDate !== targetPlan.date
-    || sourcePlan.rescheduledFromDate !== null
-    || targetPlan.rescheduledFromDate !== sourcePlan.date
-    || targetPlan.rescheduledToDate !== null
-  ) {
-    throw new TypeError("改期来源与目标关联不完整");
-  }
-
-  const existingSource = next.trainingPlan.dailyPlans.find(
-    (item) => item.date === sourcePlan.date,
-  );
-  if (existingSource && existingSource.rescheduledFromDate !== null) {
-    throw new TypeError("改期目标不能再次改期");
-  }
-  if (existingSource?.rescheduledToDate && existingSource.rescheduledToDate !== targetPlan.date) {
-    const previousTarget = next.trainingPlan.dailyPlans.find(
-      (item) => item.date === existingSource.rescheduledToDate,
-    );
-    if (previousTarget?.rescheduledFromDate === sourcePlan.date) {
-      previousTarget.rescheduledFromDate = null;
-      previousTarget.updatedAt = sourcePlan.updatedAt;
-    }
-  }
-
-  const existingTarget = next.trainingPlan.dailyPlans.find(
-    (item) => item.date === targetPlan.date,
-  );
-  if (existingTarget?.status === "rescheduled") {
-    throw new TypeError("目标日期本身已改期，不能作为新的改期目标");
-  }
-  if (
-    existingTarget?.rescheduledFromDate
-    && existingTarget.rescheduledFromDate !== sourcePlan.date
-  ) {
-    throw new TypeError("目标日期已有其他改期计划");
-  }
-
-  upsertPlan(next.trainingPlan.dailyPlans, sourcePlan);
-  upsertPlan(next.trainingPlan.dailyPlans, targetPlan);
-  assertValidData(next);
-  return next;
-}
-
-function upsertPlan(plans, plan) {
-  const index = plans.findIndex((item) => item.date === plan.date);
-  if (index === -1) plans.push(structuredClone(plan));
-  else plans[index] = structuredClone(plan);
 }
 
 function cloneData(data) {

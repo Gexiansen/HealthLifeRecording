@@ -1,7 +1,7 @@
 {
   "name": "HealthLife 健康记录",
   "short_name": "HealthLife",
-  "description": "本地优先的个人运动、饮食、睡眠、体重和饮水追踪工具。",
+  "description": "本地优先的个人运动、饮食、睡眠和体重追踪工具。",
   "lang": "zh-CN",
   "id": "./",
   "start_url": "./",

@@ -1,216 +1,71 @@
-# HealthLife schema v7
+# HealthLife schema v8
 
 ## 根对象
 
-本地数据以一个完整对象保存。根对象字段固定，导入或读取时遇到未知字段、缺失字段或未知版本将拒绝使用。
-
 ```js
 {
-  schemaVersion: 7,
-  settings: {},
-  trainingPlan: {
-    weeklyTraining: [],
-    dailyPlans: []
-  },
-  foodPreferences: {},
+  schemaVersion: 8,
+  settings: { weightUnit, goalWeightGrams, eggGramsPerPiece },
+  weeklyTraining: [/* 周一至周日 7 项 */],
+  foodPreferences: { favoriteRefs, recentRefs },
   customFoods: [],
   recipes: [],
   workouts: [],
-  dailyActivities: [],
   meals: [],
   sleepRecords: [],
-  weights: [],
-  hydration: []
+  weights: []
 }
 ```
 
-日期统一使用本地自然日 `YYYY-MM-DD`，时间统一使用 `HH:mm`。记录 ID 使用 UUID，`createdAt` 和 `updatedAt` 使用标准 UTC ISO 8601 时间戳。
+schema v8 使用 `healthlife:data:v8` 独立存储键。应用不读取、不迁移 v1 至 v7 数据；旧键不主动删除。完整备份只接受 `backupVersion: 8`。
 
-schema v7 使用 `healthlife:data:v7` 独立存储键。当前键为空时会读取并严格迁移有效的 `healthlife:data:v6`；只有 v6 键不存在时才链式迁移有效的 v5 数据。旧 v5／v6 键不会被主动删除，v1／v2／v3／v4 继续不读取。完整备份版本同步升级为 7，并兼容迁移有效的 v5／v6 完整备份。
+## 通用规则
 
-## 设置
+- 所有业务记录使用 UUID，日期为本地自然日 `YYYY-MM-DD`，时间为 `HH:mm`。
+- 每条正式记录包含 `createdAt` 和 `updatedAt` ISO 8601 时间戳。
+- 所有对象严格校验字段，不接受未知字段。
+- 睡眠和体重按日期唯一；运动和饮食允许同日多条。
+- 体重以整数克保存，食物重量和运动时长均使用整数。
 
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `weightUnit` | string | `kg` 或 `lb`，只影响界面显示 |
-| `goalWeightGrams` | integer／null | 20,000～500,000 克 |
-| `eggGramsPerPiece` | integer | 每个水煮鸡蛋的可食部分克数，20～100，默认 50 |
+## 每周训练模板
 
-## 健康计划
+`weeklyTraining` 固定为周一至周日 7 项，可选 `strengthA`、`strengthB`、`runWalk`、`walking`、`mobility`、`rest`。模板只用于当天推荐，不保存执行状态、工作安排或改期关系，也不会自动生成运动记录。
 
-`trainingPlan.weeklyTraining` 固定保存周一至周日 7 项默认训练，可选值为 `strengthA`、`strengthB`、`runWalk`、`walking`、`mobility`、`rest`。默认模板为周二力量 A、周四力量 B、周六跑走结合，其他日期休息。
+## 运动
 
-`trainingPlan.dailyPlans` 每个自然日最多一条，字段如下：
+运动包含：
 
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id`、`date`、时间戳 | — | UUID、自然日和标准时间戳；日期唯一 |
-| `workdayType` | string | `normal`、`overtime25`、`overtime30`、`overtime35`、`weekendOvertime`、`rest` |
-| `trainingOverride` | string／null | 覆盖当周模板的训练类型；`null` 表示继续使用模板 |
-| `status` | string | `planned`、`completed`、`shortened`、`rescheduled`、`rest` |
-| `rescheduledToDate` | string／null | 仅 `rescheduled` 状态必填，且不能与原日期相同 |
-| `rescheduledFromDate` | string／null | 目标计划保存来源日期；目标不能再次改期 |
+- `type`：力量、跑步、有氧、步行、拉伸、球类或其他。
+- `durationMinutes`：1～1440 的整数分钟。
+- `intensity`：1～3。
+- `source`：`manual` 或 `appleWatch`。
+- `averageHeartRateBpm`：可选，30～240。
+- `distanceMeters`：跑步、步行或有氧可选。
+- `guidedSession`：可选的引导训练快照。
+- `note`：可选备注。
 
-改期时必须同时保存来源计划和目标计划：来源的 `rescheduledToDate` 指向目标，目标的 `rescheduledFromDate` 指回来源。任意单边、孤立或链式改期都会被整体校验拒绝；目标日期已有训练时，界面先要求用户确认覆盖。
+引导训练快照固定保存原计划动作、实际动作、组次、目标值、完成值、负重、主观用力感和可选不适反馈，避免动作库更新改变历史数据。
 
-计划状态不等于实际运动记录。只有用户另外保存运动记录后，运动才进入训练统计；界面会提示匹配记录与计划状态是否一致，但不会自动生成记录或改变状态。
+## 饮食
 
-## 食物偏好
+餐食包含餐次、精确／估算模式、可信度、一个或多个食物明细、可选饱腹感和备注。每个食物明细保存：
 
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `favoriteRefs` | string[] | 最多 100 项，不重复 |
-| `recentRefs` | string[] | 最近使用优先，最多 12 项，不重复 |
+- 食物引用、名称、生熟／包装状态、来源和可信度。
+- 整数克数，以及录入单位、数量和单个克数快照。
+- 计算时的每 100 克热量、蛋白质、脂肪和碳水快照。
 
-食物引用使用稳定字符串：内置食物以 `builtin:` 开头，自定义食品以 `custom:` 开头，菜谱以 `recipe:` 开头。
+按个录入时必须满足 `grams === inputQuantity * unitGrams`。营养汇总由食物快照计算，不能直接编辑。饱腹感为可选的 1～5，不保存“健康程度”评分。
 
-## 自定义食品
+## 睡眠
 
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id` | string | UUID，全数据唯一 |
-| `name` | string | 1～60 个字符 |
-| `foodState` | string | `raw`、`cooked`、`packaged`、`prepared` |
-| `energyKcalPer100g` | number | 每 100 克 0～1,000 kcal，最多一位小数 |
-| `proteinGramsPer100g` | number | 每 100 克 0～100 g，最多一位小数 |
-| `fatGramsPer100g` | number | 每 100 克 0～100 g，最多一位小数 |
-| `carbsGramsPer100g` | number | 每 100 克 0～100 g，最多一位小数 |
-| `createdAt`、`updatedAt` | string | UTC ISO 8601 时间戳 |
+睡眠包含入睡时间、起床时间、1～5 质量评分、夜醒次数和备注。记录归属于起床日期；入睡和起床时间相同时拒绝计算。
 
-## 食物明细快照
+## 体重
 
-餐食和菜谱原料都保存完整快照，字段固定：
+体重包含整数克、可选体脂基点和备注。体脂基点示例：`2660` 表示 `26.60％`。7 日均重只使用窗口内已有样本，不补零。
 
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id` | string | UUID，全数据唯一 |
-| `foodRef` | string | 1～100 个字符的食物引用 |
-| `name` | string | 计算时使用的食物名称 |
-| `foodState` | string | 生重、熟重、包装或成品状态 |
-| `grams` | integer | 1～100,000 克 |
-| `inputUnit` | string | `grams` 或 `piece` |
-| `inputQuantity` | integer | 用户录入的克数或个数 |
-| `unitGrams` | integer | 每单位对应克数；按克录入时固定为 1 |
-| 四项 `*Per100g` | number | 计算时使用的每 100 克营养值快照 |
-| `source` | string | `builtIn`、`custom`、`recipe`、`estimated` |
-| `confidence` | string | `high`、`medium`、`low` |
+## 备份与分析导出
 
-`grams` 必须等于 `inputQuantity × unitGrams`。单项营养按“每 100 克营养值 × 实际克数 ÷ 100”计算，餐食营养是全部明细之和，最终统一保留一位小数。
-
-## 自制菜谱
-
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id` | string | UUID，全数据唯一 |
-| `name` | string | 1～60 个字符 |
-| `ingredients` | 食物明细快照[] | 1～50 项，记录各原料投入克数 |
-| `finishedWeightGrams` | integer | 烹饪完成后的整道菜熟重，1～100,000 克 |
-| `createdAt`、`updatedAt` | string | UTC ISO 8601 时间戳 |
-
-菜谱先汇总全部原料营养，再用成品熟重折算每 100 克营养。食用油和调料按普通原料加入。
-
-## 运动记录
-
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id` | string | UUID，全数据唯一 |
-| `date` | string | 本地自然日 |
-| `type` | string | `strength`、`running`、`cardio`、`walking`、`stretching`、`ballSports`、`other` |
-| `durationMinutes` | integer | 1～1,440 分钟 |
-| `intensity` | integer | 1～3，分别表示低、中、高 |
-| `source` | string | `manual` 或 `appleWatch` |
-| `activeEnergyKcal` | integer／null | Apple Watch 活动热量摘要，1～10,000 kcal |
-| `averageHeartRateBpm` | integer／null | 平均心率，30～240 bpm |
-| `maxHeartRateBpm` | integer／null | 最高心率，30～240 bpm，不能低于平均心率 |
-| `distanceMeters` | integer／null | 距离，1～1,000,000 米 |
-| `guidedSession` | object／null | 引导式训练完成快照；普通手动记录为 `null` |
-| `note` | string | 0～500 个字符 |
-| `createdAt` | string | UTC ISO 8601 时间戳 |
-| `updatedAt` | string | 不早于 `createdAt` |
-
-平均配速由 `durationMinutes ÷ distanceMeters` 计算，只在存在距离时展示，不单独持久化。上述设备指标都是可选摘要，`source: appleWatch` 表示由用户从 Apple Watch 手动抄录，不代表网页已直接连接 HealthKit。
-
-### 引导式训练快照
-
-`guidedSession` 保存一次已确认训练的历史快照：
-
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id` | string | 本次引导训练 UUID，全数据唯一 |
-| `templateId`、`templateName` | string | 完成时使用的模板标识和名称快照 |
-| `startedAt`、`completedAt` | string | UTC ISO 8601 时间戳，完成时间不得早于开始时间 |
-| `perceivedEffort` | integer | 1～3，分别表示轻松、合适、吃力 |
-| `exercises` | array | 1～20 个动作完成快照 |
-
-每个动作保存 `plannedExerciseId`、实际 `exerciseId`、`name`、计量单位、完成状态、实际组次、`feedbackRecorded` 和可选 `discomfort`。计量单位为 `reps`、`repsEachSide`、`floors` 或 `minutes`；状态为 `completed`、`shortened` 或 `skipped`。每组保存目标值、实际值和可选整数克负重，跳过动作不得包含已完成组。
-
-`feedbackRecorded` 区分未反馈和已经明确选择“没有不适”。`discomfort` 为 `null` 或 `{ bodyPart, severity }`；未反馈时必须为 `null`，明确没有不适时也为 `null` 但 `feedbackRecorded` 为 `true`。部位使用固定枚举，程度为 1～3 级主观反馈；应用只做次数汇总，不根据反馈诊断损伤。
-
-进行中的训练不进入根对象，而是使用 `healthlife:workout-draft:v2` 独立保存。草稿包含模板、日期、当前位置、已完成组、跳过动作和替代动作；每次完成一组或选择替代动作后先写入草稿，成功后界面才前进。结束页确认生成正式运动记录后再清除草稿。有效 v1 草稿会迁移到 v2，原键保留。
-
-## 每日活动
-
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id`、`date`、时间戳 | — | 与运动记录相同；每个日期最多一条 |
-| `steps` | integer | 1～100,000 步 |
-| `source` | string | `manual` 或 `appleWatch` |
-| `note` | string | 0～500 个字符 |
-
-## 饮食记录
-
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id`、`date`、时间戳 | — | 与运动记录相同 |
-| `mealType` | string | `breakfast`、`lunch`、`dinner`、`snack` |
-| `trackingMode` | string | `precise` 或 `estimated` |
-| `confidence` | string | `high`、`medium`、`low`；精确模式不得使用 `low` |
-| `items` | 食物明细快照[] | 1～50 项 |
-| `healthScore` | integer | 1～5，只表达用户主观评价 |
-| `fullnessScore` | integer | 1～5，只表达用户主观饱腹感 |
-| `note` | string | 0～500 个字符 |
-
-## 睡眠记录
-
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id`、时间戳 | — | 与运动记录相同 |
-| `date` | string | 起床日期；每个日期最多一条 |
-| `sleepTime` | string | 入睡时间 `HH:mm` |
-| `wakeTime` | string | 起床时间 `HH:mm` |
-| `qualityScore` | integer | 1～5，主观睡眠质量 |
-| `awakeCount` | integer | 0～50 次 |
-| `note` | string | 0～500 个字符 |
-
-起床时间早于入睡时间时按跨日计算；两者相等视为无效输入，不把它解释为睡眠 24 小时。
-
-## 体重记录
-
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id`、`date`、时间戳 | — | 与运动记录相同；每个日期最多一条 |
-| `weightGrams` | integer | 20,000～500,000 克 |
-| `bodyFatBasisPoints` | integer／null | 100～7,500，即 1.00％～75.00％ |
-| `note` | string | 0～500 个字符 |
-
-体重趋势使用指定结束日期向前 7 个自然日内的已有记录计算平均值，缺失日期不补零，结果同时返回样本数。
-
-趋势页的 7 天／30 天比较使用紧邻当前窗口、长度相同的上一自然日窗口。只有当前和上一周期都存在对应样本时才展示差值；数据不足时返回 `null` 并明确显示无可比样本，不补零或推断健康结论。
-
-## 饮水记录
-
-| 字段 | 类型 | 规则 |
-| --- | --- | --- |
-| `id`、`date`、时间戳 | — | 与运动记录相同；每个日期最多一条 |
-| `milliliters` | integer | 1～20,000 毫升 |
-| `note` | string | 0～500 个字符 |
-
-## 完整性规则
-
-- 自定义食品、菜谱、菜谱原料、业务记录和餐食明细的 ID 在整个根对象中唯一。
-- 睡眠、体重、饮水和每日活动分别按日期唯一；运动和饮食允许同日多条。
-- 重量和其他整数单位字段必须是整数；每 100 克营养值最多一位小数，不能使用字符串或隐式转换。
-- schema v7 不接受未知字段，不静默丢弃无效项。
-- `serializeData` 和 `parseData` 在输出或返回数据前都会执行整体校验。
-- v7 完整备份保留训练模板、双向改期关系、每日计划、食物库、菜谱、偏好、所有历史营养快照、运动摘要、引导式训练快照和每日步数。
-- 分析 JSON 按自然日汇总计划状态、体重、睡眠、运动、引导式训练动作、每日步数、餐食明细、每日营养和饮水，供后续趋势分析使用。
+- 完整备份保留设置、每周模板、食物库、菜谱、偏好和四类正式记录，用于完整替换恢复。
+- 分析 JSON 按自然日输出体重、睡眠、运动、餐食与当日营养，供后续健康习惯分析。
+- 导入必须先验证版本、字段、范围、UUID、日期唯一性和跨对象 ID 唯一性。

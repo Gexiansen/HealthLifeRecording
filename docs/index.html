@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="manifest" href="./manifest.webmanifest?v=16">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles.css?v=16">
   </head>
   <body>
     <header class="app-header">
@@ -43,10 +43,6 @@
             <p class="eyebrow">正在查看</p>
             <h2 id="today-title">今日</h2>
           </div>
-          <div class="streak-badge">
-            <strong id="streak-days">0 天</strong>
-            <span>连续记录</span>
-          </div>
           <div class="calendar-toolbar">
             <button id="previous-period" class="icon-button" type="button" aria-label="上一周">‹</button>
             <strong id="calendar-label"></strong>
@@ -58,25 +54,17 @@
             <button id="toggle-calendar" class="text-button" type="button" aria-expanded="false">展开整月</button>
             <button id="return-today" class="text-button" type="button">回到今天</button>
           </div>
-          <p id="daily-progress" hidden aria-hidden="true"></p>
         </div>
 
         <article class="health-plan-card" aria-labelledby="health-plan-title">
           <div class="health-plan-heading">
             <div>
-              <p class="eyebrow">当天安排</p>
-              <h3 id="health-plan-title">今日计划</h3>
+              <p class="eyebrow">每周训练模板</p>
+              <h3 id="health-plan-title">今日训练</h3>
             </div>
-            <button id="edit-daily-plan" class="text-button" type="button">设置安排</button>
-          </div>
-          <div class="plan-badges">
-            <span id="plan-workday-badge">工作安排未设置</span>
-            <span id="plan-status-badge">计划中</span>
           </div>
           <strong id="plan-headline" class="plan-headline">正在读取每周训练模板</strong>
           <p id="plan-detail" class="plan-detail"></p>
-          <p id="plan-link-detail" class="plan-link-detail" hidden></p>
-          <p id="plan-meal-reminder" class="plan-meal-reminder" hidden></p>
           <button id="start-guided-workout" class="plan-start-button" type="button">开始训练</button>
         </article>
 
@@ -85,11 +73,6 @@
             <div class="card-heading"><span class="card-icon">动</span><h3>运动</h3></div>
             <p id="workout-summary" class="card-value">尚未记录</p>
             <button type="button" data-open-form="workout">记录运动</button>
-          </article>
-          <article class="summary-card activity-card">
-            <div class="card-heading"><span class="card-icon">步</span><h3>每日活动</h3></div>
-            <p id="activity-summary" class="card-value">尚未记录</p>
-            <button id="activity-action" type="button" data-open-form="activity">记录步数</button>
           </article>
           <article class="summary-card meal-card">
             <div class="card-heading"><span class="card-icon">食</span><h3>饮食</h3></div>
@@ -105,15 +88,6 @@
             <div class="card-heading"><span class="card-icon">重</span><h3>体重</h3></div>
             <p id="weight-summary" class="card-value">尚未记录</p>
             <button id="weight-action" type="button" data-open-form="weight">记录体重</button>
-          </article>
-          <article class="summary-card water-card">
-            <div class="card-heading"><span class="card-icon">水</span><h3>饮水</h3></div>
-            <p id="hydration-summary" class="card-value">尚未记录</p>
-            <div class="card-actions">
-              <button type="button" data-quick-water="250" aria-label="为所选日期增加 250 毫升饮水">＋250</button>
-              <button type="button" data-quick-water="500" aria-label="为所选日期增加 500 毫升饮水">＋500</button>
-              <button id="hydration-action" type="button" data-open-form="hydration">详情</button>
-            </div>
           </article>
         </div>
       </section>
@@ -156,24 +130,9 @@
             <p id="workout-trend-meta" class="trend-meta"></p>
           </article>
           <article class="trend-card">
-            <div class="trend-card-heading"><h3>每日活动</h3><span id="activity-trend-samples"></span></div>
-            <strong id="activity-trend-value" class="trend-value">暂无数据</strong>
-            <p id="activity-trend-meta" class="trend-meta"></p>
-          </article>
-          <article class="trend-card">
             <div class="trend-card-heading"><h3>饮食</h3><span id="meal-trend-samples"></span></div>
             <strong id="meal-trend-value" class="trend-value">暂无数据</strong>
             <p id="meal-trend-meta" class="trend-meta"></p>
-          </article>
-          <article class="trend-card">
-            <div class="trend-card-heading"><h3>饮水</h3><span id="hydration-trend-samples"></span></div>
-            <strong id="hydration-trend-value" class="trend-value">暂无数据</strong>
-            <p id="hydration-trend-meta" class="trend-meta"></p>
-          </article>
-          <article class="trend-card">
-            <div class="trend-card-heading"><h3>健康计划</h3><span id="plan-trend-samples"></span></div>
-            <strong id="plan-trend-value" class="trend-value">暂无计划</strong>
-            <p id="plan-trend-meta" class="trend-meta"></p>
           </article>
         </div>
         <p class="trend-boundary">趋势只基于当前浏览器中的已有记录和样本量，不构成健康诊断。</p>
@@ -191,12 +150,9 @@
           <label><span>记录类型</span><select id="record-type-filter">
             <option value="all">全部类型</option>
             <option value="workouts">运动</option>
-            <option value="dailyActivities">每日活动</option>
             <option value="meals">饮食</option>
             <option value="sleepRecords">睡眠</option>
             <option value="weights">体重</option>
-            <option value="hydration">饮水</option>
-            <option value="plans">健康计划</option>
           </select></label>
           <label><span>月份</span><input id="record-month-filter" type="month"></label>
           <button id="clear-record-filters" class="text-button" type="button" hidden>清除筛选</button>
@@ -228,7 +184,7 @@
       <form id="workout-form" data-record-form="workout" hidden>
         <div class="field-row">
           <label class="field"><span>运动类型</span><select name="type" required><option value="strength">力量</option><option value="running">跑步</option><option value="cardio">其他有氧</option><option value="walking">步行</option><option value="stretching">拉伸</option><option value="ballSports">球类</option><option value="other">其他</option></select></label>
-          <label class="field"><span>数据来源</span><select name="source" required><option value="manual">手动记录</option><option value="appleWatch">Apple Watch 摘要</option></select></label>
+          <label class="field"><span>数据来源</span><select name="source" required><option value="manual">手动记录</option><option value="appleWatch">Apple Watch</option></select></label>
         </div>
         <div class="quick-options" aria-label="快捷选择运动时长">
           <span>快捷时长</span>
@@ -239,28 +195,16 @@
           <label class="field"><span>强度</span><select name="intensity" required><option value="1">低</option><option value="2" selected>中</option><option value="3">高</option></select></label>
         </div>
         <fieldset class="watch-fields">
-          <legend>设备摘要（可选）</legend>
-          <p class="field-help">从 Apple Watch 训练详情手动抄录；热量为设备估算值。</p>
+          <legend>Apple Watch 详情（可选）</legend>
+          <p class="field-help">只在方便时填写平均心率和距离。</p>
           <div class="nutrition-fields">
-            <label class="field"><span>活动热量（kcal）</span><input name="activeEnergyKcal" type="number" min="1" max="10000" step="1" inputmode="numeric"></label>
             <label class="field"><span>平均心率（bpm）</span><input name="averageHeartRateBpm" type="number" min="30" max="240" step="1" inputmode="numeric"></label>
-            <label class="field"><span>最高心率（bpm）</span><input name="maxHeartRateBpm" type="number" min="30" max="240" step="1" inputmode="numeric"></label>
             <label id="workout-distance-field" class="field"><span>距离（km）</span><input name="distanceKm" type="number" min="0.001" max="1000" step="0.001" inputmode="decimal"></label>
           </div>
           <output id="workout-pace-preview" class="sleep-preview">填写时长和距离后显示平均配速</output>
         </fieldset>
         <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
         <button class="primary-button" type="submit">保存运动</button>
-      </form>
-
-      <form id="activity-form" data-record-form="activity" hidden>
-        <div class="field-row">
-          <label class="field"><span>当日步数</span><input name="steps" type="number" min="1" max="100000" step="1" inputmode="numeric" required></label>
-          <label class="field"><span>数据来源</span><select name="source" required><option value="appleWatch">Apple Watch</option><option value="manual">手动记录</option></select></label>
-        </div>
-        <p class="field-help">每天保留一条步数记录；从健身或健康 App 查看当日总步数后填写。</p>
-        <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
-        <button class="primary-button" type="submit">保存每日活动</button>
       </form>
 
       <form id="meal-form" data-record-form="meal" hidden>
@@ -285,10 +229,7 @@
           <ul id="meal-items" class="food-item-list"></ul>
           <output id="meal-nutrition" class="nutrition-total">尚未添加食物</output>
         </section>
-        <div class="field-row">
-          <label class="field"><span>健康程度</span><select name="healthScore" required><option value="1">很不健康（1）</option><option value="2">偏不健康（2）</option><option value="3" selected>一般（3）</option><option value="4">比较健康（4）</option><option value="5">很健康（5）</option></select></label>
-          <label class="field"><span>饱腹感</span><select name="fullnessScore" required><option value="1">没吃饱（1）</option><option value="2">偏少（2）</option><option value="3" selected>刚好（3）</option><option value="4">偏饱（4）</option><option value="5">过饱（5）</option></select></label>
-        </div>
+        <label class="field"><span>饱腹感（可选）</span><select name="fullnessScore"><option value="">未记录</option><option value="1">没吃饱（1）</option><option value="2">偏少（2）</option><option value="3">刚好（3）</option><option value="4">偏饱（4）</option><option value="5">过饱（5）</option></select></label>
         <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
         <button class="primary-button" type="submit">保存饮食</button>
       </form>
@@ -317,56 +258,6 @@
         <button class="primary-button" type="submit">保存体重</button>
       </form>
 
-      <form id="hydration-form" data-record-form="hydration" hidden>
-        <label class="field"><span id="hydration-amount-label">今日饮水（ml）</span><input name="milliliters" type="number" min="1" max="20000" step="1" inputmode="numeric" required></label>
-        <div class="quick-options" aria-label="快捷增加饮水量">
-          <span>快捷增加</span>
-          <div><button type="button" data-form-water-add="250">＋250 ml</button><button type="button" data-form-water-add="500">＋500 ml</button></div>
-        </div>
-        <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
-        <button class="primary-button" type="submit">保存饮水</button>
-      </form>
-    </dialog>
-
-    <dialog id="plan-dialog" aria-labelledby="plan-dialog-title">
-      <div class="dialog-header">
-        <div>
-          <p class="eyebrow">健康计划</p>
-          <h2 id="plan-dialog-title">设置当天安排</h2>
-        </div>
-        <button id="close-plan-dialog" class="icon-button" type="button" aria-label="关闭当天安排">×</button>
-      </div>
-      <form id="daily-plan-form">
-        <p id="plan-date-label" class="field-help"></p>
-        <label class="field"><span>工作日类型</span><select name="workdayType" required>
-          <option value="normal">正常工作日（09:30～18:30）</option>
-          <option value="overtime25">加班至 19:20（2.5 小时）</option>
-          <option value="overtime30">加班至 19:50（3 小时）</option>
-          <option value="overtime35">加班至 20:20（3.5 小时）</option>
-          <option value="weekendOvertime">周末加班（8 小时）</option>
-          <option value="rest">休息日</option>
-        </select></label>
-        <label class="field"><span>当天训练</span><select name="trainingOverride">
-          <option value="">跟随每周模板</option>
-          <option value="strengthA">力量 A</option>
-          <option value="strengthB">力量 B</option>
-          <option value="runWalk">跑走结合</option>
-          <option value="walking">步行</option>
-          <option value="mobility">拉伸放松</option>
-          <option value="rest">休息</option>
-        </select></label>
-        <label class="field"><span>执行状态</span><select name="status" required>
-          <option value="planned">计划中</option>
-          <option value="completed">已完成</option>
-          <option value="shortened">缩短完成</option>
-          <option value="rescheduled">已改期</option>
-          <option value="rest">休息</option>
-        </select></label>
-        <label id="rescheduled-date-field" class="field" hidden><span>改到哪一天</span><input name="rescheduledToDate" type="date"></label>
-        <p id="plan-workout-link" class="field-help"></p>
-        <p id="plan-form-error" class="form-error inline-error" role="alert" hidden></p>
-        <button class="primary-button" type="submit">保存当天安排</button>
-      </form>
     </dialog>
 
     <dialog id="custom-food-dialog" aria-labelledby="custom-food-title">
@@ -422,16 +313,6 @@
       </div>
     </dialog>
 
-    <dialog id="plan-conflict-dialog" aria-labelledby="plan-conflict-title">
-      <div class="confirm-dialog-body">
-        <h2 id="plan-conflict-title">目标日期已有训练安排</h2>
-        <p id="plan-conflict-message"></p>
-        <div>
-          <button id="cancel-plan-conflict" class="secondary-neutral-button" type="button">返回修改</button>
-          <button id="confirm-plan-conflict" class="danger-button" type="button">确认覆盖</button>
-        </div>
-      </div>
-    </dialog>
 
     <dialog id="guided-workout-dialog" class="guided-workout-dialog" aria-labelledby="guided-workout-title">
       <div class="guided-workout-shell">
@@ -556,7 +437,6 @@
               <div><dt>日期范围</dt><dd id="import-date-range"></dd></div>
               <div><dt>记录总数</dt><dd id="import-total"></dd></div>
               <div><dt>分类明细</dt><dd id="import-counts"></dd></div>
-              <div><dt>健康计划</dt><dd id="import-plans"></dd></div>
               <div><dt>替换结果</dt><dd id="import-replace-summary"></dd></div>
             </dl>
             <button id="confirm-import" class="danger-button" type="button">确认完整替换</button>
@@ -575,6 +455,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.js?v=16"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-import { assertValidData } from "./model.js";
+import { assertValidData } from "./model.js?v=16";
 
 // Generic reference values are adapted from USDA FoodData Central per 100 g entries.
 // They remain estimates because cultivar, brand, cut and cooking water can change the result.

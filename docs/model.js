@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const WORKOUT_TYPES = Object.freeze([
   "strength",
@@ -23,27 +23,12 @@ export const NUTRITION_CONFIDENCE = Object.freeze(["high", "medium", "low"]);
 export const MEAL_TRACKING_MODES = Object.freeze(["precise", "estimated"]);
 export const RECORD_SOURCES = Object.freeze(["manual", "appleWatch"]);
 export const FOOD_INPUT_UNITS = Object.freeze(["grams", "piece"]);
-export const WORKDAY_TYPES = Object.freeze([
-  "normal",
-  "overtime25",
-  "overtime30",
-  "overtime35",
-  "weekendOvertime",
-  "rest",
-]);
 export const TRAINING_PLAN_TYPES = Object.freeze([
   "strengthA",
   "strengthB",
   "runWalk",
   "walking",
   "mobility",
-  "rest",
-]);
-export const PLAN_STATUSES = Object.freeze([
-  "planned",
-  "completed",
-  "shortened",
-  "rescheduled",
   "rest",
 ]);
 export const GUIDED_EXERCISE_UNITS = Object.freeze([
@@ -67,16 +52,14 @@ export const DISCOMFORT_BODY_PARTS = Object.freeze([
 const ROOT_KEYS = Object.freeze([
   "schemaVersion",
   "settings",
-  "trainingPlan",
+  "weeklyTraining",
   "foodPreferences",
   "customFoods",
   "recipes",
   "workouts",
-  "dailyActivities",
   "meals",
   "sleepRecords",
   "weights",
-  "hydration",
 ]);
 
 const BASE_RECORD_KEYS = Object.freeze([
@@ -98,18 +81,15 @@ export function createEmptyData() {
       goalWeightGrams: null,
       eggGramsPerPiece: 50,
     },
-    trainingPlan: {
-      weeklyTraining: [
-        "rest",
-        "strengthA",
-        "rest",
-        "strengthB",
-        "rest",
-        "runWalk",
-        "rest",
-      ],
-      dailyPlans: [],
-    },
+    weeklyTraining: [
+      "rest",
+      "strengthA",
+      "rest",
+      "strengthB",
+      "rest",
+      "runWalk",
+      "rest",
+    ],
     foodPreferences: {
       favoriteRefs: [],
       recentRefs: [],
@@ -117,11 +97,9 @@ export function createEmptyData() {
     customFoods: [],
     recipes: [],
     workouts: [],
-    dailyActivities: [],
     meals: [],
     sleepRecords: [],
     weights: [],
-    hydration: [],
   };
 }
 
@@ -179,22 +157,17 @@ export function assertValidData(data) {
   }
 
   validateSettings(data.settings);
-  validateTrainingPlan(data.trainingPlan);
+  validateWeeklyTraining(data.weeklyTraining);
   validateFoodPreferences(data.foodPreferences);
   validateCustomFoods(data.customFoods);
   validateRecipes(data.recipes);
   validateRecordArray(data.workouts, "workouts", validateWorkout);
-  validateRecordArray(data.dailyActivities, "dailyActivities", validateDailyActivity);
   validateRecordArray(data.meals, "meals", validateMeal);
   validateRecordArray(data.sleepRecords, "sleepRecords", validateSleep);
   validateRecordArray(data.weights, "weights", validateWeight);
-  validateRecordArray(data.hydration, "hydration", validateHydration);
   assertGlobalUniqueIds(data);
   assertUniqueDates(data.sleepRecords, "sleepRecords");
   assertUniqueDates(data.weights, "weights");
-  assertUniqueDates(data.hydration, "hydration");
-  assertUniqueDates(data.dailyActivities, "dailyActivities");
-  assertUniqueDates(data.trainingPlan.dailyPlans, "trainingPlan.dailyPlans");
   return true;
 }
 
@@ -219,73 +192,6 @@ export function parseData(text) {
   return data;
 }
 
-export function migrateV5Data(value) {
-  assertPlainObject(value, "data");
-  if (value.schemaVersion !== 5) {
-    throw new TypeError(`只能迁移 schemaVersion 5，收到：${String(value.schemaVersion)}`);
-  }
-  if (!Array.isArray(value.workouts)) throw new TypeError("workouts 必须是数组");
-  value.workouts.forEach((workout, index) => {
-    assertPlainObject(workout, `workouts[${index}]`);
-    if (Object.hasOwn(workout, "guidedSession")) {
-      throw new TypeError(`workouts[${index}] 包含 schema v5 未知字段 guidedSession`);
-    }
-  });
-  const migratedV6 = {
-    ...value,
-    schemaVersion: 6,
-    workouts: value.workouts.map((workout) => ({
-      ...workout,
-      guidedSession: null,
-    })),
-  };
-  return migrateV6Data(migratedV6);
-}
-
-export function migrateV6Data(value) {
-  assertPlainObject(value, "data");
-  if (value.schemaVersion !== 6) {
-    throw new TypeError(`只能迁移 schemaVersion 6，收到：${String(value.schemaVersion)}`);
-  }
-  if (!Array.isArray(value.workouts)) throw new TypeError("workouts 必须是数组");
-  const migrated = {
-    ...value,
-    schemaVersion: SCHEMA_VERSION,
-    workouts: value.workouts.map((workout, workoutIndex) => {
-      assertPlainObject(workout, `workouts[${workoutIndex}]`);
-      if (workout.guidedSession === null) return structuredClone(workout);
-      assertPlainObject(workout.guidedSession, `workouts[${workoutIndex}].guidedSession`);
-      if (!Array.isArray(workout.guidedSession.exercises)) {
-        throw new TypeError(`workouts[${workoutIndex}].guidedSession.exercises 必须是数组`);
-      }
-      return {
-        ...structuredClone(workout),
-        guidedSession: {
-          ...structuredClone(workout.guidedSession),
-          exercises: workout.guidedSession.exercises.map((exercise, exerciseIndex) => {
-            const path = `workouts[${workoutIndex}].guidedSession.exercises[${exerciseIndex}]`;
-            assertPlainObject(exercise, path);
-            if (
-              Object.hasOwn(exercise, "plannedExerciseId")
-              || Object.hasOwn(exercise, "discomfort")
-            ) {
-              throw new TypeError(`${path} 包含 schema v6 未知字段`);
-            }
-            return {
-              ...structuredClone(exercise),
-              plannedExerciseId: exercise.exerciseId,
-              feedbackRecorded: false,
-              discomfort: null,
-            };
-          }),
-        },
-      };
-    }),
-  };
-  assertValidData(migrated);
-  return migrated;
-}
-
 function validateSettings(settings) {
   assertPlainObject(settings, "settings");
   assertExactKeys(
@@ -303,74 +209,13 @@ function validateSettings(settings) {
   assertIntegerInRange(settings.eggGramsPerPiece, 20, 100, "settings.eggGramsPerPiece");
 }
 
-function validateTrainingPlan(trainingPlan) {
-  assertPlainObject(trainingPlan, "trainingPlan");
-  assertExactKeys(trainingPlan, ["weeklyTraining", "dailyPlans"], "trainingPlan");
-  if (!Array.isArray(trainingPlan.weeklyTraining) || trainingPlan.weeklyTraining.length !== 7) {
-    throw new TypeError("trainingPlan.weeklyTraining 必须包含周一至周日 7 项");
+function validateWeeklyTraining(weeklyTraining) {
+  if (!Array.isArray(weeklyTraining) || weeklyTraining.length !== 7) {
+    throw new TypeError("weeklyTraining 必须包含周一至周日 7 项");
   }
-  trainingPlan.weeklyTraining.forEach((type, index) => {
-    assertEnum(type, TRAINING_PLAN_TYPES, `trainingPlan.weeklyTraining[${index}]`);
+  weeklyTraining.forEach((type, index) => {
+    assertEnum(type, TRAINING_PLAN_TYPES, `weeklyTraining[${index}]`);
   });
-  if (!Array.isArray(trainingPlan.dailyPlans) || trainingPlan.dailyPlans.length > 3_650) {
-    throw new TypeError("trainingPlan.dailyPlans 必须是最多 3650 项的数组");
-  }
-  trainingPlan.dailyPlans.forEach((plan, index) => {
-    const path = `trainingPlan.dailyPlans[${index}]`;
-    validateBaseRecord(
-      plan,
-      [
-        ...BASE_RECORD_KEYS,
-        "workdayType",
-        "trainingOverride",
-        "status",
-        "rescheduledToDate",
-        "rescheduledFromDate",
-      ],
-      path,
-    );
-    assertEnum(plan.workdayType, WORKDAY_TYPES, `${path}.workdayType`);
-    if (plan.trainingOverride !== null) {
-      assertEnum(plan.trainingOverride, TRAINING_PLAN_TYPES, `${path}.trainingOverride`);
-    }
-    assertEnum(plan.status, PLAN_STATUSES, `${path}.status`);
-    if (plan.status === "rescheduled") {
-      assertDate(plan.rescheduledToDate, `${path}.rescheduledToDate`);
-      if (plan.rescheduledToDate === plan.date) {
-        throw new TypeError(`${path}.rescheduledToDate 不能与原日期相同`);
-      }
-      if (plan.rescheduledFromDate !== null) {
-        throw new TypeError(`${path} 不能同时作为改期来源和目标`);
-      }
-    } else if (plan.rescheduledToDate !== null) {
-      throw new TypeError(`${path}.rescheduledToDate 仅在改期时填写`);
-    }
-    if (plan.rescheduledFromDate !== null) {
-      assertDate(plan.rescheduledFromDate, `${path}.rescheduledFromDate`);
-      if (plan.rescheduledFromDate === plan.date) {
-        throw new TypeError(`${path}.rescheduledFromDate 不能与当前日期相同`);
-      }
-    }
-  });
-  assertRescheduleLinks(trainingPlan.dailyPlans);
-}
-
-function assertRescheduleLinks(plans) {
-  const byDate = new Map(plans.map((plan) => [plan.date, plan]));
-  for (const plan of plans) {
-    if (plan.status === "rescheduled") {
-      const target = byDate.get(plan.rescheduledToDate);
-      if (!target || target.rescheduledFromDate !== plan.date) {
-        throw new TypeError(`改期目标 ${plan.rescheduledToDate} 缺少来源关联`);
-      }
-    }
-    if (plan.rescheduledFromDate !== null) {
-      const source = byDate.get(plan.rescheduledFromDate);
-      if (!source || source.status !== "rescheduled" || source.rescheduledToDate !== plan.date) {
-        throw new TypeError(`改期来源 ${plan.rescheduledFromDate} 缺少目标关联`);
-      }
-    }
-  }
 }
 
 function validateFoodPreferences(preferences) {
@@ -439,9 +284,7 @@ function validateWorkout(record, path) {
       "durationMinutes",
       "intensity",
       "source",
-      "activeEnergyKcal",
       "averageHeartRateBpm",
-      "maxHeartRateBpm",
       "distanceMeters",
       "guidedSession",
       "note",
@@ -452,21 +295,12 @@ function validateWorkout(record, path) {
   assertIntegerInRange(record.durationMinutes, 1, 1_440, `${path}.durationMinutes`);
   assertIntegerInRange(record.intensity, 1, 3, `${path}.intensity`);
   assertEnum(record.source, RECORD_SOURCES, `${path}.source`);
-  assertNullableIntegerInRange(record.activeEnergyKcal, 1, 10_000, `${path}.activeEnergyKcal`);
   assertNullableIntegerInRange(
     record.averageHeartRateBpm,
     30,
     240,
     `${path}.averageHeartRateBpm`,
   );
-  assertNullableIntegerInRange(record.maxHeartRateBpm, 30, 240, `${path}.maxHeartRateBpm`);
-  if (
-    record.averageHeartRateBpm !== null
-    && record.maxHeartRateBpm !== null
-    && record.maxHeartRateBpm < record.averageHeartRateBpm
-  ) {
-    throw new TypeError(`${path}.maxHeartRateBpm 不能低于平均心率`);
-  }
   assertNullableIntegerInRange(record.distanceMeters, 1, 1_000_000, `${path}.distanceMeters`);
   if (
     record.distanceMeters !== null
@@ -560,17 +394,6 @@ function validateExerciseDiscomfort(discomfort, path) {
   assertIntegerInRange(discomfort.severity, 1, 3, `${path}.severity`);
 }
 
-function validateDailyActivity(record, path) {
-  validateBaseRecord(
-    record,
-    [...BASE_RECORD_KEYS, "steps", "source", "note"],
-    path,
-  );
-  assertIntegerInRange(record.steps, 1, 100_000, `${path}.steps`);
-  assertEnum(record.source, RECORD_SOURCES, `${path}.source`);
-  assertStringLength(record.note, 0, 500, `${path}.note`);
-}
-
 function validateMeal(record, path) {
   validateBaseRecord(
     record,
@@ -580,7 +403,6 @@ function validateMeal(record, path) {
       "trackingMode",
       "confidence",
       "items",
-      "healthScore",
       "fullnessScore",
       "note",
     ],
@@ -593,8 +415,7 @@ function validateMeal(record, path) {
     throw new TypeError(`${path}.confidence 与精确模式不匹配`);
   }
   validateFoodEntries(record.items, `${path}.items`, 1, 50);
-  assertIntegerInRange(record.healthScore, 1, 5, `${path}.healthScore`);
-  assertIntegerInRange(record.fullnessScore, 1, 5, `${path}.fullnessScore`);
+  assertNullableIntegerInRange(record.fullnessScore, 1, 5, `${path}.fullnessScore`);
   assertStringLength(record.note, 0, 500, `${path}.note`);
 }
 
@@ -630,16 +451,6 @@ function validateWeight(record, path) {
     7_500,
     `${path}.bodyFatBasisPoints`,
   );
-  assertStringLength(record.note, 0, 500, `${path}.note`);
-}
-
-function validateHydration(record, path) {
-  validateBaseRecord(
-    record,
-    [...BASE_RECORD_KEYS, "milliliters", "note"],
-    path,
-  );
-  assertIntegerInRange(record.milliliters, 1, 20_000, `${path}.milliliters`);
   assertStringLength(record.note, 0, 500, `${path}.note`);
 }
 
@@ -721,11 +532,9 @@ function assertGlobalUniqueIds(data) {
   }
   for (const collectionName of [
     "workouts",
-    "dailyActivities",
     "meals",
     "sleepRecords",
     "weights",
-    "hydration",
   ]) {
     for (const record of data[collectionName]) {
       collect(record.id);
@@ -737,7 +546,6 @@ function assertGlobalUniqueIds(data) {
       }
     }
   }
-  for (const plan of data.trainingPlan.dailyPlans) collect(plan.id);
 }
 
 function assertUniqueDates(records, path) {

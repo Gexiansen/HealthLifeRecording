@@ -1,11 +1,8 @@
 const COLLECTIONS = new Set([
   "workouts",
-  "dailyActivities",
   "meals",
   "sleepRecords",
   "weights",
-  "hydration",
-  "plans",
 ]);
 
 export function getDateContext(selectedDate, today) {
@@ -14,13 +11,11 @@ export function getDateContext(selectedDate, today) {
   if (selectedDate === today) {
     return {
       heading: "今日",
-      hydrationLabel: "今日饮水（ml）",
     };
   }
   const [, month, day] = selectedDate.split("-").map(Number);
   return {
     heading: `${month}月${day}日`,
-    hydrationLabel: "当日饮水（ml）",
   };
 }
 
@@ -32,18 +27,6 @@ export function getDefaultMealType(hour) {
   if (hour < 15) return "lunch";
   if (hour < 21) return "dinner";
   return "snack";
-}
-
-export function addHydrationAmount(currentMilliliters, addedMilliliters) {
-  if (!Number.isInteger(currentMilliliters) || currentMilliliters < 0) {
-    throw new TypeError("currentMilliliters 必须是非负整数");
-  }
-  if (!Number.isInteger(addedMilliliters) || addedMilliliters < 1) {
-    throw new TypeError("addedMilliliters 必须是正整数");
-  }
-  const total = currentMilliliters + addedMilliliters;
-  if (total > 20_000) throw new RangeError("单日饮水量不能超过 20000 ml");
-  return total;
 }
 
 export function calculatePaceSecondsPerKilometer(durationMinutes, distanceMeters) {
