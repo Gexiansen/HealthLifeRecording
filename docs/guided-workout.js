@@ -166,6 +166,19 @@ export const EXERCISE_LIBRARY = Object.freeze({
     mistakes: Object.freeze(["一开始走得过快", "为了速度明显前倾", "出现不适后仍继续加速"]),
     stopCondition: "胸闷、眩晕、异常气短，或下肢出现尖锐疼痛时立即停止。",
   }),
+  runWalkIntervals: Object.freeze({
+    id: "runWalkIntervals",
+    name: "跑走交替",
+    equipment: "运动鞋",
+    unit: "minutes",
+    unitLabel: "分钟",
+    weightEnabled: false,
+    weightLabel: null,
+    setup: "选择平坦安全的路线，每组先慢跑 1 分钟，再快走 4 分钟。",
+    cues: Object.freeze(["慢跑保持能说短句的速度", "快走时逐渐恢复呼吸", "全程保持轻松，不追求速度"]),
+    mistakes: Object.freeze(["一开始就冲刺", "为了完成慢跑而忽略身体不适", "恢复不足仍继续下一组"]),
+    stopCondition: "胸闷、眩晕、异常气短，或膝盖和跟腱出现尖锐疼痛时立即停止。",
+  }),
 });
 
 export const EXERCISE_REPLACEMENTS = Object.freeze({
@@ -174,6 +187,7 @@ export const EXERCISE_REPLACEMENTS = Object.freeze({
   pushup: Object.freeze(["inclinePushup"]),
   deadBug: Object.freeze(["birdDog"]),
   stairClimb: Object.freeze(["briskWalk"]),
+  runWalkIntervals: Object.freeze(["briskWalk"]),
 });
 
 export const GUIDED_TEMPLATES = Object.freeze({
@@ -215,13 +229,21 @@ export const GUIDED_TEMPLATES = Object.freeze({
       Object.freeze({ exerciseId: "stairClimb", sets: 2, targetValue: 5, restSeconds: 120 }),
     ]),
   }),
+  runWalk: Object.freeze({
+    id: "runWalk",
+    name: "初级跑走结合",
+    description: "慢跑 1 分钟、快走 4 分钟，共 4 轮，保持轻松强度。",
+    exercises: Object.freeze([
+      Object.freeze({ exerciseId: "runWalkIntervals", sets: 4, targetValue: 5, restSeconds: 90 }),
+    ]),
+  }),
 });
 
 export function recommendedTemplateId(trainingPlanType) {
   return {
     strengthA: "strengthA",
     strengthB: "strengthB",
-    walking: "stairBeginner",
+    runWalk: "runWalk",
   }[trainingPlanType] ?? null;
 }
 

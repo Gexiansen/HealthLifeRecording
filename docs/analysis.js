@@ -1,9 +1,9 @@
-import { assertValidData, calculateSleepMinutes } from "./model.js?v=17";
-import { sumNutrition } from "./nutrition.js?v=17";
-import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=17";
+import { assertValidData, calculateSleepMinutes } from "./model.js?v=21";
+import { sumNutrition } from "./nutrition.js?v=21";
+import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=21";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
-export const ANALYSIS_VERSION = 6;
+export const ANALYSIS_VERSION = 7;
 
 export function createAnalysisExport(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);

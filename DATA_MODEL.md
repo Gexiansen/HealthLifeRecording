@@ -1,11 +1,11 @@
-# HealthLife schema v8
+# HealthLife schema v9
 
 ## 根对象
 
 ```js
 {
-  schemaVersion: 8,
-  settings: { weightUnit, goalWeightGrams, eggGramsPerPiece },
+  schemaVersion: 9,
+  settings: { eggGramsPerPiece },
   weeklyTraining: [/* 周一至周日 7 项 */],
   foodPreferences: { favoriteRefs, recentRefs },
   customFoods: [],
@@ -17,7 +17,7 @@
 }
 ```
 
-schema v8 使用 `healthlife:data:v8` 独立存储键。应用不读取、不迁移 v1 至 v7 数据；旧键不主动删除。完整备份只接受 `backupVersion: 8`。
+schema v9 使用 `healthlife:data:v9` 独立存储键。当前应用只读取和写入 v9，不读取、不迁移 v1 至 v8 数据。完整备份使用 `backupVersion: 9`，只接受 v9 备份。
 
 进行中的引导训练继续使用 `healthlife:workout-draft:v2`，撤销历史使用独立的 `healthlife:workout-undo:v1`。撤销历史保存同一训练草稿的最近状态快照，最多 50 项；每个快照必须通过完整草稿校验并与当前草稿 UUID 匹配。它们都不是正式健康记录，不进入完整备份或分析导出。
 
@@ -31,7 +31,7 @@ schema v8 使用 `healthlife:data:v8` 独立存储键。应用不读取、不迁
 
 ## 每周训练模板
 
-`weeklyTraining` 固定为周一至周日 7 项，可选 `strengthA`、`strengthB`、`runWalk`、`walking`、`mobility`、`rest`。模板只用于当天推荐，不保存执行状态、工作安排或改期关系，也不会自动生成运动记录。
+`weeklyTraining` 固定为周一至周日 7 项，可选 `strengthA`、`strengthB`、`runWalk`、`rest`。模板都对应可执行的推荐训练，只用于当天推荐，不保存执行状态、工作安排或改期关系，也不会自动生成运动记录。
 
 ## 运动
 
@@ -68,6 +68,6 @@ schema v8 使用 `healthlife:data:v8` 独立存储键。应用不读取、不迁
 
 ## 备份与分析导出
 
-- 完整备份保留设置、每周模板、食物库、菜谱、偏好和四类正式记录，用于完整替换恢复。
+- 完整备份保留设置、每周模板、食物库、菜谱、偏好和四类正式记录，用于完整替换恢复；当前只接受 v9 备份。
 - 分析 JSON 按自然日输出体重、睡眠、运动、餐食与当日营养，供后续健康习惯分析。
 - 导入必须先验证版本、字段、范围、UUID、日期唯一性和跨对象 ID 唯一性。

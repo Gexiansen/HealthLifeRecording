@@ -11,9 +11,9 @@ import {
 } from "../docs/model.js";
 import { IDS, meal, sleep, weight, workout } from "./helpers.js";
 
-test("schema v8 仅包含四类健康记录与每周训练模板", () => {
+test("schema v9 仅包含四类健康记录与可执行训练模板", () => {
   const data = createEmptyData();
-  assert.equal(SCHEMA_VERSION, 8);
+  assert.equal(SCHEMA_VERSION, 9);
   assert.deepEqual(Object.keys(data), [
     "schemaVersion", "settings", "weeklyTraining", "foodPreferences", "customFoods",
     "recipes", "workouts", "meals", "sleepRecords", "weights",
@@ -26,8 +26,8 @@ test("schema v8 仅包含四类健康记录与每周训练模板", () => {
   assert.deepEqual(parseData(serializeData(data)), data);
 });
 
-test("schema v1 至 v7 均不读取，未知字段也被拒绝", () => {
-  for (let version = 1; version <= 7; version += 1) {
+test("schema v1 至 v8 不直接读取，未知字段仍被拒绝", () => {
+  for (let version = 1; version <= 8; version += 1) {
     const data = createEmptyData();
     data.schemaVersion = version;
     assert.throws(() => assertValidData(data), /schemaVersion/);
@@ -35,6 +35,9 @@ test("schema v1 至 v7 均不读取，未知字段也被拒绝", () => {
   const unknown = createEmptyData();
   unknown.hydration = [];
   assert.throws(() => assertValidData(unknown), /未知字段/);
+  const removedSettings = createEmptyData();
+  removedSettings.settings.weightUnit = "kg";
+  assert.throws(() => assertValidData(removedSettings), /未知字段/);
 });
 
 test("运动只接受可选平均心率与适用类型的距离", () => {

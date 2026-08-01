@@ -35,6 +35,7 @@ test("动作库覆盖首批动作与同模式替代动作且当天计划映射�
     "inclinePushup",
     "birdDog",
     "briskWalk",
+    "runWalkIntervals",
   ]);
   for (const exercise of Object.values(EXERCISE_LIBRARY)) {
     assert.equal(exercise.cues.length, 3);
@@ -43,8 +44,9 @@ test("动作库覆盖首批动作与同模式替代动作且当天计划映射�
   }
   assert.equal(recommendedTemplateId("strengthA"), "strengthA");
   assert.equal(recommendedTemplateId("strengthB"), "strengthB");
-  assert.equal(recommendedTemplateId("walking"), "stairBeginner");
+  assert.equal(recommendedTemplateId("runWalk"), "runWalk");
   assert.equal(recommendedTemplateId("rest"), null);
+  assert.equal(GUIDED_TEMPLATES.runWalk.exercises[0].exerciseId, "runWalkIntervals");
 });
 
 test("训练草稿按组推进并生成不可变的动作完成快照", () => {

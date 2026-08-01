@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export const WORKOUT_TYPES = Object.freeze([
   "strength",
@@ -27,8 +27,6 @@ export const TRAINING_PLAN_TYPES = Object.freeze([
   "strengthA",
   "strengthB",
   "runWalk",
-  "walking",
-  "mobility",
   "rest",
 ]);
 export const GUIDED_EXERCISE_UNITS = Object.freeze([
@@ -77,8 +75,6 @@ export function createEmptyData() {
   return {
     schemaVersion: SCHEMA_VERSION,
     settings: {
-      weightUnit: "kg",
-      goalWeightGrams: null,
       eggGramsPerPiece: 50,
     },
     weeklyTraining: [
@@ -194,18 +190,7 @@ export function parseData(text) {
 
 function validateSettings(settings) {
   assertPlainObject(settings, "settings");
-  assertExactKeys(
-    settings,
-    ["weightUnit", "goalWeightGrams", "eggGramsPerPiece"],
-    "settings",
-  );
-  assertEnum(settings.weightUnit, ["kg", "lb"], "settings.weightUnit");
-  assertNullableIntegerInRange(
-    settings.goalWeightGrams,
-    20_000,
-    500_000,
-    "settings.goalWeightGrams",
-  );
+  assertExactKeys(settings, ["eggGramsPerPiece"], "settings");
   assertIntegerInRange(settings.eggGramsPerPiece, 20, 100, "settings.eggGramsPerPiece");
 }
 

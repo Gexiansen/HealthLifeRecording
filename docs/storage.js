@@ -2,16 +2,16 @@ import {
   createEmptyData,
   parseData,
   serializeData,
-} from "./model.js?v=17";
-import { parseBackupMetadata } from "./backup.js?v=17";
+} from "./model.js?v=21";
+import { parseBackupMetadata } from "./backup.js?v=21";
 import {
   assertValidWorkoutUndoHistory,
   assertValidWorkoutDraft,
   migrateWorkoutDraftV1,
-} from "./guided-workout.js?v=17";
+} from "./guided-workout.js?v=21";
 
-export const STORAGE_KEY = "healthlife:data:v8";
-export const BACKUP_META_KEY = "healthlife:backup-meta:v8";
+export const STORAGE_KEY = "healthlife:data:v9";
+export const BACKUP_META_KEY = "healthlife:backup-meta:v9";
 export const WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v2";
 export const PREVIOUS_WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v1";
 export const WORKOUT_UNDO_KEY = "healthlife:workout-undo:v1";

@@ -24,16 +24,16 @@ function memoryStorage(initial = {}) {
   };
 }
 
-test("schema v8 使用独立键并且不读取 v1 至 v7", () => {
-  assert.equal(STORAGE_KEY, "healthlife:data:v8");
-  assert.equal(BACKUP_META_KEY, "healthlife:backup-meta:v8");
-  const storage = memoryStorage({ "healthlife:data:v7": JSON.stringify({ schemaVersion: 7 }) });
+test("schema v9 使用独立键并且不读取 v1 至 v8", () => {
+  assert.equal(STORAGE_KEY, "healthlife:data:v9");
+  assert.equal(BACKUP_META_KEY, "healthlife:backup-meta:v9");
+  const storage = memoryStorage({ "healthlife:data:v8": JSON.stringify({ schemaVersion: 8 }) });
   const result = loadData(storage);
   assert.equal(result.status, "empty");
-  assert.equal(result.data.schemaVersion, 8);
+  assert.equal(result.data.schemaVersion, 9);
 });
 
-test("v8 数据可保存读取，损坏内容停止写入假成功", () => {
+test("v9 数据可保存读取，损坏内容停止写入假成功", () => {
   const storage = memoryStorage();
   saveData(createEmptyData(), storage);
   assert.equal(loadData(storage).status, "ready");

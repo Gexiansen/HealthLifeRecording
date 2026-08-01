@@ -1,7 +1,7 @@
 import {
   calculateSleepMinutes,
   createId,
-} from "./model.js?v=17";
+} from "./model.js?v=21";
 import {
   allRecordsByDate,
   deleteRecord,
@@ -12,7 +12,7 @@ import {
   updateEggGramsPerPiece,
   updateFoodPreferences,
   updateWeeklyTraining,
-} from "./data.js?v=17";
+} from "./data.js?v=21";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -24,37 +24,37 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=17";
+} from "./storage.js?v=21";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=17";
-import { calculateTrendComparison } from "./stats.js?v=17";
+} from "./calendar.js?v=21";
+import { calculateTrendComparison } from "./stats.js?v=21";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=17";
+} from "./backup.js?v=21";
 import {
   calculatePaceSecondsPerKilometer,
   filterRecordItems,
   getDateContext,
   getDefaultMealType,
   getRestoreLabel,
-} from "./interaction.js?v=17";
+} from "./interaction.js?v=21";
 import {
   calculateRecipeNutrition,
   createFoodEntry,
   formatNutrition,
   getFoodCatalog,
   sumNutrition,
-} from "./nutrition.js?v=17";
-import { serializeAnalysisExport } from "./analysis.js?v=17";
+} from "./nutrition.js?v=21";
+import { serializeAnalysisExport } from "./analysis.js?v=21";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -72,12 +72,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=17";
+} from "./guided-workout.js?v=21";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=17";
+} from "./training-insights.js?v=21";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -111,8 +111,6 @@ const TRAINING_PLAN_LABELS = Object.freeze({
   strengthA: "力量 A",
   strengthB: "力量 B",
   runWalk: "跑走结合",
-  walking: "步行",
-  mobility: "拉伸放松",
   rest: "休息",
 });
 
@@ -322,7 +320,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=17").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=21").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -545,12 +543,10 @@ function renderTrainingRecommendation() {
   elements.planHeadline.textContent = TRAINING_PLAN_LABELS[plannedType];
   elements.planDetail.textContent = plannedType === "rest"
     ? "今天按模板休息；如身体状态良好，也可以手动选择轻量训练。"
-    : "这是每周模板推荐，可根据当天状态缩短或改为休息。";
+    : "这是每周模板推荐；也可以选择其他训练或暂时跳过。";
   elements.startGuidedWorkout.textContent = workoutDraft
     ? `继续${GUIDED_TEMPLATES[workoutDraft.templateId].name}`
-    : recommendedTemplateId(plannedType)
-      ? "开始推荐训练"
-      : "选择训练";
+    : "选择训练";
 }
 
 function reconcileWorkoutDraft() {
@@ -1024,10 +1020,15 @@ function confirmGuidedWorkout() {
       completedAt,
       collectWorkoutFeedback(),
     );
+    const workoutType = guidedSession.templateId === "stairBeginner"
+      ? "cardio"
+      : guidedSession.templateId === "runWalk"
+        ? "running"
+        : "strength";
     const workout = {
       id: createId(),
       date: workoutDraft.date,
-      type: guidedSession.templateId === "stairBeginner" ? "cardio" : "strength",
+      type: workoutType,
       durationMinutes: estimateWorkoutDurationMinutes(workoutDraft, completedAt),
       intensity: perceivedEffort,
       source: "manual",

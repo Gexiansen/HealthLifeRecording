@@ -38,8 +38,8 @@ test("记录列表按日期和创建时间倒序，每周模板直接更新根�
   data.weights.push(weight());
   assert.equal(allRecordsByDate(data)[0].collectionName, "weights");
   const weekly = [...data.weeklyTraining];
-  weekly[0] = "walking";
+  weekly[0] = "runWalk";
   const next = updateWeeklyTraining(data, weekly);
-  assert.equal(next.weeklyTraining[0], "walking");
+  assert.equal(next.weeklyTraining[0], "runWalk");
   assert.equal(data.weeklyTraining[0], "rest");
 });

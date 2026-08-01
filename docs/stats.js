@@ -2,8 +2,8 @@ import {
   assertValidData,
   calculateSleepMinutes,
   calculateWeightMovingAverage,
-} from "./model.js?v=17";
-import { roundNutrition, sumNutrition } from "./nutrition.js?v=17";
+} from "./model.js?v=21";
+import { roundNutrition, sumNutrition } from "./nutrition.js?v=21";
 
 export function calculateTrendSummary(data, endDate, days) {
   assertValidData(data);

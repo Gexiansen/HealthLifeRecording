@@ -3,11 +3,11 @@ import {
   createEmptyData,
   parseData,
   serializeData,
-} from "./model.js?v=17";
-import { COLLECTIONS } from "./data.js?v=17";
+} from "./model.js?v=21";
+import { COLLECTIONS } from "./data.js?v=21";
 
 export const BACKUP_FORMAT = "healthlife-complete-backup";
-export const BACKUP_VERSION = 8;
+export const BACKUP_VERSION = 9;
 
 export function createCompleteBackup(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);

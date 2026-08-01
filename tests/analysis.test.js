@@ -11,8 +11,8 @@ test("分析导出按日期聚合四类数据并保留营养和运动摘要", ()
   data.sleepRecords.push(sleep());
   data.weights.push(weight());
   const result = createAnalysisExport(data, "2026-07-31T00:00:00.000Z");
-  assert.equal(ANALYSIS_VERSION, 6);
-  assert.equal(result.schemaVersion, 8);
+  assert.equal(ANALYSIS_VERSION, 7);
+  assert.equal(result.schemaVersion, 9);
   assert.equal(result.days.length, 1);
   assert.equal(result.days[0].workouts[0].averageHeartRateBpm, 130);
   assert.equal(result.days[0].workouts[0].paceSecondsPerKilometer, 450);

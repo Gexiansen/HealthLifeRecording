@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=17">
+    <link rel="manifest" href="./manifest.webmanifest?v=21">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=17">
+    <link rel="stylesheet" href="./styles.css?v=21">
   </head>
   <body>
     <header class="app-header">
@@ -425,7 +425,7 @@
     <dialog id="data-dialog" aria-labelledby="data-dialog-title">
       <div class="dialog-header">
         <div>
-          <p class="eyebrow">健康计划与本地数据</p>
+          <p class="eyebrow">训练模板与本地数据</p>
           <h2 id="data-dialog-title">设置</h2>
         </div>
         <button id="close-data-dialog" class="icon-button" type="button" aria-label="关闭设置">×</button>
@@ -433,7 +433,7 @@
       <div class="data-dialog-body">
         <section class="data-section">
           <h3>每周训练模板</h3>
-          <p class="data-help">当天可以单独调整；模板只负责默认安排，不会自动生成运动记录。</p>
+          <p class="data-help">模板只负责默认推荐，不会自动生成运动记录；需要时可在今日选择其他训练。</p>
           <form id="weekly-plan-form" class="weekly-plan-form">
             <label class="field"><span>周一</span><select name="day0"></select></label>
             <label class="field"><span>周二</span><select name="day1"></select></label>
@@ -482,6 +482,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=17"></script>
+    <script type="module" src="./app.js?v=21"></script>
   </body>
 </html>
