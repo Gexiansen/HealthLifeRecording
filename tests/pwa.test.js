@@ -12,25 +12,27 @@ test("Service Worker 缓存精简后的完整应用外壳", async () => {
   const sw = await readFile(new URL("../docs/sw.js", import.meta.url), "utf8");
   const html = await readFile(new URL("../docs/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../docs/app.js", import.meta.url), "utf8");
-  assert.match(sw, /healthlife-shell-v21/);
+  assert.match(sw, /healthlife-shell-v22/);
   for (const file of [
     "index.html", "styles.css", "app.js", "model.js", "data.js", "calendar.js",
-    "stats.js", "backup.js", "interaction.js", "nutrition.js", "analysis.js",
+    "stats.js", "backup.js", "interaction.js", "analysis.js",
     "guided-workout.js", "training-insights.js", "storage.js", "manifest.webmanifest",
   ]) {
     assert.match(sw, new RegExp(`\\./${file.replace(".", "\\.")}`));
     await access(new URL(`../docs/${file}`, import.meta.url));
   }
+  assert.doesNotMatch(sw, /nutrition\.js/);
+  assert.doesNotMatch(app, /nutrition\.js/);
   assert.doesNotMatch(sw, /planning\.js/);
-  assert.match(html, /\.\/styles\.css\?v=21/);
-  assert.match(html, /\.\/app\.js\?v=21/);
-  assert.match(html, /\.\/manifest\.webmanifest\?v=21/);
-  assert.match(app, /register\("\.\/sw\.js\?v=21"\)/);
+  assert.match(html, /\.\/styles\.css\?v=22/);
+  assert.match(html, /\.\/app\.js\?v=22/);
+  assert.match(html, /\.\/manifest\.webmanifest\?v=22/);
+  assert.match(app, /register\("\.\/sw\.js\?v=22"\)/);
   for (const file of [
     "model.js", "data.js", "storage.js", "calendar.js", "stats.js", "backup.js",
-    "interaction.js", "nutrition.js", "analysis.js", "guided-workout.js", "training-insights.js",
+    "interaction.js", "analysis.js", "guided-workout.js", "training-insights.js",
   ]) {
-    assert.match(app, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=21`));
-    assert.match(sw, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=21`));
+    assert.match(app, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=22`));
+    assert.match(sw, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=22`));
   }
 });

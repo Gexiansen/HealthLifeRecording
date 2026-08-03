@@ -1,4 +1,4 @@
-import { assertValidData } from "./model.js?v=21";
+// Legacy standalone helpers kept for reference tests; the v10 application does not load this module.
 
 // Generic reference values are adapted from USDA FoodData Central per 100 g entries.
 // They remain estimates because cultivar, brand, cut and cooking water can change the result.
@@ -93,10 +93,9 @@ export function createFoodEntry(
 }
 
 export function getFoodCatalog(data, options = {}) {
-  assertValidData(data);
   const includeRecipes = options.includeRecipes !== false;
   const builtIn = BUILT_IN_FOODS.map((item) => ({ ...item }));
-  const custom = data.customFoods.map((item) => ({
+  const custom = (data?.customFoods ?? []).map((item) => ({
     ref: `custom:${item.id}`,
     name: item.name,
     foodState: item.foodState,
@@ -107,7 +106,7 @@ export function getFoodCatalog(data, options = {}) {
     source: "custom",
   }));
   const recipes = includeRecipes
-    ? data.recipes.map((recipe) => {
+    ? (data?.recipes ?? []).map((recipe) => {
       const nutrition = calculateRecipeNutrition(recipe).per100g;
       return {
         ref: `recipe:${recipe.id}`,
@@ -122,10 +121,10 @@ export function getFoodCatalog(data, options = {}) {
     })
     : [];
   const favorites = new Map(
-    data.foodPreferences.favoriteRefs.map((ref, index) => [ref, index]),
+    (data?.foodPreferences?.favoriteRefs ?? []).map((ref, index) => [ref, index]),
   );
   const recent = new Map(
-    data.foodPreferences.recentRefs.map((ref, index) => [ref, index]),
+    (data?.foodPreferences?.recentRefs ?? []).map((ref, index) => [ref, index]),
   );
   return [...builtIn, ...custom, ...recipes].sort((left, right) => {
     const priority = foodPriority(left.ref, favorites, recent)

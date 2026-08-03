@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createEmptyData } from "../docs/model.js";
+// Standalone legacy utility coverage; these helpers are not part of the v10 app flow.
 import {
   calculateRecipeNutrition,
   createFoodEntry,
@@ -48,7 +48,7 @@ test("按实际克数计算单项和整餐营养", () => {
 });
 
 test("水煮鸡蛋按个数和单个克数换算后计算营养", () => {
-  const egg = getFoodCatalog(createEmptyData()).find(
+  const egg = getFoodCatalog({}).find(
     (food) => food.ref === "builtin:egg-boiled",
   );
   const entry = createFoodEntry(
@@ -87,7 +87,11 @@ test("菜谱按原料总营养和成品熟重折算每百克", () => {
 });
 
 test("食物目录包含基础食物、自定义食品和菜谱并优先收藏", () => {
-  const data = createEmptyData();
+  const data = {
+    customFoods: [],
+    recipes: [],
+    foodPreferences: { favoriteRefs: [], recentRefs: [] },
+  };
   data.customFoods.push({
     id: "93000000-0000-4000-8000-000000000001",
     name: "虚构包装食品",

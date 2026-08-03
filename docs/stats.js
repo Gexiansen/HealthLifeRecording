@@ -2,8 +2,7 @@ import {
   assertValidData,
   calculateSleepMinutes,
   calculateWeightMovingAverage,
-} from "./model.js?v=21";
-import { roundNutrition, sumNutrition } from "./nutrition.js?v=21";
+} from "./model.js?v=22";
 
 export function calculateTrendSummary(data, endDate, days) {
   assertValidData(data);
@@ -22,7 +21,6 @@ export function calculateTrendSummary(data, endDate, days) {
   const sleepMinutes = sleepRecords.map((record) => calculateSleepMinutes(record.sleepTime, record.wakeTime));
   const workouts = data.workouts.filter(inRange);
   const meals = data.meals.filter(inRange);
-  const mealNutrition = sumNutrition(meals.flatMap((record) => record.items));
   const mealRecordedDays = new Set(meals.map((record) => record.date)).size;
 
   return {
@@ -55,20 +53,6 @@ export function calculateTrendSummary(data, endDate, days) {
       count: meals.length,
       recordedDays: mealRecordedDays,
       completionPercent: Math.round(mealRecordedDays / days * 100),
-      averageFullness: averageFixed(
-        meals.map((record) => record.fullnessScore).filter((value) => value !== null),
-      ),
-      preciseCount: meals.filter((record) => record.trackingMode === "precise").length,
-      estimatedCount: meals.filter((record) => record.trackingMode === "estimated").length,
-      totalNutrition: mealNutrition,
-      dailyAverageNutrition: mealRecordedDays
-        ? roundNutrition({
-          energyKcal: mealNutrition.energyKcal / mealRecordedDays,
-          proteinGrams: mealNutrition.proteinGrams / mealRecordedDays,
-          fatGrams: mealNutrition.fatGrams / mealRecordedDays,
-          carbsGrams: mealNutrition.carbsGrams / mealRecordedDays,
-        })
-        : null,
     },
   };
 }
@@ -87,10 +71,6 @@ export function calculateTrendComparison(data, endDate, days) {
         : null,
       mealCompletionPoints: previous.meal.count && current.meal.count
         ? current.meal.completionPercent - previous.meal.completionPercent
-        : null,
-      mealProteinGrams: previous.meal.count && current.meal.count
-        ? current.meal.dailyAverageNutrition.proteinGrams
-          - previous.meal.dailyAverageNutrition.proteinGrams
         : null,
     },
   };

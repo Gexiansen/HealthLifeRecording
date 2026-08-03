@@ -32,10 +32,11 @@ test("跑走引导完成后按跑步类型保存，爬楼梯仍按有氧保存",
   assert.match(app, /guidedSession\.templateId === "stairBeginner"\s*\n?\s*\? "cardio"\s*\n?\s*:\s*guidedSession\.templateId === "runWalk"\s*\n?\s*\? "running"/);
 });
 
-test("表单移除健康评分、活动热量和最高心率，饱腹感可选", () => {
+test("饮食改为餐次加一段文字，不再要求营养计算字段", () => {
   assert.doesNotMatch(html, /name="healthScore"|name="activeEnergyKcal"|name="maxHeartRateBpm"/);
-  assert.match(html, /name="fullnessScore"/);
-  assert.match(html, /value="">未记录/);
+  assert.match(html, /name="content"/);
+  assert.match(html, /尽量写上大致数量/);
+  assert.doesNotMatch(html, /name="trackingMode"|name="confidence"|name="fullnessScore"|meal-food-select|open-custom-food|open-recipe/);
   assert.doesNotMatch(html, /onclick=/);
 });
 

@@ -14,7 +14,8 @@ test("7 天趋势只汇总四类核心记录", () => {
   assert.equal(summary.workout.totalMinutes, 30);
   assert.equal(summary.workout.averageHeartRateBpm, 130);
   assert.equal(summary.meal.count, 1);
-  assert.equal(summary.meal.averageFullness, null);
+  assert.equal(summary.meal.recordedDays, 1);
+  assert.equal(summary.meal.completionPercent, 14);
   assert.equal(summary.sleep.averageMinutes, 450);
   assert.equal(summary.weight.latestGrams, 82_450);
   assert.deepEqual(Object.keys(summary), ["period", "weight", "sleep", "workout", "meal"]);
@@ -25,7 +26,7 @@ test("空窗口返回 null 样本，不以缺失日期补零", () => {
   assert.equal(summary.weight.latestGrams, null);
   assert.equal(summary.sleep.averageMinutes, null);
   assert.equal(summary.workout.averageHeartRateBpm, null);
-  assert.equal(summary.meal.dailyAverageNutrition, null);
+  assert.deepEqual(summary.meal, { count: 0, recordedDays: 0, completionPercent: 0 });
 });
 
 test("趋势比较使用紧邻的等长上一周期", () => {

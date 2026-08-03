@@ -1,9 +1,8 @@
-import { assertValidData, calculateSleepMinutes } from "./model.js?v=21";
-import { sumNutrition } from "./nutrition.js?v=21";
-import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=21";
+import { assertValidData, calculateSleepMinutes } from "./model.js?v=22";
+import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=22";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
-export const ANALYSIS_VERSION = 7;
+export const ANALYSIS_VERSION = 8;
 
 export function createAnalysisExport(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);
@@ -63,24 +62,8 @@ function createDay(data, date) {
     })),
     meals: meals.map((record) => ({
       mealType: record.mealType,
-      trackingMode: record.trackingMode,
-      confidence: record.confidence,
-      nutrition: sumNutrition(record.items),
-      items: record.items.map((item) => ({
-        name: item.name,
-        foodState: item.foodState,
-        grams: item.grams,
-        inputUnit: item.inputUnit,
-        inputQuantity: item.inputQuantity,
-        unitGrams: item.unitGrams,
-        source: item.source,
-        confidence: item.confidence,
-        nutrition: sumNutrition([item]),
-      })),
-      fullnessScore: record.fullnessScore,
-      note: record.note,
+      content: record.content,
     })),
-    dailyNutrition: sumNutrition(meals.flatMap((record) => record.items)),
   };
 }
 

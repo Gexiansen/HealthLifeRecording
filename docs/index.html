@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=21">
+    <link rel="manifest" href="./manifest.webmanifest?v=22">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=21">
+    <link rel="stylesheet" href="./styles.css?v=22">
   </head>
   <body>
     <header class="app-header">
@@ -197,7 +197,7 @@
         <fieldset class="watch-fields">
           <legend>Apple Watch 详情（可选）</legend>
           <p class="field-help">只在方便时填写平均心率和距离。</p>
-          <div class="nutrition-fields">
+          <div class="metric-fields">
             <label class="field"><span>平均心率（bpm）</span><input name="averageHeartRateBpm" type="number" min="30" max="240" step="1" inputmode="numeric"></label>
             <label id="workout-distance-field" class="field"><span>距离（km）</span><input name="distanceKm" type="number" min="0.001" max="1000" step="0.001" inputmode="decimal"></label>
           </div>
@@ -208,29 +208,9 @@
       </form>
 
       <form id="meal-form" data-record-form="meal" hidden>
-        <div class="field-row">
-          <label class="field"><span>餐次</span><select name="mealType" required><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select></label>
-          <label class="field"><span>记录方式</span><select name="trackingMode" required><option value="precise">称重记录</option><option value="estimated">外卖／堂食估算</option></select></label>
-        </div>
-        <label class="field"><span>估算可信度</span><select name="confidence" required><option value="high">较高：称重并使用包装标签或本人菜谱</option><option value="medium" selected>中等：使用食物库均值或份量有估算</option><option value="low">较低：堂食菜品粗略估算</option></select></label>
-        <section class="food-builder" aria-labelledby="meal-food-title">
-          <div class="food-builder-heading">
-            <div><strong id="meal-food-title">食物明细</strong><span>营养值均为估算</span></div>
-            <div><button id="open-custom-food" class="text-button" type="button">新建食品</button><button id="open-recipe" class="text-button" type="button">新建菜谱</button></div>
-          </div>
-          <label class="field"><span>选择食物或菜谱</span><select id="meal-food-select"></select></label>
-          <div class="food-add-row">
-            <label class="field"><span id="meal-food-quantity-label">实际食用（克）</span><input id="meal-food-quantity" type="number" min="1" max="100000" step="1" inputmode="numeric"></label>
-            <label class="field"><span>单位</span><select id="meal-food-unit"><option value="grams">克</option><option value="piece">个</option></select></label>
-            <label id="egg-piece-weight-field" class="field" hidden><span>每个可食部分（克）</span><input id="egg-grams-per-piece" type="number" min="20" max="100" step="1" inputmode="numeric"></label>
-            <label class="favorite-toggle"><input id="meal-food-favorite" type="checkbox"><span>收藏</span></label>
-            <button id="add-meal-food" type="button">加入本餐</button>
-          </div>
-          <ul id="meal-items" class="food-item-list"></ul>
-          <output id="meal-nutrition" class="nutrition-total">尚未添加食物</output>
-        </section>
-        <label class="field"><span>饱腹感（可选）</span><select name="fullnessScore"><option value="">未记录</option><option value="1">没吃饱（1）</option><option value="2">偏少（2）</option><option value="3">刚好（3）</option><option value="4">偏饱（4）</option><option value="5">过饱（5）</option></select></label>
-        <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
+        <label class="field"><span>餐次</span><select name="mealType" required><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select></label>
+        <label class="field"><span>吃了什么</span><textarea name="content" minlength="1" maxlength="2000" rows="6" placeholder="例如：鸡蛋 2 个，牛奶 250 ml，燕麦一碗。尽量写上大致数量、克数或包装份量。" required></textarea></label>
+        <p class="field-help">先把真实饮食写下来，不要求现在计算营养；后续可导出这些文字做分析。</p>
         <button class="primary-button" type="submit">保存饮食</button>
       </form>
 
@@ -258,48 +238,6 @@
         <button class="primary-button" type="submit">保存体重</button>
       </form>
 
-    </dialog>
-
-    <dialog id="custom-food-dialog" aria-labelledby="custom-food-title">
-      <div class="dialog-header">
-        <div><p class="eyebrow">本地食物库</p><h2 id="custom-food-title">新建食品</h2></div>
-        <button id="close-custom-food" class="icon-button" type="button" aria-label="关闭新建食品">×</button>
-      </div>
-      <form id="custom-food-form">
-        <label class="field"><span>食品名称</span><input name="name" type="text" minlength="1" maxlength="60" required></label>
-        <label class="field"><span>状态</span><select name="foodState" required><option value="raw">生重</option><option value="cooked">熟重</option><option value="packaged">包装食品</option><option value="prepared">成品</option></select></label>
-        <p class="field-help">请按包装营养标签或可靠食物成分数据填写每 100 克含量。</p>
-        <div class="nutrition-fields">
-          <label class="field"><span>热量（kcal）</span><input name="energyKcalPer100g" type="number" min="0" max="1000" step="0.1" inputmode="decimal" required></label>
-          <label class="field"><span>蛋白质（g）</span><input name="proteinGramsPer100g" type="number" min="0" max="100" step="0.1" inputmode="decimal" required></label>
-          <label class="field"><span>脂肪（g）</span><input name="fatGramsPer100g" type="number" min="0" max="100" step="0.1" inputmode="decimal" required></label>
-          <label class="field"><span>碳水（g）</span><input name="carbsGramsPer100g" type="number" min="0" max="100" step="0.1" inputmode="decimal" required></label>
-        </div>
-        <p id="custom-food-error" class="form-error inline-error" role="alert" hidden></p>
-        <button class="primary-button" type="submit">保存到本地食物库</button>
-      </form>
-    </dialog>
-
-    <dialog id="recipe-dialog" aria-labelledby="recipe-title">
-      <div class="dialog-header">
-        <div><p class="eyebrow">家庭烹饪</p><h2 id="recipe-title">新建菜谱</h2></div>
-        <button id="close-recipe" class="icon-button" type="button" aria-label="关闭新建菜谱">×</button>
-      </div>
-      <form id="recipe-form">
-        <label class="field"><span>菜谱名称</span><input name="name" type="text" minlength="1" maxlength="60" required></label>
-        <section class="food-builder">
-          <label class="field"><span>原料</span><select id="recipe-food-select"></select></label>
-          <div class="food-add-row recipe-add-row">
-            <label class="field"><span>投入重量（克）</span><input id="recipe-food-grams" type="number" min="1" max="100000" step="1" inputmode="numeric"></label>
-            <button id="add-recipe-food" type="button">加入原料</button>
-          </div>
-          <ul id="recipe-items" class="food-item-list"></ul>
-        </section>
-        <label class="field"><span>完成烹饪后的整道菜熟重（克）</span><input name="finishedWeightGrams" type="number" min="1" max="100000" step="1" inputmode="numeric" required></label>
-        <output id="recipe-nutrition" class="nutrition-total">添加原料并填写成品熟重后计算</output>
-        <p id="recipe-error" class="form-error inline-error" role="alert" hidden></p>
-        <button class="primary-button" type="submit">保存菜谱</button>
-      </form>
     </dialog>
 
     <dialog id="discard-dialog" aria-labelledby="discard-dialog-title">
@@ -482,6 +420,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=21"></script>
+    <script type="module" src="./app.js?v=22"></script>
   </body>
 </html>
