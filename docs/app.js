@@ -1503,8 +1503,8 @@ function openForm(type, explicitRecord = null) {
 function fillForm(type, form, record) {
   if (!record) {
     if (type === "sleep") {
-      form.elements.sleepTime.value = "23:00";
-      form.elements.wakeTime.value = "07:00";
+      form.elements.sleepTime.value = "22:30";
+      form.elements.wakeTime.value = "06:30";
     } else if (type === "meal") {
       form.elements.mealType.value = getDefaultMealType(new Date().getHours());
     } else if (type === "workout") {

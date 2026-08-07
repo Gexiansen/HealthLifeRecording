@@ -40,6 +40,11 @@ test("饮食改为餐次加一段文字，不再要求营养计算字段", () =>
   assert.doesNotMatch(html, /onclick=/);
 });
 
+test("新建睡眠记录默认 22:30 入睡、06:30 起床", () => {
+  assert.match(app, /form\.elements\.sleepTime\.value = "22:30"/);
+  assert.match(app, /form\.elements\.wakeTime\.value = "06:30"/);
+});
+
 test("引导训练提供持久撤销、返回修改和两类高风险操作确认", () => {
   for (const id of [
     "undo-workout-action",
