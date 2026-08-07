@@ -2,14 +2,14 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=22";
+} from "./model.js?v=23";
 import {
   allRecordsByDate,
   deleteRecord,
   findDailyRecord,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=22";
+} from "./data.js?v=23";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -21,30 +21,30 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=22";
+} from "./storage.js?v=23";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=22";
-import { calculateTrendComparison } from "./stats.js?v=22";
+} from "./calendar.js?v=23";
+import { calculateTrendComparison } from "./stats.js?v=23";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=22";
+} from "./backup.js?v=23";
 import {
   calculatePaceSecondsPerKilometer,
   filterRecordItems,
   getDateContext,
   getDefaultMealType,
   getRestoreLabel,
-} from "./interaction.js?v=22";
-import { serializeAnalysisExport } from "./analysis.js?v=22";
+} from "./interaction.js?v=23";
+import { serializeAnalysisExport } from "./analysis.js?v=23";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -62,12 +62,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=22";
+} from "./guided-workout.js?v=23";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=22";
+} from "./training-insights.js?v=23";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -184,6 +184,7 @@ const elements = {
   closeDialog: document.querySelector("#close-dialog"),
   recordDate: document.querySelector("#record-date"),
   sleepDurationPreview: document.querySelector("#sleep-duration-preview"),
+  workoutWatchFields: document.querySelector("#workout-watch-fields"),
   workoutPacePreview: document.querySelector("#workout-pace-preview"),
   workoutDistanceField: document.querySelector("#workout-distance-field"),
   formError: document.querySelector("#form-error"),
@@ -281,7 +282,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=22").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=23").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -1497,7 +1498,8 @@ function openForm(type, explicitRecord = null) {
   updateWorkoutPacePreview();
   formBaseline = getFormSignature();
   elements.dialog.showModal();
-  form.querySelector("input, select, textarea")?.focus();
+  const initialFocusTarget = form.querySelector("[data-primary-input]") ?? elements.dialogTitle;
+  initialFocusTarget.focus({ preventScroll: true });
 }
 
 function fillForm(type, form, record) {
@@ -1530,7 +1532,7 @@ function fillForm(type, form, record) {
 }
 
 function handleFormInput(event) {
-  if (editing?.type === "workout" && event?.target?.name === "type") {
+  if (editing?.type === "workout" && ["type", "source"].includes(event?.target?.name)) {
     updateWorkoutFieldState(true);
   }
   updateSleepDurationPreview();
@@ -1569,11 +1571,16 @@ function updateWorkoutPacePreview() {
 
 function updateWorkoutFieldState(clearUnsupported) {
   if (editing?.type !== "workout" || !activeForm) return;
-  const supportsDistance = ["running", "walking", "cardio"].includes(
+  const hasWatchDetails = activeForm.elements.source.value === "appleWatch";
+  const supportsDistance = hasWatchDetails && ["running", "walking", "cardio"].includes(
     activeForm.elements.type.value,
   );
+  elements.workoutWatchFields.hidden = !hasWatchDetails;
   elements.workoutDistanceField.hidden = !supportsDistance;
   elements.workoutPacePreview.hidden = !supportsDistance;
+  if (!hasWatchDetails && clearUnsupported) {
+    activeForm.elements.averageHeartRateBpm.value = "";
+  }
   if (!supportsDistance && clearUnsupported) {
     activeForm.elements.distanceKm.value = "";
   }

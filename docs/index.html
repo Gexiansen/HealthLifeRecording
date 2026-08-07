@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=22">
+    <link rel="manifest" href="./manifest.webmanifest?v=23">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=22">
+    <link rel="stylesheet" href="./styles.css?v=23">
   </head>
   <body>
     <header class="app-header">
@@ -56,18 +56,6 @@
           </div>
         </div>
 
-        <article class="health-plan-card" aria-labelledby="health-plan-title">
-          <div class="health-plan-heading">
-            <div>
-              <p class="eyebrow">每周训练模板</p>
-              <h3 id="health-plan-title">今日训练</h3>
-            </div>
-          </div>
-          <strong id="plan-headline" class="plan-headline">正在读取每周训练模板</strong>
-          <p id="plan-detail" class="plan-detail"></p>
-          <button id="start-guided-workout" class="plan-start-button" type="button">开始训练</button>
-        </article>
-
         <div class="summary-grid">
           <article class="summary-card workout-card">
             <div class="card-heading"><span class="card-icon">动</span><h3>运动</h3></div>
@@ -90,6 +78,18 @@
             <button id="weight-action" type="button" data-open-form="weight">记录体重</button>
           </article>
         </div>
+
+        <article class="health-plan-card" aria-labelledby="health-plan-title">
+          <div class="health-plan-heading">
+            <div>
+              <p class="eyebrow">每周训练模板</p>
+              <h3 id="health-plan-title">今日训练</h3>
+            </div>
+          </div>
+          <strong id="plan-headline" class="plan-headline">正在读取每周训练模板</strong>
+          <p id="plan-detail" class="plan-detail"></p>
+          <button id="start-guided-workout" class="plan-start-button" type="button">开始训练</button>
+        </article>
       </section>
 
       <section id="view-trends" class="view" aria-labelledby="trends-title" hidden>
@@ -171,7 +171,7 @@
       <div class="dialog-header">
         <div>
           <p class="eyebrow">健康记录</p>
-          <h2 id="dialog-title">新增记录</h2>
+          <h2 id="dialog-title" tabindex="-1">新增记录</h2>
         </div>
         <button id="close-dialog" class="icon-button" type="button" aria-label="关闭">×</button>
       </div>
@@ -191,10 +191,10 @@
           <div><button type="button" data-quick-duration="15">15 分</button><button type="button" data-quick-duration="30">30 分</button><button type="button" data-quick-duration="45">45 分</button><button type="button" data-quick-duration="60">60 分</button></div>
         </div>
         <div class="field-row">
-          <label class="field"><span>时长（分钟）</span><input name="durationMinutes" type="number" min="1" max="1440" inputmode="numeric" required></label>
+          <label class="field"><span>时长（分钟）</span><input name="durationMinutes" type="number" min="1" max="1440" inputmode="numeric" data-primary-input required></label>
           <label class="field"><span>强度</span><select name="intensity" required><option value="1">低</option><option value="2" selected>中</option><option value="3">高</option></select></label>
         </div>
-        <fieldset class="watch-fields">
+        <fieldset id="workout-watch-fields" class="watch-fields" hidden>
           <legend>Apple Watch 详情（可选）</legend>
           <p class="field-help">只在方便时填写平均心率和距离。</p>
           <div class="metric-fields">
@@ -209,7 +209,7 @@
 
       <form id="meal-form" data-record-form="meal" hidden>
         <label class="field"><span>餐次</span><select name="mealType" required><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select></label>
-        <label class="field"><span>吃了什么</span><textarea name="content" minlength="1" maxlength="2000" rows="6" placeholder="例如：鸡蛋 2 个，牛奶 250 ml，燕麦一碗。尽量写上大致数量、克数或包装份量。" required></textarea></label>
+        <label class="field"><span>吃了什么</span><textarea name="content" minlength="1" maxlength="2000" rows="6" placeholder="例如：鸡蛋 2 个，牛奶 250 ml，燕麦一碗。尽量写上大致数量、克数或包装份量。" data-primary-input required></textarea></label>
         <p class="field-help">先把真实饮食写下来，不要求现在计算营养；后续可导出这些文字做分析。</p>
         <button class="primary-button" type="submit">保存饮食</button>
       </form>
@@ -231,7 +231,7 @@
 
       <form id="weight-form" data-record-form="weight" hidden>
         <div class="field-row">
-          <label class="field"><span>体重（kg）</span><input name="weightKg" type="number" min="20" max="500" step="0.001" inputmode="decimal" required></label>
+          <label class="field"><span>体重（kg）</span><input name="weightKg" type="number" min="20" max="500" step="0.001" inputmode="decimal" data-primary-input required></label>
           <label class="field"><span>体脂率（％）</span><input name="bodyFatPercent" type="number" min="1" max="75" step="0.01" inputmode="decimal"></label>
         </div>
         <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
@@ -420,6 +420,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=22"></script>
+    <script type="module" src="./app.js?v=23"></script>
   </body>
 </html>

@@ -12,7 +12,7 @@ test("Service Worker 缓存精简后的完整应用外壳", async () => {
   const sw = await readFile(new URL("../docs/sw.js", import.meta.url), "utf8");
   const html = await readFile(new URL("../docs/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../docs/app.js", import.meta.url), "utf8");
-  assert.match(sw, /healthlife-shell-v22/);
+  assert.match(sw, /healthlife-shell-v23/);
   for (const file of [
     "index.html", "styles.css", "app.js", "model.js", "data.js", "calendar.js",
     "stats.js", "backup.js", "interaction.js", "analysis.js",
@@ -24,15 +24,15 @@ test("Service Worker 缓存精简后的完整应用外壳", async () => {
   assert.doesNotMatch(sw, /nutrition\.js/);
   assert.doesNotMatch(app, /nutrition\.js/);
   assert.doesNotMatch(sw, /planning\.js/);
-  assert.match(html, /\.\/styles\.css\?v=22/);
-  assert.match(html, /\.\/app\.js\?v=22/);
-  assert.match(html, /\.\/manifest\.webmanifest\?v=22/);
-  assert.match(app, /register\("\.\/sw\.js\?v=22"\)/);
+  assert.match(html, /\.\/styles\.css\?v=23/);
+  assert.match(html, /\.\/app\.js\?v=23/);
+  assert.match(html, /\.\/manifest\.webmanifest\?v=23/);
+  assert.match(app, /register\("\.\/sw\.js\?v=23"\)/);
   for (const file of [
     "model.js", "data.js", "storage.js", "calendar.js", "stats.js", "backup.js",
     "interaction.js", "analysis.js", "guided-workout.js", "training-insights.js",
   ]) {
-    assert.match(app, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=22`));
-    assert.match(sw, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=22`));
+    assert.match(app, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=23`));
+    assert.match(sw, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=23`));
   }
 });

@@ -19,6 +19,30 @@ test("首页只保留四类核心卡片和简单今日训练推荐", () => {
   assert.doesNotMatch(html, /id="daily-progress"|id="streak-badge"|id="edit-daily-plan"/);
 });
 
+test("首页优先展示四类记录入口，再展示今日训练推荐", () => {
+  const summaryIndex = html.indexOf('class="summary-grid"');
+  const planIndex = html.indexOf('class="health-plan-card"');
+  assert.ok(summaryIndex >= 0);
+  assert.ok(planIndex >= 0);
+  assert.ok(summaryIndex < planIndex);
+});
+
+test("运动表单只在 Apple Watch 来源下展示设备详情", () => {
+  assert.match(html, /id="workout-watch-fields" class="watch-fields" hidden/);
+  assert.match(app, /workoutWatchFields: document\.querySelector\("#workout-watch-fields"\)/);
+  assert.match(app, /\["type", "source"\]\.includes\(event\?\.target\?\.name\)/);
+  assert.match(app, /elements\.workoutWatchFields\.hidden = !hasWatchDetails/);
+});
+
+test("记录表单将焦点放到高频输入，睡眠表单避免主动唤起时间控件", () => {
+  assert.equal(html.match(/data-primary-input/g)?.length, 3);
+  assert.match(html, /name="durationMinutes"[^>]*data-primary-input/);
+  assert.match(html, /name="content"[^>]*data-primary-input/);
+  assert.match(html, /name="weightKg"[^>]*data-primary-input/);
+  assert.match(html, /id="dialog-title" tabindex="-1"/);
+  assert.match(app, /form\.querySelector\("\[data-primary-input\]"\) \?\? elements\.dialogTitle/);
+});
+
 test("每周模板只展示当前可执行的四类推荐", () => {
   const labels = app.match(/const TRAINING_PLAN_LABELS = Object\.freeze\(\{[\s\S]*?\}\);/)?.[0] ?? "";
   assert.match(labels, /strengthA: "力量 A"/);
