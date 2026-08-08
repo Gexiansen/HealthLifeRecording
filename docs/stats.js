@@ -2,7 +2,7 @@ import {
   assertValidData,
   calculateSleepMinutes,
   calculateWeightMovingAverage,
-} from "./model.js?v=23";
+} from "./model.js?v=24";
 
 export function calculateTrendSummary(data, endDate, days) {
   assertValidData(data);
@@ -74,6 +74,18 @@ export function calculateTrendComparison(data, endDate, days) {
         : null,
     },
   };
+}
+
+export function countWorkoutDaysInMonth(data, month) {
+  assertValidData(data);
+  if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(month)) {
+    throw new TypeError("month 必须是有效的 YYYY-MM");
+  }
+  return new Set(
+    data.workouts
+      .filter((record) => record.date.startsWith(`${month}-`))
+      .map((record) => record.date),
+  ).size;
 }
 
 function sumBy(records, keySelector, valueSelector) {

@@ -77,6 +77,23 @@ main { max-width: 720px; margin: 0 auto; padding: 16px; }
 
 .date-panel { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; }
 .date-panel .eyebrow, .section-heading .eyebrow { color: var(--muted); }
+.date-context { min-width: 0; }
+.date-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.calendar-plan-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #e7f1eb;
+  color: var(--primary-dark);
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.calendar-plan-badge[data-plan-type="rest"],
+.calendar-plan-badge[data-plan-type="unavailable"] { background: #eef0ed; color: var(--muted); }
+.month-workout-summary { min-width: 62px; text-align: right; }
+.month-workout-summary span { display: block; color: var(--muted); font-size: 12px; font-weight: 700; }
+.month-workout-summary strong { display: block; margin-top: 4px; font-size: 18px; }
 .text-button { min-height: 44px; border: 0; background: transparent; color: var(--primary); font-weight: 700; }
 
 

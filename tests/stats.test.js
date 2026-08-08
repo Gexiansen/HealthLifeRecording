@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createEmptyData } from "../docs/model.js";
-import { calculateTrendComparison, calculateTrendSummary } from "../docs/stats.js";
+import {
+  calculateTrendComparison,
+  calculateTrendSummary,
+  countWorkoutDaysInMonth,
+} from "../docs/stats.js";
 import { IDS, meal, sleep, weight, workout } from "./helpers.js";
 
 test("7 天趋势只汇总四类核心记录", () => {
@@ -42,4 +46,16 @@ test("趋势比较使用紧邻的等长上一周期", () => {
   const result = calculateTrendComparison(data, "2026-07-31", 7);
   assert.equal(result.changes.weightGrams, -1_000);
   assert.equal(result.changes.workoutMinutes, 10);
+});
+
+test("月度运动天数按自然日去重并忽略相邻月份", () => {
+  const data = createEmptyData();
+  data.workouts.push(
+    workout({ date: "2026-08-03" }),
+    workout({ id: IDS.second, date: "2026-08-03" }),
+    workout({ id: "66666666-6666-4666-8666-666666666666", date: "2026-08-17" }),
+    workout({ id: "77777777-7777-4777-8777-777777777777", date: "2026-07-31" }),
+  );
+  assert.equal(countWorkoutDaysInMonth(data, "2026-08"), 2);
+  assert.throws(() => countWorkoutDaysInMonth(data, "2026-8"), /month/);
 });

@@ -2,13 +2,13 @@ import {
   createEmptyData,
   parseData,
   serializeData,
-} from "./model.js?v=23";
-import { parseBackupMetadata } from "./backup.js?v=23";
+} from "./model.js?v=24";
+import { parseBackupMetadata } from "./backup.js?v=24";
 import {
   assertValidWorkoutUndoHistory,
   assertValidWorkoutDraft,
   migrateWorkoutDraftV1,
-} from "./guided-workout.js?v=23";
+} from "./guided-workout.js?v=24";
 
 export const STORAGE_KEY = "healthlife:data:v10";
 export const BACKUP_META_KEY = "healthlife:backup-meta:v10";

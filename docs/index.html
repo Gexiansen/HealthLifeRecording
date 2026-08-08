@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=23">
+    <link rel="manifest" href="./manifest.webmanifest?v=24">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=23">
+    <link rel="stylesheet" href="./styles.css?v=24">
   </head>
   <body>
     <header class="app-header">
@@ -39,9 +39,16 @@
     <main>
       <section id="view-today" class="view" aria-labelledby="today-title">
         <div class="date-panel">
-          <div>
+          <div class="date-context">
             <p class="eyebrow">正在查看</p>
-            <h2 id="today-title">今日</h2>
+            <div class="date-title-row">
+              <h2 id="today-title">今日</h2>
+              <span id="selected-training-label" class="calendar-plan-badge" data-plan-type="unavailable">正在读取</span>
+            </div>
+          </div>
+          <div class="month-workout-summary">
+            <span id="month-workout-label">本月运动</span>
+            <strong id="month-workout-days">0 天</strong>
           </div>
           <div class="calendar-toolbar">
             <button id="previous-period" class="icon-button" type="button" aria-label="上一周">‹</button>
@@ -420,6 +427,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=23"></script>
+    <script type="module" src="./app.js?v=24"></script>
   </body>
 </html>

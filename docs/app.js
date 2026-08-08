@@ -2,14 +2,14 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=23";
+} from "./model.js?v=24";
 import {
   allRecordsByDate,
   deleteRecord,
   findDailyRecord,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=23";
+} from "./data.js?v=24";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -21,30 +21,30 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=23";
+} from "./storage.js?v=24";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=23";
-import { calculateTrendComparison } from "./stats.js?v=23";
+} from "./calendar.js?v=24";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=24";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=23";
+} from "./backup.js?v=24";
 import {
   calculatePaceSecondsPerKilometer,
   filterRecordItems,
   getDateContext,
   getDefaultMealType,
   getRestoreLabel,
-} from "./interaction.js?v=23";
-import { serializeAnalysisExport } from "./analysis.js?v=23";
+} from "./interaction.js?v=24";
+import { serializeAnalysisExport } from "./analysis.js?v=24";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -62,12 +62,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=23";
+} from "./guided-workout.js?v=24";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=23";
+} from "./training-insights.js?v=24";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -140,6 +140,9 @@ const elements = {
   appUpdate: document.querySelector("#app-update"),
   reloadApp: document.querySelector("#reload-app"),
   todayTitle: document.querySelector("#today-title"),
+  selectedTrainingLabel: document.querySelector("#selected-training-label"),
+  monthWorkoutLabel: document.querySelector("#month-workout-label"),
+  monthWorkoutDays: document.querySelector("#month-workout-days"),
   returnToday: document.querySelector("#return-today"),
   previousPeriod: document.querySelector("#previous-period"),
   nextPeriod: document.querySelector("#next-period"),
@@ -282,7 +285,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=23").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=24").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -428,7 +431,12 @@ function renderToday() {
   const today = localDateString(new Date());
   const isFuture = selectedDate > today;
   const dateContext = getDateContext(selectedDate, today);
+  const selectedMonth = selectedDate.slice(0, 7);
   elements.todayTitle.textContent = dateContext.heading;
+  elements.monthWorkoutLabel.textContent = `${Number(selectedMonth.slice(5, 7))}月运动`;
+  elements.monthWorkoutDays.textContent = data
+    ? `${countWorkoutDaysInMonth(data, selectedMonth)} 天`
+    : "不可用";
   elements.returnToday.hidden = selectedDate === today;
   renderCalendar();
   renderTrainingRecommendation();
@@ -478,6 +486,8 @@ function renderToday() {
 
 function renderTrainingRecommendation() {
   if (!data) {
+    elements.selectedTrainingLabel.textContent = "计划不可用";
+    elements.selectedTrainingLabel.dataset.planType = "unavailable";
     elements.planHeadline.textContent = "无法读取训练模板";
     elements.planDetail.textContent = "";
     elements.startGuidedWorkout.textContent = "训练不可用";
@@ -486,6 +496,8 @@ function renderTrainingRecommendation() {
   }
   const dayIndex = (new Date(`${selectedDate}T00:00:00Z`).getUTCDay() + 6) % 7;
   const plannedType = data.weeklyTraining[dayIndex];
+  elements.selectedTrainingLabel.textContent = TRAINING_PLAN_LABELS[plannedType];
+  elements.selectedTrainingLabel.dataset.planType = plannedType === "rest" ? "rest" : "training";
   elements.planHeadline.textContent = TRAINING_PLAN_LABELS[plannedType];
   elements.planDetail.textContent = plannedType === "rest"
     ? "今天按模板休息；如身体状态良好，也可以手动选择轻量训练。"

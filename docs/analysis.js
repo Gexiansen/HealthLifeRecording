@@ -1,5 +1,5 @@
-import { assertValidData, calculateSleepMinutes } from "./model.js?v=23";
-import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=23";
+import { assertValidData, calculateSleepMinutes } from "./model.js?v=24";
+import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=24";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
 export const ANALYSIS_VERSION = 8;

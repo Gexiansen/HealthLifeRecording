@@ -27,6 +27,15 @@ test("首页优先展示四类记录入口，再展示今日训练推荐", () =>
   assert.ok(summaryIndex < planIndex);
 });
 
+test("日历标题展示所选日期训练类型和所选月份运动天数", () => {
+  for (const id of ["selected-training-label", "month-workout-label", "month-workout-days"]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(app, /countWorkoutDaysInMonth\(data, selectedMonth\)/);
+  assert.match(app, /elements\.selectedTrainingLabel\.textContent = TRAINING_PLAN_LABELS\[plannedType\]/);
+  assert.doesNotMatch(html, /执行率/);
+});
+
 test("运动表单只在 Apple Watch 来源下展示设备详情", () => {
   assert.match(html, /id="workout-watch-fields" class="watch-fields" hidden/);
   assert.match(app, /workoutWatchFields: document\.querySelector\("#workout-watch-fields"\)/);
