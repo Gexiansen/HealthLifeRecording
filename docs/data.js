@@ -1,4 +1,4 @@
-import { assertValidData, serializeData } from "./model.js?v=24";
+import { assertValidData, serializeData } from "./model.js?v=25";
 
 export const COLLECTIONS = Object.freeze([
   "workouts",
@@ -68,6 +68,42 @@ export function allRecordsByDate(data) {
 export function updateWeeklyTraining(data, weeklyTraining) {
   const next = cloneData(data);
   next.weeklyTraining = structuredClone(weeklyTraining);
+  assertValidData(next);
+  return next;
+}
+
+export function saveFood(data, food) {
+  const next = cloneData(data);
+  const index = next.foods.findIndex((item) => item.id === food.id);
+  if (index === -1) next.foods.push(structuredClone(food));
+  else next.foods[index] = structuredClone(food);
+  assertValidData(next);
+  return next;
+}
+
+export function deleteFood(data, foodId) {
+  const next = cloneData(data);
+  const index = next.foods.findIndex((item) => item.id === foodId);
+  if (index === -1) throw new TypeError(`找不到食材：${foodId}`);
+  const [deletedFood] = next.foods.splice(index, 1);
+  assertValidData(next);
+  return { data: next, deletedFood };
+}
+
+export function reorderFoods(data, orderedIds) {
+  if (!Array.isArray(orderedIds) || orderedIds.length !== data.foods.length) {
+    throw new TypeError("orderedIds 必须包含全部食材 ID");
+  }
+  const byId = new Map(data.foods.map((food) => [food.id, food]));
+  if (byId.size !== orderedIds.length || new Set(orderedIds).size !== orderedIds.length) {
+    throw new TypeError("orderedIds 包含重复或缺失 ID");
+  }
+  const next = cloneData(data);
+  next.foods = orderedIds.map((id) => {
+    const food = byId.get(id);
+    if (!food) throw new TypeError(`找不到食材：${id}`);
+    return structuredClone(food);
+  });
   assertValidData(next);
   return next;
 }

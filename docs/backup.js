@@ -1,13 +1,16 @@
 import {
   assertValidData,
   createEmptyData,
+  migrateDataV10,
   parseData,
+  parseDataV10,
   serializeData,
-} from "./model.js?v=24";
-import { COLLECTIONS } from "./data.js?v=24";
+} from "./model.js?v=25";
+import { COLLECTIONS } from "./data.js?v=25";
 
 export const BACKUP_FORMAT = "healthlife-complete-backup";
-export const BACKUP_VERSION = 10;
+export const BACKUP_VERSION = 11;
+export const PREVIOUS_BACKUP_VERSION = 10;
 
 export function createCompleteBackup(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);
@@ -34,13 +37,17 @@ export function parseCompleteBackup(text) {
   }
   assertExactKeys(backup, ["format", "backupVersion", "exportedAt", "data"], "backup");
   if (backup.format !== BACKUP_FORMAT) throw new TypeError("不是 HealthLife 完整备份");
-  if (backup.backupVersion !== BACKUP_VERSION) {
+  if (![PREVIOUS_BACKUP_VERSION, BACKUP_VERSION].includes(backup.backupVersion)) {
     throw new TypeError(`不支持的 backupVersion：${String(backup.backupVersion)}`);
   }
   assertIsoTimestamp(backup.exportedAt, "backup.exportedAt");
-  const data = parseData(JSON.stringify(backup.data));
+  const sourceBackupVersion = backup.backupVersion;
+  const data = sourceBackupVersion === BACKUP_VERSION
+    ? parseData(JSON.stringify(backup.data))
+    : migrateDataV10(parseDataV10(JSON.stringify(backup.data)));
   return {
     backup: { ...backup, backupVersion: BACKUP_VERSION, data },
+    sourceBackupVersion,
     summary: summarizeData(data),
   };
 }
@@ -58,6 +65,8 @@ export function summarizeData(data) {
     lastDate: dates.at(-1) ?? null,
     counts,
     weeklyTraining: [...data.weeklyTraining],
+    foodCount: data.foods.length,
+    healthStageCount: data.healthStages.length,
   };
 }
 
@@ -65,10 +74,14 @@ export function createBackupMetadata(lastBackupAt, data) {
   assertIsoTimestamp(lastBackupAt, "lastBackupAt");
   const summary = summarizeData(data);
   return {
-    version: 3,
+    version: 4,
     lastBackupAt,
     recordCount: summary.totalRecords,
-    weeklyTrainingSignature: createSignature(data.weeklyTraining),
+    settingsSignature: createSignature({
+      weeklyTraining: data.weeklyTraining,
+      foods: data.foods,
+      healthStages: data.healthStages,
+    }),
   };
 }
 
@@ -83,14 +96,14 @@ export function parseBackupMetadata(text) {
   try {
     assertExactKeys(
       metadata,
-      ["version", "lastBackupAt", "recordCount", "weeklyTrainingSignature"],
+      ["version", "lastBackupAt", "recordCount", "settingsSignature"],
       "metadata",
     );
     if (
-      metadata.version !== 3
+      metadata.version !== 4
       || !Number.isInteger(metadata.recordCount)
       || metadata.recordCount < 0
-      || typeof metadata.weeklyTrainingSignature !== "string"
+      || typeof metadata.settingsSignature !== "string"
     ) return null;
     assertIsoTimestamp(metadata.lastBackupAt, "metadata.lastBackupAt");
     return metadata;
@@ -101,16 +114,23 @@ export function parseBackupMetadata(text) {
 
 export function getBackupReminder(data, metadata, now = new Date().toISOString()) {
   const recordCount = summarizeData(data).totalRecords;
-  const hasTemplateChanges = JSON.stringify(data.weeklyTraining)
-    !== JSON.stringify(createEmptyData().weeklyTraining);
-  if (recordCount === 0 && !hasTemplateChanges) return { needed: false, reason: "empty" };
+  const defaults = createEmptyData();
+  const hasSettingsChanges = data.foods.length > 0
+    || data.healthStages.length > 0
+    || JSON.stringify(data.weeklyTraining) !== JSON.stringify(defaults.weeklyTraining);
+  if (recordCount === 0 && !hasSettingsChanges) return { needed: false, reason: "empty" };
   if (!metadata) return { needed: true, reason: "never" };
   assertIsoTimestamp(now, "now");
   const ageDays = Math.floor((Date.parse(now) - Date.parse(metadata.lastBackupAt)) / 86_400_000);
   if (ageDays >= 14) return { needed: true, reason: "stale" };
   if (recordCount - metadata.recordCount >= 10) return { needed: true, reason: "manyChanges" };
-  if (metadata.weeklyTrainingSignature !== createSignature(data.weeklyTraining)) {
-    return { needed: true, reason: "templateChanges" };
+  const currentSettingsSignature = createSignature({
+    weeklyTraining: data.weeklyTraining,
+    foods: data.foods,
+    healthStages: data.healthStages,
+  });
+  if (metadata.settingsSignature !== currentSettingsSignature) {
+    return { needed: true, reason: "settingsChanges" };
   }
   return { needed: false, reason: "current" };
 }

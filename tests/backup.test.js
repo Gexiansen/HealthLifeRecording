@@ -9,20 +9,22 @@ import {
   serializeCompleteBackup,
   summarizeData,
 } from "../docs/backup.js";
-import { weight } from "./helpers.js";
+import { food, v10Meal, weight } from "./helpers.js";
 
 const NOW = "2026-07-31T00:00:00.000Z";
 
-test("v10 完整备份严格往返并只汇总四类记录", () => {
+test("v11 完整备份严格往返并汇总记录和个人配置", () => {
   const data = createEmptyData();
   data.weights.push(weight());
+  data.foods.push(food());
   const result = parseCompleteBackup(serializeCompleteBackup(data, NOW));
-  assert.equal(BACKUP_VERSION, 10);
+  assert.equal(BACKUP_VERSION, 11);
   assert.deepEqual(result.backup.data, data);
   assert.deepEqual(result.summary.counts, {
     workouts: 0, meals: 0, sleepRecords: 0, weights: 1,
   });
   assert.equal(result.summary.totalRecords, 1);
+  assert.equal(result.summary.foodCount, 1);
 });
 
 test("备份拒绝 v1 至 v9，并拒绝未知字段", () => {
@@ -35,6 +37,28 @@ test("备份拒绝 v1 至 v9，并拒绝未知字段", () => {
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /未知字段/);
 });
 
+test("有效 v10 完整备份整体迁移为 v11，旧饮食不生成蛋白质估算", () => {
+  const v10Data = {
+    schemaVersion: 10,
+    weeklyTraining: [...createEmptyData().weeklyTraining],
+    workouts: [],
+    meals: [v10Meal()],
+    sleepRecords: [],
+    weights: [],
+  };
+  const result = parseCompleteBackup(JSON.stringify({
+    format: "healthlife-complete-backup",
+    backupVersion: 10,
+    exportedAt: NOW,
+    data: v10Data,
+  }));
+  assert.equal(result.sourceBackupVersion, 10);
+  assert.equal(result.backup.backupVersion, 11);
+  assert.equal(result.backup.data.schemaVersion, 11);
+  assert.deepEqual(result.backup.data.meals[0].foodItems, []);
+  assert.equal(result.backup.data.meals[0].freeText, v10Data.meals[0].content);
+});
+
 test("备份提醒覆盖记录变化和每周模板变化", () => {
   const empty = createEmptyData();
   assert.deepEqual(getBackupReminder(empty, null), { needed: false, reason: "empty" });
@@ -44,6 +68,6 @@ test("备份提醒覆盖记录变化和每周模板变化", () => {
   assert.equal(getBackupReminder(empty, metadata, "2026-08-01T00:00:00.000Z").needed, false);
   const templateChanged = structuredClone(empty);
   templateChanged.weeklyTraining[0] = "runWalk";
-  assert.equal(getBackupReminder(templateChanged, metadata, "2026-08-01T00:00:00.000Z").reason, "templateChanges");
+  assert.equal(getBackupReminder(templateChanged, metadata, "2026-08-01T00:00:00.000Z").reason, "settingsChanges");
   assert.equal(summarizeData(templateChanged).weeklyTraining[0], "runWalk");
 });

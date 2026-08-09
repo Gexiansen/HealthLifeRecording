@@ -1,17 +1,20 @@
 import {
   createEmptyData,
+  migrateDataV10,
   parseData,
+  parseDataV10,
   serializeData,
-} from "./model.js?v=24";
-import { parseBackupMetadata } from "./backup.js?v=24";
+} from "./model.js?v=25";
+import { parseBackupMetadata } from "./backup.js?v=25";
 import {
   assertValidWorkoutUndoHistory,
   assertValidWorkoutDraft,
   migrateWorkoutDraftV1,
-} from "./guided-workout.js?v=24";
+} from "./guided-workout.js?v=25";
 
-export const STORAGE_KEY = "healthlife:data:v10";
-export const BACKUP_META_KEY = "healthlife:backup-meta:v10";
+export const STORAGE_KEY = "healthlife:data:v11";
+export const PREVIOUS_STORAGE_KEY = "healthlife:data:v10";
+export const BACKUP_META_KEY = "healthlife:backup-meta:v11";
 export const WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v2";
 export const PREVIOUS_WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v1";
 export const WORKOUT_UNDO_KEY = "healthlife:workout-undo:v1";
@@ -37,30 +40,73 @@ export function loadData(storage = globalThis.localStorage) {
     };
   }
 
-  if (raw === null) {
+  if (raw !== null) {
+    try {
+      return {
+        status: "ready",
+        data: parseData(raw),
+        raw,
+        error: null,
+        migratedFromVersion: null,
+      };
+    } catch (error) {
+      return {
+        status: "corrupt",
+        data: null,
+        raw,
+        error,
+        migratedFromVersion: null,
+      };
+    }
+  }
+
+  let previousRaw;
+  try {
+    previousRaw = storage.getItem(PREVIOUS_STORAGE_KEY);
+  } catch (error) {
+    return { status: "unavailable", data: null, raw: null, error };
+  }
+  if (previousRaw === null) {
     return {
       status: "empty",
       data: createEmptyData(),
       raw: null,
       error: null,
+      migratedFromVersion: null,
     };
   }
 
+  let migrated;
   try {
-    return {
-      status: "ready",
-      data: parseData(raw),
-      raw,
-      error: null,
-    };
+    migrated = migrateDataV10(parseDataV10(previousRaw));
   } catch (error) {
     return {
       status: "corrupt",
       data: null,
-      raw,
+      raw: previousRaw,
       error,
+      migratedFromVersion: null,
     };
   }
+  const serialized = serializeData(migrated);
+  try {
+    storage.setItem(STORAGE_KEY, serialized);
+  } catch (error) {
+    return {
+      status: "migrationFailed",
+      data: migrated,
+      raw: previousRaw,
+      error,
+      migratedFromVersion: 10,
+    };
+  }
+  return {
+    status: "ready",
+    data: migrated,
+    raw: serialized,
+    error: null,
+    migratedFromVersion: 10,
+  };
 }
 
 export function saveData(data, storage = globalThis.localStorage) {

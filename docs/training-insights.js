@@ -1,7 +1,7 @@
 import {
   DISCOMFORT_BODY_PART_LABELS,
   EXERCISE_LIBRARY,
-} from "./guided-workout.js?v=24";
+} from "./guided-workout.js?v=25";
 
 export function getExerciseHistory(workouts, exerciseId, limit = 3) {
   if (!Array.isArray(workouts)) throw new TypeError("workouts 必须是数组");

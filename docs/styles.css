@@ -301,6 +301,24 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .field { display: grid; gap: 7px; margin-bottom: 14px; color: var(--muted); font-size: 13px; font-weight: 700; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .field-help { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.meal-food-picker { margin-bottom: 14px; border: 1px solid var(--line); border-radius: 16px; background: #f8faf7; padding: 12px; }
+.meal-picker-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.meal-picker-heading strong, .meal-picker-heading span { display: block; }
+.meal-picker-heading span { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.meal-food-options { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.meal-food-option { position: relative; }
+.meal-food-option input { position: absolute; width: 1px; height: 1px; min-height: 0; opacity: 0; }
+.meal-food-option span { display: grid; min-height: 44px; place-items: center; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--primary-dark); padding: 7px 11px; font-size: 13px; font-weight: 750; }
+.meal-food-option input:checked + span { border-color: var(--primary); background: #dfeee6; box-shadow: inset 0 0 0 1px var(--primary); }
+.meal-food-option input:focus-visible + span { outline: 3px solid rgba(31, 98, 82, 0.22); outline-offset: 2px; }
+.meal-selected-foods { display: grid; gap: 8px; margin-top: 12px; }
+.meal-selected-item { display: grid; grid-template-columns: minmax(0, 1fr) 92px 48px; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 9px; }
+.meal-selected-item strong, .meal-selected-item span { display: block; }
+.meal-selected-item span { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.meal-selected-item label { color: var(--muted); font-size: 11px; font-weight: 750; }
+.meal-selected-item input { min-height: 44px; margin-top: 4px; padding: 8px; }
+.meal-remove-food { min-width: 44px; min-height: 44px; border: 0; border-radius: 11px; background: white; color: var(--danger); padding: 0 6px; font-size: 12px; font-weight: 750; }
+.protein-preview { display: block; margin-top: 12px; border-radius: 11px; background: #fff1d8; color: #654a12; padding: 10px 12px; font-size: 13px; font-weight: 750; line-height: 1.45; }
 .sleep-preview { display: block; margin: -2px 0 14px; border-radius: 11px; background: #edf5f1; color: var(--primary-dark); padding: 10px 12px; font-size: 14px; font-weight: 750; }
 .quick-options { margin-bottom: 14px; }
 .quick-options > span { display: block; margin-bottom: 7px; color: var(--muted); font-size: 13px; font-weight: 700; }
@@ -317,7 +335,24 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .data-section { border-top: 1px solid var(--line); padding: 16px 0; }
 .data-section:first-child { border-top: 0; padding-top: 6px; }
 .data-section h3 { margin-bottom: 8px; }
+.data-section-heading { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
+.data-section-heading .data-help { margin-bottom: 10px; }
 .data-help { margin-bottom: 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.food-list { display: grid; gap: 8px; }
+.food-list-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 14px; background: #f8faf7; padding: 10px 11px; }
+.food-list-item strong, .food-list-item span { display: block; }
+.food-list-item span { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.food-list-actions { display: flex; gap: 4px; }
+.food-list-actions button { min-width: 44px; min-height: 44px; border: 0; border-radius: 11px; background: white; color: var(--primary-dark); font-weight: 750; }
+.food-list-actions .delete-food { color: var(--danger); }
+.food-form { margin-top: 12px; border: 1px solid #b8d2c7; border-radius: 16px; background: #f2f8f4; padding: 14px; }
+.food-form h4 { margin: 0 0 14px; font-size: 15px; }
+.checkbox-field { display: flex; align-items: center; gap: 9px; min-height: 44px; margin-bottom: 12px; color: var(--ink); font-size: 13px; font-weight: 750; }
+.checkbox-field input { width: 22px; min-height: 22px; margin: 0; accent-color: var(--primary); }
+.food-protein-fields { margin: 0 0 12px; border: 1px solid var(--line); border-radius: 14px; background: white; padding: 12px; }
+.food-protein-fields legend { color: var(--ink); font-size: 13px; font-weight: 800; padding: 0 4px; }
+.food-form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.food-form-actions .primary-button { margin-top: 0; }
 .weekly-plan-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
 .weekly-plan-form .primary-button, .weekly-plan-form .form-error { grid-column: 1 / -1; }
 .file-field { display: grid; gap: 7px; color: var(--muted); font-size: 13px; font-weight: 700; }
@@ -397,4 +432,6 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
   .weekly-plan-form .primary-button, .weekly-plan-form .form-error { grid-column: auto; }
   .workout-set-form { grid-template-columns: 1fr; }
   .workout-feedback { grid-template-columns: 1fr; }
+  .food-list-item { grid-template-columns: 1fr; }
+  .food-list-actions { justify-content: flex-end; }
 }

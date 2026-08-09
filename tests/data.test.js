@@ -4,12 +4,16 @@ import {
   allRecordsByDate,
   deleteRecord,
   findDailyRecord,
+  deleteFood,
+  reorderFoods,
   recordsForDate,
+  saveFood,
   saveRecord,
   updateWeeklyTraining,
 } from "../docs/data.js";
 import { createEmptyData } from "../docs/model.js";
-import { IDS, meal, sleep, weight, workout } from "./helpers.js";
+import { createMealFoodSnapshot } from "../docs/nutrition.js";
+import { food, IDS, meal, sleep, weight, workout } from "./helpers.js";
 
 test("四类记录可新增、编辑、按日期汇总与删除且不修改原对象", () => {
   const original = createEmptyData();
@@ -23,6 +27,35 @@ test("四类记录可新增、编辑、按日期汇总与删除且不修改原�
   assert.equal(data.workouts[0].durationMinutes, 45);
   const result = deleteRecord(data, "meals", IDS.meal);
   assert.equal(result.data.meals.length, 0);
+});
+
+test("个人食材可新增、编辑、排序和移除且不修改原对象", () => {
+  const original = createEmptyData();
+  let data = saveFood(original, food());
+  data = saveFood(data, food({ id: IDS.second, name: "虚构第二食材" }));
+  assert.equal(original.foods.length, 0);
+  data = saveFood(data, food({ name: "虚构已编辑食材" }));
+  assert.equal(data.foods[0].name, "虚构已编辑食材");
+  data = reorderFoods(data, [IDS.second, IDS.food]);
+  assert.deepEqual(data.foods.map((item) => item.id), [IDS.second, IDS.food]);
+  const deleted = deleteFood(data, IDS.second);
+  assert.equal(deleted.data.foods.length, 1);
+  assert.equal(deleted.deletedFood.id, IDS.second);
+});
+
+test("移除常用食材不会删除或改写已有饮食快照", () => {
+  const sourceFood = food();
+  const data = createEmptyData();
+  data.foods.push(sourceFood);
+  data.meals.push(meal({
+    content: "虚构高蛋白食品 100 g",
+    freeText: "",
+    foodItems: [createMealFoodSnapshot(sourceFood, 100, IDS.foodItem)],
+  }));
+  const result = deleteFood(data, sourceFood.id);
+  assert.equal(result.data.foods.length, 0);
+  assert.equal(result.data.meals[0].foodItems[0].proteinEstimate.proteinMilligrams, 20_000);
+  assert.equal(data.foods.length, 1);
 });
 
 test("睡眠和体重支持每日唯一查询，其他集合拒绝该查询", () => {

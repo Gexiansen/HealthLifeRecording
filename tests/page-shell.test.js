@@ -46,10 +46,11 @@ test("运动表单只在 Apple Watch 来源下展示设备详情", () => {
 test("记录表单将焦点放到高频输入，睡眠表单避免主动唤起时间控件", () => {
   assert.equal(html.match(/data-primary-input/g)?.length, 3);
   assert.match(html, /name="durationMinutes"[^>]*data-primary-input/);
-  assert.match(html, /name="content"[^>]*data-primary-input/);
+  assert.match(html, /name="freeText"[^>]*data-primary-input/);
   assert.match(html, /name="weightKg"[^>]*data-primary-input/);
   assert.match(html, /id="dialog-title" tabindex="-1"/);
-  assert.match(app, /form\.querySelector\("\[data-primary-input\]"\) \?\? elements\.dialogTitle/);
+  assert.match(app, /form\.querySelector\("\[data-food-select\]"\) \?\? form\.querySelector\("\[data-primary-input\]"\)/);
+  assert.match(app, /\(initialFocusTarget \?\? elements\.dialogTitle\)\.focus/);
 });
 
 test("每周模板只展示当前可执行的四类推荐", () => {
@@ -65,10 +66,21 @@ test("跑走引导完成后按跑步类型保存，爬楼梯仍按有氧保存",
   assert.match(app, /guidedSession\.templateId === "stairBeginner"\s*\n?\s*\? "cardio"\s*\n?\s*:\s*guidedSession\.templateId === "runWalk"\s*\n?\s*\? "running"/);
 });
 
-test("饮食改为餐次加一段文字，不再要求营养计算字段", () => {
+test("饮食支持常用食材多选、份量调整、蛋白质预览和自由文字兜底", () => {
   assert.doesNotMatch(html, /name="healthScore"|name="activeEnergyKcal"|name="maxHeartRateBpm"/);
-  assert.match(html, /name="content"/);
-  assert.match(html, /尽量写上大致数量/);
+  for (const id of [
+    "meal-food-options",
+    "meal-selected-foods",
+    "meal-protein-preview",
+    "manage-foods-from-meal",
+    "food-list",
+    "food-form",
+    "delete-food-dialog",
+  ]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(html, /name="freeText"/);
+  assert.match(app, /createMealFoodSnapshot/);
+  assert.match(app, /buildMealContent/);
+  assert.doesNotMatch(app, /window\.confirm/);
   assert.doesNotMatch(html, /name="trackingMode"|name="confidence"|name="fullnessScore"|meal-food-select|open-custom-food|open-recipe/);
   assert.doesNotMatch(html, /onclick=/);
 });

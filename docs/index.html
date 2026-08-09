@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=24">
+    <link rel="manifest" href="./manifest.webmanifest?v=25">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=24">
+    <link rel="stylesheet" href="./styles.css?v=25">
   </head>
   <body>
     <header class="app-header">
@@ -216,8 +216,18 @@
 
       <form id="meal-form" data-record-form="meal" hidden>
         <label class="field"><span>餐次</span><select name="mealType" required><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select></label>
-        <label class="field"><span>吃了什么</span><textarea name="content" minlength="1" maxlength="2000" rows="6" placeholder="例如：鸡蛋 2 个，牛奶 250 ml，燕麦一碗。尽量写上大致数量、克数或包装份量。" data-primary-input required></textarea></label>
-        <p class="field-help">先把真实饮食写下来，不要求现在计算营养；后续可导出这些文字做分析。</p>
+        <section class="meal-food-picker" aria-labelledby="meal-food-picker-title">
+          <div class="meal-picker-heading">
+            <div><strong id="meal-food-picker-title">常用食材</strong><span>选择后使用默认份量</span></div>
+            <button id="manage-foods-from-meal" class="text-button" type="button">管理食材</button>
+          </div>
+          <p id="meal-food-empty" class="field-help" hidden>还没有常用食材，可以先用下方文字记录，或前往设置添加。</p>
+          <div id="meal-food-options" class="meal-food-options"></div>
+          <div id="meal-selected-foods" class="meal-selected-foods" hidden></div>
+          <output id="meal-protein-preview" class="protein-preview">尚未选择可估算蛋白质的食材</output>
+        </section>
+        <label class="field"><span>补充说明（可选）</span><textarea name="freeText" maxlength="2000" rows="4" placeholder="外卖、堂食或临时食物可以直接写在这里，例如：牛肉面一碗，份量不详。" data-primary-input></textarea></label>
+        <p class="field-help">蛋白质仅根据已选择食材的参考值估算；文字补充不会被自动换算。</p>
         <button class="primary-button" type="submit">保存饮食</button>
       </form>
 
@@ -367,6 +377,17 @@
       </div>
     </dialog>
 
+    <dialog id="delete-food-dialog" aria-labelledby="delete-food-dialog-title">
+      <div class="confirm-dialog-body">
+        <h2 id="delete-food-dialog-title">删除常用食材？</h2>
+        <p id="delete-food-dialog-message">已有饮食记录中的历史快照不会改变。</p>
+        <div>
+          <button id="cancel-delete-food" class="secondary-neutral-button" type="button">取消</button>
+          <button id="confirm-delete-food" class="danger-button" type="button">确认删除</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="data-dialog" aria-labelledby="data-dialog-title">
       <div class="dialog-header">
         <div>
@@ -376,6 +397,44 @@
         <button id="close-data-dialog" class="icon-button" type="button" aria-label="关闭设置">×</button>
       </div>
       <div class="data-dialog-body">
+        <section class="data-section">
+          <div class="data-section-heading">
+            <div><h3>我的常用食材</h3><p class="data-help">保存常吃食材和默认份量，之后记录饮食时直接选择。</p></div>
+            <button id="add-food" class="text-button" type="button">添加食材</button>
+          </div>
+          <p id="food-list-empty" class="data-help">还没有常用食材。</p>
+          <div id="food-list" class="food-list"></div>
+          <form id="food-form" class="food-form" hidden>
+            <input name="id" type="hidden">
+            <h4 id="food-form-title">添加常用食材</h4>
+            <div class="field-row">
+              <label class="field"><span>名称</span><input name="name" maxlength="80" required></label>
+              <label class="field"><span>分类</span><select name="category" required><option value="protein">肉蛋豆类</option><option value="staple">主食</option><option value="vegetable">蔬菜</option><option value="fruit">水果</option><option value="dairy">奶类</option><option value="drink">饮品</option><option value="other">其他</option></select></label>
+            </div>
+            <div class="field-row">
+              <label class="field"><span>默认份量</span><input name="defaultAmount" type="number" min="1" max="100000" step="1" inputmode="numeric" required></label>
+              <label class="field"><span>单位</span><select name="unit" required><option value="grams">克（g）</option><option value="milliliters">毫升（ml）</option><option value="piece">个</option><option value="serving">份</option></select></label>
+            </div>
+            <label class="checkbox-field"><input name="proteinEnabled" type="checkbox"><span>为这个食材启用蛋白质估算</span></label>
+            <fieldset id="food-protein-fields" class="food-protein-fields" hidden>
+              <legend>蛋白质参考值</legend>
+              <div class="field-row">
+                <label class="field"><span>参考份量（同上单位）</span><input name="referenceAmount" type="number" min="1" max="100000" step="1" inputmode="numeric"></label>
+                <label class="field"><span>蛋白质（g）</span><input name="proteinGrams" type="number" min="0" max="1000" step="0.1" inputmode="decimal"></label>
+              </div>
+              <div class="field-row">
+                <label class="field"><span>口径</span><select name="basis"><option value="raw">生重</option><option value="cooked">熟重</option><option value="edible">可食部分</option><option value="packaged">包装份量</option></select></label>
+                <label class="field"><span>来源</span><select name="source"><option value="packageLabel">包装营养标签</option><option value="publicReference">公共参考值</option><option value="other">其他</option></select></label>
+              </div>
+              <label class="field"><span>来源说明（可选）</span><input name="sourceNote" maxlength="300" placeholder="例如：包装每 100 ml 标示"></label>
+            </fieldset>
+            <p id="food-form-error" class="form-error inline-error" role="alert" hidden></p>
+            <div class="food-form-actions">
+              <button id="cancel-food-edit" class="secondary-neutral-button" type="button">取消</button>
+              <button class="primary-button" type="submit">保存食材</button>
+            </div>
+          </form>
+        </section>
         <section class="data-section">
           <h3>每周训练模板</h3>
           <p class="data-help">模板只负责默认推荐，不会自动生成运动记录；需要时可在今日选择其他训练。</p>
@@ -427,6 +486,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=24"></script>
+    <script type="module" src="./app.js?v=25"></script>
   </body>
 </html>

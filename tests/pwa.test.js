@@ -12,27 +12,30 @@ test("Service Worker 缓存精简后的完整应用外壳", async () => {
   const sw = await readFile(new URL("../docs/sw.js", import.meta.url), "utf8");
   const html = await readFile(new URL("../docs/index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../docs/app.js", import.meta.url), "utf8");
-  assert.match(sw, /healthlife-shell-v24/);
+  assert.match(sw, /healthlife-shell-v25/);
   for (const file of [
     "index.html", "styles.css", "app.js", "model.js", "data.js", "calendar.js",
     "stats.js", "backup.js", "interaction.js", "analysis.js",
-    "guided-workout.js", "training-insights.js", "storage.js", "manifest.webmanifest",
+    "guided-workout.js", "training-insights.js", "nutrition.js", "health-stage.js",
+    "storage.js", "manifest.webmanifest",
   ]) {
     assert.match(sw, new RegExp(`\\./${file.replace(".", "\\.")}`));
     await access(new URL(`../docs/${file}`, import.meta.url));
   }
-  assert.doesNotMatch(sw, /nutrition\.js/);
-  assert.doesNotMatch(app, /nutrition\.js/);
+  assert.match(sw, /nutrition\.js/);
+  assert.match(app, /nutrition\.js/);
   assert.doesNotMatch(sw, /planning\.js/);
-  assert.match(html, /\.\/styles\.css\?v=24/);
-  assert.match(html, /\.\/app\.js\?v=24/);
-  assert.match(html, /\.\/manifest\.webmanifest\?v=24/);
-  assert.match(app, /register\("\.\/sw\.js\?v=24"\)/);
+  assert.match(html, /\.\/styles\.css\?v=25/);
+  assert.match(html, /\.\/app\.js\?v=25/);
+  assert.match(html, /\.\/manifest\.webmanifest\?v=25/);
+  assert.match(app, /register\("\.\/sw\.js\?v=25"\)/);
   for (const file of [
     "model.js", "data.js", "storage.js", "calendar.js", "stats.js", "backup.js",
     "interaction.js", "analysis.js", "guided-workout.js", "training-insights.js",
+    "nutrition.js",
   ]) {
-    assert.match(app, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=24`));
-    assert.match(sw, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=24`));
+    assert.match(app, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=25`));
+    assert.match(sw, new RegExp(`\\./${file.replace(".", "\\.")}\\?v=25`));
   }
+  assert.match(sw, /\.\/health-stage\.js\?v=25/);
 });

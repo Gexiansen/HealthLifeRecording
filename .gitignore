@@ -13,6 +13,7 @@ playwright-report/
 # Local health data and backups
 backups/
 healthlife-backup-*.json
+HEALTH_ADVICE_HISTORY.local.md
 
 # Logs and temporary files
 *.log
@@ -25,4 +26,3 @@ healthlife-backup-*.json
 .codex/
 .claude/
 .agents/
-

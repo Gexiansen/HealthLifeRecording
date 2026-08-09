@@ -4,6 +4,9 @@ export const IDS = Object.freeze({
   sleep: "33333333-3333-4333-8333-333333333333",
   weight: "44444444-4444-4444-8444-444444444444",
   second: "55555555-5555-4555-8555-555555555555",
+  food: "66666666-6666-4666-8666-666666666666",
+  foodItem: "77777777-7777-4777-8777-777777777777",
+  stage: "88888888-8888-4888-8888-888888888888",
 });
 
 const TIME = "2026-07-31T00:00:00.000Z";
@@ -32,10 +35,58 @@ export function meal(overrides = {}) {
     date: "2026-07-31",
     mealType: "breakfast",
     content: "鸡蛋 1 个，牛奶 250 ml",
+    freeText: "鸡蛋 1 个，牛奶 250 ml",
+    foodItems: [],
     createdAt: TIME,
     updatedAt: TIME,
     ...overrides,
   };
+}
+
+export function food(overrides = {}) {
+  return {
+    id: IDS.food,
+    name: "虚构高蛋白食品",
+    category: "protein",
+    defaultAmount: 100,
+    unit: "grams",
+    proteinReference: {
+      referenceAmount: 100,
+      proteinMilligrams: 20_000,
+      basis: "cooked",
+      source: "publicReference",
+      sourceNote: "虚构测试参考值",
+    },
+    createdAt: TIME,
+    updatedAt: TIME,
+    ...overrides,
+  };
+}
+
+export function healthStage(overrides = {}) {
+  return {
+    id: IDS.stage,
+    title: "虚构测试阶段",
+    startDate: "2026-07-28",
+    endDate: "2026-08-24",
+    status: "active",
+    completedAt: null,
+    goals: {
+      protein: { minimumMilligrams: 90_000, maximumMilligrams: 120_000 },
+      strength: { sessionsPerWeek: 2 },
+      cardio: null,
+    },
+    createdAt: TIME,
+    updatedAt: TIME,
+    ...overrides,
+  };
+}
+
+export function v10Meal(overrides = {}) {
+  const current = meal(overrides);
+  delete current.freeText;
+  delete current.foodItems;
+  return current;
 }
 
 export function sleep(overrides = {}) {

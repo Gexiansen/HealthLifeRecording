@@ -2,14 +2,17 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=24";
+} from "./model.js?v=25";
 import {
   allRecordsByDate,
+  deleteFood,
   deleteRecord,
   findDailyRecord,
+  reorderFoods,
+  saveFood,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=24";
+} from "./data.js?v=25";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -21,30 +24,30 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=24";
+} from "./storage.js?v=25";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=24";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=24";
+} from "./calendar.js?v=25";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=25";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=24";
+} from "./backup.js?v=25";
 import {
   calculatePaceSecondsPerKilometer,
   filterRecordItems,
   getDateContext,
   getDefaultMealType,
   getRestoreLabel,
-} from "./interaction.js?v=24";
-import { serializeAnalysisExport } from "./analysis.js?v=24";
+} from "./interaction.js?v=25";
+import { serializeAnalysisExport } from "./analysis.js?v=25";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -62,12 +65,22 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=24";
+} from "./guided-workout.js?v=25";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=24";
+} from "./training-insights.js?v=25";
+import {
+  buildMealContent,
+  calculateDailyProteinSummary,
+  calculateFoodProteinMilligrams,
+  calculateMealProteinSummary,
+  createMealFoodSnapshot,
+  foodFromMealSnapshot,
+  formatFoodAmount,
+  formatProteinGrams,
+} from "./nutrition.js?v=25";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -104,6 +117,30 @@ const TRAINING_PLAN_LABELS = Object.freeze({
   rest: "休息",
 });
 
+const FOOD_CATEGORY_LABELS = Object.freeze({
+  protein: "肉蛋豆类",
+  staple: "主食",
+  vegetable: "蔬菜",
+  fruit: "水果",
+  dairy: "奶类",
+  drink: "饮品",
+  other: "其他",
+});
+
+const FOOD_UNIT_LABELS = Object.freeze({
+  grams: "克",
+  milliliters: "毫升",
+  piece: "个",
+  serving: "份",
+});
+
+const FOOD_BASIS_LABELS = Object.freeze({
+  raw: "生重",
+  cooked: "熟重",
+  edible: "可食部分",
+  packaged: "包装份量",
+});
+
 let storageState = loadData();
 let data = storageState.data;
 let backupMetadata = loadBackupMetadata();
@@ -120,6 +157,9 @@ let formBaseline = null;
 let installPromptEvent = null;
 let pendingDiscardAction = null;
 let weeklyPlanBaseline = null;
+let foodFormBaseline = null;
+let mealSelections = [];
+let pendingFoodDeletion = null;
 let workoutDraftState = loadWorkoutDraft();
 let workoutDraft = workoutDraftState.draft;
 let workoutUndoState = loadWorkoutUndoHistory(workoutDraft);
@@ -154,6 +194,11 @@ const elements = {
   startGuidedWorkout: document.querySelector("#start-guided-workout"),
   workoutSummary: document.querySelector("#workout-summary"),
   mealSummary: document.querySelector("#meal-summary"),
+  mealFoodEmpty: document.querySelector("#meal-food-empty"),
+  mealFoodOptions: document.querySelector("#meal-food-options"),
+  mealSelectedFoods: document.querySelector("#meal-selected-foods"),
+  mealProteinPreview: document.querySelector("#meal-protein-preview"),
+  manageFoodsFromMeal: document.querySelector("#manage-foods-from-meal"),
   sleepSummary: document.querySelector("#sleep-summary"),
   weightSummary: document.querySelector("#weight-summary"),
   sleepAction: document.querySelector("#sleep-action"),
@@ -215,6 +260,18 @@ const elements = {
   installApp: document.querySelector("#install-app"),
   weeklyPlanForm: document.querySelector("#weekly-plan-form"),
   weeklyPlanError: document.querySelector("#weekly-plan-error"),
+  foodList: document.querySelector("#food-list"),
+  foodListEmpty: document.querySelector("#food-list-empty"),
+  addFood: document.querySelector("#add-food"),
+  foodForm: document.querySelector("#food-form"),
+  foodFormTitle: document.querySelector("#food-form-title"),
+  foodProteinFields: document.querySelector("#food-protein-fields"),
+  foodFormError: document.querySelector("#food-form-error"),
+  cancelFoodEdit: document.querySelector("#cancel-food-edit"),
+  deleteFoodDialog: document.querySelector("#delete-food-dialog"),
+  deleteFoodDialogMessage: document.querySelector("#delete-food-dialog-message"),
+  cancelDeleteFood: document.querySelector("#cancel-delete-food"),
+  confirmDeleteFood: document.querySelector("#confirm-delete-food"),
   guidedWorkoutDialog: document.querySelector("#guided-workout-dialog"),
   guidedWorkoutTitle: document.querySelector("#guided-workout-title"),
   closeGuidedWorkout: document.querySelector("#close-guided-workout"),
@@ -276,6 +333,9 @@ function initialize() {
   renderAll();
   reconcileWorkoutDraft();
   registerServiceWorker();
+  if (storageState.migratedFromVersion === 10 && storageState.status === "ready") {
+    showToast("现有 v10 数据已安全升级，原数据仍保留");
+  }
 }
 
 function registerServiceWorker() {
@@ -285,7 +345,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=24").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=25").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -350,6 +410,17 @@ function bindEvents() {
   elements.installApp.addEventListener("click", installApp);
   elements.reloadApp.addEventListener("click", () => window.location.reload());
   elements.weeklyPlanForm.addEventListener("submit", handleWeeklyPlanSubmit);
+  elements.addFood.addEventListener("click", () => openFoodForm());
+  elements.foodForm.addEventListener("submit", handleFoodSubmit);
+  elements.foodForm.elements.proteinEnabled.addEventListener("change", updateFoodProteinFields);
+  elements.cancelFoodEdit.addEventListener("click", closeFoodForm);
+  elements.manageFoodsFromMeal.addEventListener("click", openFoodSettingsFromMeal);
+  elements.cancelDeleteFood.addEventListener("click", closeDeleteFoodDialog);
+  elements.confirmDeleteFood.addEventListener("click", confirmFoodDeletion);
+  elements.deleteFoodDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeDeleteFoodDialog();
+  });
   elements.startGuidedWorkout.addEventListener("click", openGuidedWorkout);
   elements.closeGuidedWorkout.addEventListener("click", closeGuidedWorkout);
   elements.undoWorkoutAction.addEventListener("click", undoWorkoutAction);
@@ -373,7 +444,7 @@ function bindEvents() {
 }
 
 function renderStorageState() {
-  if (storageState.status === "ready" || storageState.status === "empty") {
+  if (isStorageWritable()) {
     elements.storageAlert.hidden = true;
     document.querySelectorAll("[data-open-form]").forEach((button) => {
       button.disabled = false;
@@ -386,6 +457,10 @@ function renderStorageState() {
     elements.storageAlertTitle.textContent = "检测到异常本地数据，已停止写入";
     elements.storageAlertMessage.textContent = "原始内容仍保留在浏览器中。请先下载保存，再处理或恢复数据。";
     elements.downloadRaw.hidden = false;
+  } else if (storageState.status === "migrationFailed") {
+    elements.storageAlertTitle.textContent = "v10 数据升级写入失败，当前为只读";
+    elements.storageAlertMessage.textContent = "原 v10 数据仍完整保留。请先下载原始内容并检查浏览器可用空间，再刷新重试。";
+    elements.downloadRaw.hidden = false;
   } else {
     elements.storageAlertTitle.textContent = "浏览器本地存储不可用";
     elements.storageAlertMessage.textContent = "当前无法安全读取或保存健康记录，请检查浏览器隐私设置。";
@@ -393,6 +468,10 @@ function renderStorageState() {
   document.querySelectorAll("[data-open-form]").forEach((button) => {
     button.disabled = true;
   });
+}
+
+function isStorageWritable() {
+  return storageState.status === "ready" || storageState.status === "empty";
 }
 
 function renderAll() {
@@ -419,7 +498,7 @@ function renderBackupState() {
     never: "当前数据从未导出完整备份。",
     stale: "上次备份已超过 14 天。",
     manyChanges: "上次备份后已新增至少 10 条记录。",
-    templateChanges: "每周训练模板在上次备份后发生了变化。",
+    settingsChanges: "常用食材、健康阶段或每周模板在上次备份后发生了变化。",
   };
   elements.backupReminderMessage.textContent = messages[reminder.reason] ?? "";
   elements.backupStatus.textContent = backupMetadata
@@ -441,10 +520,10 @@ function renderToday() {
   renderCalendar();
   renderTrainingRecommendation();
   document.querySelectorAll("[data-open-form]").forEach((button) => {
-    button.disabled = isFuture || !data;
+    button.disabled = isFuture || !data || !isStorageWritable();
     button.title = isFuture ? "未来日期不能记录健康数据" : "";
   });
-  elements.startGuidedWorkout.disabled = (!workoutDraft && isFuture) || !data;
+  elements.startGuidedWorkout.disabled = (!workoutDraft && isFuture) || !data || !isStorageWritable();
   elements.startGuidedWorkout.title = !workoutDraft && isFuture ? "未来日期不能开始训练" : "";
 
   if (!data) {
@@ -459,15 +538,23 @@ function renderToday() {
 
   const workouts = data.workouts.filter((record) => record.date === selectedDate);
   const meals = data.meals.filter((record) => record.date === selectedDate);
+  const protein = calculateDailyProteinSummary(data.meals, selectedDate);
   const sleep = findDailyRecord(data, "sleepRecords", selectedDate);
   const weight = findDailyRecord(data, "weights", selectedDate);
 
   elements.workoutSummary.textContent = workouts.length
     ? `${workouts.length} 次，共 ${workouts.reduce((sum, item) => sum + item.durationMinutes, 0)} 分钟`
     : "尚未记录";
-  elements.mealSummary.textContent = meals.length
-    ? `${meals.length} 餐 · 已记录文字内容`
-    : "尚未记录";
+  if (!meals.length) {
+    elements.mealSummary.textContent = "尚未记录";
+  } else if (protein.estimatedProteinMilligrams === 0) {
+    elements.mealSummary.textContent = `${meals.length} 餐 · 尚无蛋白质估算`;
+  } else {
+    const incompleteMeals = protein.partialMealCount + protein.unestimatedMealCount;
+    elements.mealSummary.textContent = `${meals.length} 餐 · 已估 ${formatProteinGrams(protein.estimatedProteinMilligrams)} g${
+      incompleteMeals ? ` · ${incompleteMeals} 餐未完整估算` : ""
+    }`;
+  }
   elements.sleepSummary.textContent = sleep
     ? `${formatMinutes(calculateSleepMinutes(sleep.sleepTime, sleep.wakeTime))}，质量 ${sleep.qualityScore}/5`
     : "尚未记录";
@@ -1345,6 +1432,7 @@ function createRecordCard(collectionName, record) {
   editButton.type = "button";
   editButton.textContent = "编辑";
   editButton.setAttribute("aria-label", `编辑${labelText.textContent}记录`);
+  editButton.disabled = !isStorageWritable();
   editButton.addEventListener("click", () => openForm(COLLECTION_TO_TYPE[collectionName], record));
   const more = document.createElement("details");
   more.className = "record-more";
@@ -1356,6 +1444,7 @@ function createRecordCard(collectionName, record) {
   deleteButton.className = "delete-action";
   deleteButton.textContent = "删除";
   deleteButton.setAttribute("aria-label", `删除${labelText.textContent}记录`);
+  deleteButton.disabled = !isStorageWritable();
   deleteButton.addEventListener("click", () => handleDelete(collectionName, record.id));
   more.append(summary, deleteButton);
   actions.append(editButton, more);
@@ -1388,7 +1477,11 @@ function describeRecord(collectionName, record) {
     ];
     detail = metrics.filter(Boolean).join(" · ");
   } else if (collectionName === "meals") {
-    detail = `${MEAL_LABELS[record.mealType]} · ${record.content}`;
+    const protein = calculateMealProteinSummary(record.foodItems, record.freeText);
+    const estimate = protein.estimatedItemCount
+      ? ` · 蛋白质约 ${formatProteinGrams(protein.estimatedProteinMilligrams)} g${protein.unestimatedItemCount ? `，另有 ${protein.unestimatedItemCount} 项未估算` : ""}`
+      : " · 蛋白质未估算";
+    detail = `${MEAL_LABELS[record.mealType]} · ${record.content}${estimate}`;
   } else if (collectionName === "sleepRecords") {
     detail = `${record.sleepTime}–${record.wakeTime} · ${formatMinutes(calculateSleepMinutes(record.sleepTime, record.wakeTime))} · 质量 ${record.qualityScore}/5`;
   } else if (collectionName === "weights") {
@@ -1458,7 +1551,13 @@ function populateWeeklyPlanOptions() {
 }
 
 function renderWeeklyPlanForm() {
-  if (!data) return;
+  for (const field of elements.weeklyPlanForm.querySelectorAll("select, button")) {
+    field.disabled = !data || !isStorageWritable();
+  }
+  if (!data) {
+    weeklyPlanBaseline = formSignature(elements.weeklyPlanForm);
+    return;
+  }
   data.weeklyTraining.forEach((type, index) => {
     elements.weeklyPlanForm.elements[`day${index}`].value = type;
   });
@@ -1468,7 +1567,7 @@ function renderWeeklyPlanForm() {
 
 function handleWeeklyPlanSubmit(event) {
   event.preventDefault();
-  if (!data) return;
+  if (!data || !isStorageWritable()) return;
   const weeklyTraining = Array.from(
     { length: 7 },
     (_, index) => event.currentTarget.elements[`day${index}`].value,
@@ -1486,8 +1585,214 @@ function handleWeeklyPlanSubmit(event) {
   }
 }
 
+function renderFoodList() {
+  elements.foodList.replaceChildren();
+  elements.addFood.disabled = !data || !isStorageWritable();
+  if (!data) {
+    elements.foodListEmpty.hidden = false;
+    elements.foodListEmpty.textContent = "当前数据不可用，恢复有效备份后才能管理食材。";
+    return;
+  }
+  elements.foodListEmpty.textContent = "还没有常用食材。";
+  elements.foodListEmpty.hidden = data.foods.length > 0;
+  data.foods.forEach((food, index) => {
+    const item = document.createElement("article");
+    item.className = "food-list-item";
+    const detail = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = food.name;
+    const meta = document.createElement("span");
+    const protein = food.proteinReference === null
+      ? "仅记录"
+      : `蛋白质 ${formatProteinGrams(food.proteinReference.proteinMilligrams)} g／${formatFoodAmount(food.proteinReference.referenceAmount, food.unit)}（${FOOD_BASIS_LABELS[food.proteinReference.basis]}）`;
+    meta.textContent = `${FOOD_CATEGORY_LABELS[food.category]} · 默认 ${formatFoodAmount(food.defaultAmount, food.unit)} · ${protein}`;
+    detail.append(name, meta);
+    const actions = document.createElement("div");
+    actions.className = "food-list-actions";
+    const up = createFoodAction("↑", `上移${food.name}`, () => moveFood(index, -1));
+    up.disabled = index === 0 || !isStorageWritable();
+    const down = createFoodAction("↓", `下移${food.name}`, () => moveFood(index, 1));
+    down.disabled = index === data.foods.length - 1 || !isStorageWritable();
+    const edit = createFoodAction("编辑", `编辑${food.name}`, () => openFoodForm(food));
+    edit.disabled = !isStorageWritable();
+    const remove = createFoodAction("删除", `删除${food.name}`, () => removeFood(food));
+    remove.classList.add("delete-food");
+    remove.disabled = !isStorageWritable();
+    actions.append(up, down, edit, remove);
+    item.append(detail, actions);
+    elements.foodList.append(item);
+  });
+}
+
+function createFoodAction(text, label, action) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = text;
+  button.setAttribute("aria-label", label);
+  button.addEventListener("click", action);
+  return button;
+}
+
+function openFoodForm(food = null) {
+  if (!data || !isStorageWritable()) return;
+  if (
+    !elements.foodForm.hidden
+    && formSignature(elements.foodForm) !== foodFormBaseline
+  ) {
+    requestDiscardConfirmation(() => {
+      resetFoodForm();
+      openFoodForm(food);
+    });
+    return;
+  }
+  elements.foodForm.reset();
+  elements.foodForm.elements.id.value = food?.id ?? "";
+  elements.foodForm.elements.name.value = food?.name ?? "";
+  elements.foodForm.elements.category.value = food?.category ?? "protein";
+  elements.foodForm.elements.defaultAmount.value = String(food?.defaultAmount ?? 100);
+  elements.foodForm.elements.unit.value = food?.unit ?? "grams";
+  elements.foodForm.elements.proteinEnabled.checked = food?.proteinReference !== null && food !== null;
+  elements.foodForm.elements.referenceAmount.value = food?.proteinReference?.referenceAmount ?? food?.defaultAmount ?? 100;
+  elements.foodForm.elements.proteinGrams.value = food?.proteinReference === null || !food
+    ? ""
+    : formatProteinGrams(food.proteinReference.proteinMilligrams);
+  elements.foodForm.elements.basis.value = food?.proteinReference?.basis ?? "cooked";
+  elements.foodForm.elements.source.value = food?.proteinReference?.source ?? "packageLabel";
+  elements.foodForm.elements.sourceNote.value = food?.proteinReference?.sourceNote ?? "";
+  elements.foodFormTitle.textContent = food ? "编辑常用食材" : "添加常用食材";
+  setInlineError(elements.foodFormError, "");
+  updateFoodProteinFields();
+  elements.foodForm.hidden = false;
+  foodFormBaseline = formSignature(elements.foodForm);
+  elements.foodForm.elements.name.focus({ preventScroll: true });
+}
+
+function updateFoodProteinFields() {
+  const enabled = elements.foodForm.elements.proteinEnabled.checked;
+  elements.foodProteinFields.hidden = !enabled;
+  for (const name of ["referenceAmount", "proteinGrams", "basis", "source"]) {
+    elements.foodForm.elements[name].required = enabled;
+  }
+}
+
+function handleFoodSubmit(event) {
+  event.preventDefault();
+  if (!data || !isStorageWritable()) return;
+  const form = event.currentTarget;
+  const existing = data.foods.find((item) => item.id === form.elements.id.value) ?? null;
+  const name = form.elements.name.value.trim();
+  if (data.foods.some((item) => item.id !== existing?.id && item.name.trim() === name)) {
+    setInlineError(elements.foodFormError, "已经存在同名常用食材");
+    return;
+  }
+  const now = new Date().toISOString();
+  const proteinReference = form.elements.proteinEnabled.checked
+    ? {
+      referenceAmount: Number(form.elements.referenceAmount.value),
+      proteinMilligrams: Math.round(Number(form.elements.proteinGrams.value) * 1_000),
+      basis: form.elements.basis.value,
+      source: form.elements.source.value,
+      sourceNote: form.elements.sourceNote.value.trim(),
+    }
+    : null;
+  const food = {
+    id: existing?.id ?? createId(),
+    name,
+    category: form.elements.category.value,
+    defaultAmount: Number(form.elements.defaultAmount.value),
+    unit: form.elements.unit.value,
+    proteinReference,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+  try {
+    const next = saveFood(data, food);
+    saveData(next);
+    data = next;
+    resetFoodForm();
+    renderFoodList();
+    renderAll();
+    showToast(existing ? "常用食材已更新，历史饮食未改变" : "常用食材已添加");
+  } catch (error) {
+    setInlineError(elements.foodFormError, error.message || "食材保存失败");
+  }
+}
+
+function closeFoodForm() {
+  if (formSignature(elements.foodForm) === foodFormBaseline) {
+    resetFoodForm();
+    return;
+  }
+  requestDiscardConfirmation(resetFoodForm);
+}
+
+function resetFoodForm() {
+  elements.foodForm.hidden = true;
+  elements.foodForm.reset();
+  setInlineError(elements.foodFormError, "");
+  foodFormBaseline = null;
+}
+
+function moveFood(index, direction) {
+  const target = index + direction;
+  if (!data || target < 0 || target >= data.foods.length) return;
+  const ids = data.foods.map((food) => food.id);
+  [ids[index], ids[target]] = [ids[target], ids[index]];
+  try {
+    const next = reorderFoods(data, ids);
+    saveData(next);
+    data = next;
+    renderFoodList();
+    renderBackupState();
+  } catch (error) {
+    showToast(error.message || "食材排序保存失败");
+  }
+}
+
+function removeFood(food) {
+  if (!data || !isStorageWritable()) return;
+  pendingFoodDeletion = food;
+  elements.deleteFoodDialogMessage.textContent = `删除“${food.name}”后，已有饮食记录中的历史快照仍会保留。`;
+  elements.deleteFoodDialog.showModal();
+}
+
+function closeDeleteFoodDialog() {
+  pendingFoodDeletion = null;
+  elements.deleteFoodDialog.close();
+}
+
+function confirmFoodDeletion() {
+  if (!data || !pendingFoodDeletion) return;
+  const food = pendingFoodDeletion;
+  try {
+    const result = deleteFood(data, food.id);
+    saveData(result.data);
+    data = result.data;
+    if (elements.foodForm.elements.id.value === food.id) resetFoodForm();
+    pendingFoodDeletion = null;
+    elements.deleteFoodDialog.close();
+    renderFoodList();
+    renderAll();
+    showToast("常用食材已删除，历史饮食未改变");
+  } catch (error) {
+    pendingFoodDeletion = null;
+    elements.deleteFoodDialog.close();
+    showToast(error.message || "食材删除失败");
+  }
+}
+
+function openFoodSettingsFromMeal() {
+  const open = () => {
+    elements.dialog.close();
+    openDataDialog();
+    openFoodForm();
+  };
+  if (getFormSignature() === formBaseline) open();
+  else requestDiscardConfirmation(open);
+}
+
 function openForm(type, explicitRecord = null) {
-  if (!data) return;
+  if (!data || !isStorageWritable()) return;
   const config = TYPE_CONFIG[type];
   let record = explicitRecord;
   if (!record && ["sleep", "weight"].includes(type)) {
@@ -1501,17 +1806,21 @@ function openForm(type, explicitRecord = null) {
   });
   const form = document.querySelector(`[data-record-form="${type}"]`);
   activeForm = form;
+  mealSelections = [];
   elements.recordDate.value = record?.date ?? selectedDate;
   elements.dialogTitle.textContent = `${record ? "编辑" : "新增"}${config.label}`;
   setFormError("");
   fillForm(type, form, record);
+  if (type === "meal") renderMealFoodPicker(record);
   updateSleepDurationPreview();
   updateWorkoutFieldState(false);
   updateWorkoutPacePreview();
   formBaseline = getFormSignature();
   elements.dialog.showModal();
-  const initialFocusTarget = form.querySelector("[data-primary-input]") ?? elements.dialogTitle;
-  initialFocusTarget.focus({ preventScroll: true });
+  const initialFocusTarget = type === "meal"
+    ? form.querySelector("[data-food-select]") ?? form.querySelector("[data-primary-input]")
+    : form.querySelector("[data-primary-input]");
+  (initialFocusTarget ?? elements.dialogTitle).focus({ preventScroll: true });
 }
 
 function fillForm(type, form, record) {
@@ -1543,10 +1852,137 @@ function fillForm(type, form, record) {
   }
 }
 
+function renderMealFoodPicker(record) {
+  mealSelections = (record?.foodItems ?? []).map((snapshot) => ({
+    sourceFoodId: snapshot.sourceFoodId,
+    snapshotId: snapshot.id,
+    food: foodFromMealSnapshot(snapshot),
+    amount: snapshot.amount,
+  }));
+  elements.mealFoodOptions.replaceChildren();
+  elements.mealFoodEmpty.hidden = data.foods.length > 0;
+  for (const food of data.foods) {
+    const label = document.createElement("label");
+    label.className = "meal-food-option";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = food.id;
+    input.dataset.foodSelect = food.id;
+    input.checked = mealSelections.some((item) => item.sourceFoodId === food.id);
+    const text = document.createElement("span");
+    text.textContent = `${food.name} · ${formatFoodAmount(food.defaultAmount, food.unit)}`;
+    input.addEventListener("change", () => toggleMealFood(food, input.checked));
+    label.append(input, text);
+    elements.mealFoodOptions.append(label);
+  }
+  renderMealSelections();
+}
+
+function toggleMealFood(food, selected) {
+  if (selected) {
+    if (!mealSelections.some((item) => item.sourceFoodId === food.id)) {
+      mealSelections.push({
+        sourceFoodId: food.id,
+        snapshotId: createId(),
+        food: structuredClone(food),
+        amount: food.defaultAmount,
+      });
+    }
+  } else {
+    mealSelections = mealSelections.filter((item) => item.sourceFoodId !== food.id);
+  }
+  renderMealSelections();
+}
+
+function renderMealSelections() {
+  elements.mealSelectedFoods.replaceChildren();
+  elements.mealSelectedFoods.hidden = mealSelections.length === 0;
+  for (const selection of mealSelections) {
+    const item = document.createElement("div");
+    item.className = "meal-selected-item";
+    const detail = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = selection.food.name;
+    const meta = document.createElement("span");
+    meta.textContent = selection.food.proteinReference === null
+      ? `${FOOD_CATEGORY_LABELS[selection.food.category]} · 暂无蛋白质参考值`
+      : `${FOOD_CATEGORY_LABELS[selection.food.category]} · ${FOOD_BASIS_LABELS[selection.food.proteinReference.basis]}参考值`;
+    detail.append(name, meta);
+    const amountLabel = document.createElement("label");
+    amountLabel.textContent = `本次份量（${FOOD_UNIT_LABELS[selection.food.unit]}）`;
+    const amount = document.createElement("input");
+    amount.type = "number";
+    amount.min = "1";
+    amount.max = "100000";
+    amount.step = "1";
+    amount.inputMode = "numeric";
+    amount.value = String(selection.amount);
+    amount.dataset.mealFoodAmount = selection.sourceFoodId;
+    amount.addEventListener("input", () => {
+      selection.amount = Number(amount.value);
+      renderMealProteinPreview();
+    });
+    amountLabel.append(amount);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "meal-remove-food";
+    remove.textContent = "移除";
+    remove.setAttribute("aria-label", `移除${selection.food.name}`);
+    remove.addEventListener("click", () => {
+      mealSelections = mealSelections.filter(
+        (item) => item.sourceFoodId !== selection.sourceFoodId,
+      );
+      const checkbox = elements.mealFoodOptions.querySelector(
+        `[data-food-select="${selection.sourceFoodId}"]`,
+      );
+      if (checkbox) checkbox.checked = false;
+      renderMealSelections();
+    });
+    item.append(detail, amountLabel, remove);
+    elements.mealSelectedFoods.append(item);
+  }
+  renderMealProteinPreview();
+}
+
+function renderMealProteinPreview() {
+  let estimatedProteinMilligrams = 0;
+  let estimatedItemCount = 0;
+  let unestimatedItemCount = 0;
+  try {
+    for (const selection of mealSelections) {
+      const value = calculateFoodProteinMilligrams(
+        selection.food,
+        selection.amount,
+        selection.food.unit,
+      );
+      if (value === null) unestimatedItemCount += 1;
+      else {
+        estimatedItemCount += 1;
+        estimatedProteinMilligrams += value;
+      }
+    }
+  } catch {
+    elements.mealProteinPreview.textContent = "请填写有效的整数份量后再保存";
+    return;
+  }
+  const hasFreeText = editing?.type === "meal"
+    && Boolean(activeForm?.elements.freeText.value.trim());
+  if (!estimatedItemCount) {
+    elements.mealProteinPreview.textContent = mealSelections.length || hasFreeText
+      ? "当前已填内容暂无蛋白质估算"
+      : "尚未选择可估算蛋白质的食材";
+    return;
+  }
+  elements.mealProteinPreview.textContent = `本餐已估算蛋白质 ${formatProteinGrams(estimatedProteinMilligrams)} g${
+    unestimatedItemCount || hasFreeText ? "，另有食材或文字未估算" : ""
+  }`;
+}
+
 function handleFormInput(event) {
   if (editing?.type === "workout" && ["type", "source"].includes(event?.target?.name)) {
     updateWorkoutFieldState(true);
   }
+  if (editing?.type === "meal") renderMealProteinPreview();
   updateSleepDurationPreview();
   updateWorkoutPacePreview();
 }
@@ -1612,7 +2048,9 @@ function setInlineError(element, message) {
 function getFormSignature() {
   if (!activeForm) return "";
   const fields = [elements.recordDate, ...activeForm.querySelectorAll("input, select, textarea")];
-  const value = fields.map((field) => `${field.name || field.id}:${field.value}`).join("|");
+  const value = fields.map((field) => `${field.name || field.id}:${
+    field.type === "checkbox" ? field.checked : field.value
+  }`).join("|");
   return value;
 }
 
@@ -1643,12 +2081,16 @@ function requestDiscardConfirmation(action) {
 }
 
 function requestCloseDataDialog() {
-  if (formSignature(elements.weeklyPlanForm) === weeklyPlanBaseline) {
+  const weeklyDirty = formSignature(elements.weeklyPlanForm) !== weeklyPlanBaseline;
+  const foodDirty = !elements.foodForm.hidden
+    && formSignature(elements.foodForm) !== foodFormBaseline;
+  if (!weeklyDirty && !foodDirty) {
     elements.dataDialog.close();
     return;
   }
   requestDiscardConfirmation(() => {
     weeklyPlanBaseline = null;
+    resetFoodForm();
     elements.dataDialog.close();
   });
 }
@@ -1708,12 +2150,19 @@ function buildRecord(type, form, base) {
     };
   }
   if (type === "meal") {
-    const content = form.elements.content.value.trim();
-    if (!content) throw new TypeError("请填写饮食内容");
+    const foodItems = mealSelections.map((selection) => createMealFoodSnapshot(
+      selection.food,
+      selection.amount,
+      selection.snapshotId,
+    ));
+    const freeText = form.elements.freeText.value.trim();
+    const content = buildMealContent(foodItems, freeText);
     return {
       ...base,
       mealType: form.elements.mealType.value,
       content,
+      freeText,
+      foodItems,
     };
   }
   if (type === "sleep") {
@@ -1739,6 +2188,7 @@ function buildRecord(type, form, base) {
 }
 
 function handleDelete(collectionName, recordId) {
+  if (!isStorageWritable()) return;
   try {
     const previousData = data;
     const result = deleteRecord(data, collectionName, recordId);
@@ -1784,7 +2234,10 @@ function setFormError(message) {
 
 function downloadCorruptData() {
   if (!storageState.raw) return;
-  downloadText(storageState.raw, `healthlife-corrupt-${localDateString(new Date())}.json`);
+  const prefix = storageState.status === "migrationFailed"
+    ? "healthlife-v10-before-migration"
+    : "healthlife-corrupt";
+  downloadText(storageState.raw, `${prefix}-${localDateString(new Date())}.json`);
 }
 
 function openDataDialog() {
@@ -1793,6 +2246,8 @@ function openDataDialog() {
   elements.importPreview.hidden = true;
   setImportError("");
   renderBackupState();
+  resetFoodForm();
+  renderFoodList();
   renderWeeklyPlanForm();
   elements.dataDialog.showModal();
   elements.closeDataDialog.focus();
@@ -1859,7 +2314,8 @@ function renderImportPreview() {
     ? `${summary.firstDate} 至 ${summary.lastDate}`
     : "空账本";
   elements.importTotal.textContent = `${summary.totalRecords} 条`;
-  elements.importCounts.textContent = `运动 ${summary.counts.workouts}、饮食 ${summary.counts.meals}、睡眠 ${summary.counts.sleepRecords}、体重 ${summary.counts.weights}；每周模板：${summary.weeklyTraining.map((type) => TRAINING_PLAN_LABELS[type]).join("、")}`;
+  const migrationLabel = pendingImport.sourceBackupVersion === 10 ? "；将安全升级 v10 备份" : "";
+  elements.importCounts.textContent = `运动 ${summary.counts.workouts}、饮食 ${summary.counts.meals}、睡眠 ${summary.counts.sleepRecords}、体重 ${summary.counts.weights}；常用食材 ${summary.foodCount}、健康阶段 ${summary.healthStageCount}；每周模板：${summary.weeklyTraining.map((type) => TRAINING_PLAN_LABELS[type]).join("、")}${migrationLabel}`;
   const currentCount = data ? summarizeData(data).totalRecords : 0;
   const restoreLabel = getRestoreLabel(currentCount, summary.totalRecords);
   elements.importReplaceSummary.textContent = restoreLabel.summary;
@@ -1871,9 +2327,13 @@ function confirmImport() {
   if (!pendingImport) return;
   const now = new Date().toISOString();
   try {
-    const hasTemplateChanges = data
-      && JSON.stringify(data.weeklyTraining) !== JSON.stringify(createEmptyData().weeklyTraining);
-    if (data && (summarizeData(data).totalRecords > 0 || hasTemplateChanges)) {
+    const defaults = createEmptyData();
+    const hasSettingsChanges = data && (
+      data.foods.length > 0
+      || data.healthStages.length > 0
+      || JSON.stringify(data.weeklyTraining) !== JSON.stringify(defaults.weeklyTraining)
+    );
+    if (data && (summarizeData(data).totalRecords > 0 || hasSettingsChanges)) {
       downloadText(
         serializeCompleteBackup(data, now),
         `healthlife-before-restore-${localDateString(new Date())}.json`,
@@ -1883,7 +2343,13 @@ function confirmImport() {
     }
     saveData(pendingImport.backup.data);
     data = pendingImport.backup.data;
-    storageState = { status: "ready", data, raw: null, error: null };
+    storageState = {
+      status: "ready",
+      data,
+      raw: null,
+      error: null,
+      migratedFromVersion: null,
+    };
     backupMetadata = createBackupMetadata(now, data);
     try {
       saveBackupMetadata(backupMetadata);
