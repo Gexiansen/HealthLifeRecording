@@ -345,9 +345,31 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .inline-error { margin-right: 0; margin-left: 0; }
 .secondary-wide-button { width: 100%; min-height: 46px; margin-top: 8px; border: 1px solid var(--line); border-radius: 13px; background: white; color: var(--primary-dark); font-weight: 750; }
 .form-error { margin: 0 18px 12px; border-radius: 10px; background: #fff0ed; color: var(--danger); padding: 10px 12px; font-size: 14px; }
-.data-dialog-body { padding: 0 18px 20px; }
+.settings-dialog { height: min(760px, calc(100dvh - 24px - env(safe-area-inset-bottom, 0px))); overflow: hidden; background: white; }
+.settings-dialog[open] { display: flex; flex-direction: column; }
+.settings-dialog-header { position: static; display: grid; flex: 0 0 auto; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 10px; padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+.settings-dialog-header > div { min-width: 0; }
+.settings-dialog-header h2 { font-size: 22px; }
+.settings-dialog-header .eyebrow { margin-bottom: 2px; }
+.settings-back[aria-hidden="true"] { visibility: hidden; }
+.settings-dialog-body { flex: 1; min-height: 0; overflow-y: auto; background: var(--canvas); padding: 10px 14px max(16px, env(safe-area-inset-bottom, 0px)); overscroll-behavior: contain; }
+.settings-view { display: grid; gap: 10px; }
+.settings-card { border: 1px solid var(--line); border-radius: 16px; background: white; padding: 11px 12px; }
+.settings-card .eyebrow { margin-bottom: 2px; color: var(--muted); }
+.settings-card h3 { margin-bottom: 5px; }
+.settings-card .data-help { margin-bottom: 8px; line-height: 1.45; }
+.settings-card .primary-button, .settings-card .secondary-wide-button { margin-top: 0; }
+.settings-navigation-list { display: grid; }
+.settings-navigation-button { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 52px; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--ink); padding: 7px 2px; text-align: left; }
+.settings-navigation-list .settings-navigation-button:first-child { border-top: 0; }
+.settings-navigation-button strong, .settings-navigation-button small { display: block; }
+.settings-navigation-button strong { font-size: 14px; }
+.settings-navigation-button small { margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+.settings-chevron { color: var(--muted); font-size: 24px; line-height: 1; }
+.settings-backup-card .settings-navigation-button { margin-top: 6px; border: 1px solid var(--line); border-radius: 12px; background: #f8faf7; padding: 7px 10px; }
 .data-section { border-top: 1px solid var(--line); padding: 16px 0; }
 .data-section:first-child { border-top: 0; padding-top: 6px; }
+.settings-view .settings-secondary-section { border: 1px solid var(--line); border-radius: 18px; background: white; padding: 16px; }
 .data-section h3 { margin-bottom: 8px; }
 .data-section-heading { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
 .data-section-heading .data-help { margin-bottom: 10px; }
@@ -476,6 +498,12 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (max-width: 559px) {
+  .settings-dialog { position: fixed; inset: 0; width: 100%; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+  .settings-dialog-header { padding: max(10px, env(safe-area-inset-top, 0px)) 14px 8px; }
+  .settings-dialog-body { padding: 8px 12px max(12px, env(safe-area-inset-bottom, 0px)); }
+  .settings-home { gap: 8px; }
+  .settings-card { padding: 10px 11px; }
+  .settings-card .data-help { margin-bottom: 7px; }
   .food-dialog { position: fixed; top: var(--food-dialog-top, 0px); right: 0; bottom: auto; left: 0; width: 100%; height: 100dvh; height: var(--food-dialog-height, 100dvh); max-height: var(--food-dialog-height, 100dvh); margin: 0; border-radius: 0; }
   .food-dialog-header { padding: max(10px, env(safe-area-inset-top, 0px)) 14px 8px; }
   .food-dialog-header h2 { font-size: 20px; }

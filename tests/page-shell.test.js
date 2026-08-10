@@ -137,6 +137,58 @@ test("常用食材新增和编辑使用独立二级弹窗，不再展开在设�
   assert.match(styles, /@media \(max-width:\s*559px\)[\s\S]*\.food-dialog[^{]*\{[^}]*height:\s*100dvh/);
 });
 
+test("设置首页按完整备份、恢复和分析导出的优先级组织高频操作", () => {
+  const homeStart = html.indexOf('id="settings-home"');
+  const restoreStart = html.indexOf('id="settings-restore"');
+  assert.ok(homeStart >= 0);
+  assert.ok(restoreStart > homeStart);
+  const home = html.slice(homeStart, restoreStart);
+  const orderedIds = [
+    "backup-status",
+    "export-backup",
+    "open-restore-settings",
+    "export-analysis",
+    "open-food-settings",
+    "open-weekly-settings",
+    "open-app-settings",
+  ];
+  let previousIndex = -1;
+  for (const id of orderedIds) {
+    const currentIndex = home.indexOf(`id="${id}"`);
+    assert.ok(currentIndex > previousIndex, `${id} 应按首页优先级出现`);
+    previousIndex = currentIndex;
+  }
+  assert.doesNotMatch(home, /id="import-file"|id="weekly-plan-form"|id="food-list"/);
+  for (const view of ["restore", "foods", "weekly", "app"]) {
+    assert.match(html, new RegExp(`id="settings-${view}"[^>]*data-settings-view="${view}" hidden`));
+  }
+});
+
+test("设置二级页面保留返回、未保存保护和恢复备份安全流程", () => {
+  for (const id of [
+    "settings-back",
+    "settings-restore",
+    "settings-foods",
+    "settings-weekly",
+    "settings-app",
+  ]) assert.match(html, new RegExp(`id="${id}"`));
+  const restore = html.slice(
+    html.indexOf('id="settings-restore"'),
+    html.indexOf('id="settings-foods"'),
+  );
+  for (const id of ["import-file", "import-preview", "confirm-import"]) {
+    assert.match(restore, new RegExp(`id="${id}"`));
+  }
+  assert.match(restore, /id="confirm-import" class="danger-button"/);
+  assert.match(app, /function openSettingsView\(viewName\)/);
+  assert.match(app, /function requestSettingsBack\(\)[\s\S]*settingsView === "weekly" && isWeeklyPlanDirty\(\)/);
+  assert.match(app, /function requestSettingsDismiss\(\)[\s\S]*requestSettingsBack\(\)/);
+  assert.match(app, /elements\.dataDialog\.addEventListener\("cancel"[\s\S]*requestSettingsDismiss\(\)/);
+  assert.match(app, /openDataDialog\("foods"\);\s*openFoodForm\(\);/);
+  assert.match(styles, /\.settings-navigation-button[^{]*\{[^}]*min-height:\s*52px/);
+  assert.match(styles, /@media \(max-width:\s*559px\)[\s\S]*\.settings-dialog[^{]*\{[^}]*height:\s*100dvh/);
+});
+
 test("常用食材表单使用紧凑字段组，并随输入法自动保持当前输入可见", () => {
   assert.match(html, /class="food-basics-grid"/);
   assert.match(html, /class="food-protein-reference"/);

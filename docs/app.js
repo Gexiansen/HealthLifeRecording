@@ -2,7 +2,7 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=29";
+} from "./model.js?v=30";
 import {
   allRecordsByDate,
   deleteFood,
@@ -14,7 +14,7 @@ import {
   saveFoodWithProteinHistory,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=29";
+} from "./data.js?v=30";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -26,22 +26,22 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=29";
+} from "./storage.js?v=30";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=29";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=29";
+} from "./calendar.js?v=30";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=30";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=29";
+} from "./backup.js?v=30";
 import {
   calculatePaceSecondsPerKilometer,
   calculateVisibilityScroll,
@@ -52,8 +52,8 @@ import {
   getDefaultWorkoutScenario,
   getLatestWorkoutForScenario,
   getRestoreLabel,
-} from "./interaction.js?v=29";
-import { serializeAnalysisExport } from "./analysis.js?v=29";
+} from "./interaction.js?v=30";
+import { serializeAnalysisExport } from "./analysis.js?v=30";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -71,12 +71,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=29";
+} from "./guided-workout.js?v=30";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=29";
+} from "./training-insights.js?v=30";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -86,7 +86,7 @@ import {
   foodFromMealSnapshot,
   formatFoodAmount,
   formatProteinGrams,
-} from "./nutrition.js?v=29";
+} from "./nutrition.js?v=30";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -154,6 +154,14 @@ const FOOD_BASIS_LABELS = Object.freeze({
   packaged: "包装份量",
 });
 
+const SETTINGS_VIEW_CONFIG = Object.freeze({
+  home: { kicker: "本地数据与管理", title: "设置" },
+  restore: { kicker: "数据安全", title: "恢复完整备份" },
+  foods: { kicker: "饮食快捷记录", title: "常用食材" },
+  weekly: { kicker: "训练推荐", title: "每周训练模板" },
+  app: { kicker: "应用", title: "安装与更新" },
+});
+
 let storageState = loadData();
 let data = storageState.data;
 let backupMetadata = loadBackupMetadata();
@@ -170,6 +178,7 @@ let formBaseline = null;
 let installPromptEvent = null;
 let pendingDiscardAction = null;
 let weeklyPlanBaseline = null;
+let settingsView = "home";
 let foodFormBaseline = null;
 let foodDialogViewportBaseline = null;
 let foodVisibilityFrame = null;
@@ -268,10 +277,19 @@ const elements = {
   toastMessage: document.querySelector("#toast-message"),
   undoButton: document.querySelector("#undo-button"),
   dataDialog: document.querySelector("#data-dialog"),
+  dataDialogTitle: document.querySelector("#data-dialog-title"),
+  settingsKicker: document.querySelector("#settings-kicker"),
+  settingsBack: document.querySelector("#settings-back"),
+  settingsDialogBody: document.querySelector("#settings-dialog-body"),
+  settingsViews: document.querySelectorAll("[data-settings-view]"),
   closeDataDialog: document.querySelector("#close-data-dialog"),
   backupStatus: document.querySelector("#backup-status"),
   exportBackup: document.querySelector("#export-backup"),
   exportAnalysis: document.querySelector("#export-analysis"),
+  openRestoreSettings: document.querySelector("#open-restore-settings"),
+  openFoodSettings: document.querySelector("#open-food-settings"),
+  openWeeklySettings: document.querySelector("#open-weekly-settings"),
+  openAppSettings: document.querySelector("#open-app-settings"),
   importFile: document.querySelector("#import-file"),
   importError: document.querySelector("#import-error"),
   importPreview: document.querySelector("#import-preview"),
@@ -386,7 +404,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=29").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=30").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -441,11 +459,16 @@ function bindEvents() {
   elements.discardChanges.addEventListener("click", discardFormChanges);
   elements.undoButton.addEventListener("click", undoLastChange);
   elements.downloadRaw.addEventListener("click", downloadCorruptData);
-  elements.openData.addEventListener("click", openDataDialog);
-  elements.openDataReminder.addEventListener("click", openDataDialog);
+  elements.openData.addEventListener("click", () => openDataDialog("home"));
+  elements.openDataReminder.addEventListener("click", () => openDataDialog("home"));
+  elements.settingsBack.addEventListener("click", requestSettingsBack);
   elements.closeDataDialog.addEventListener("click", requestCloseDataDialog);
   elements.exportBackup.addEventListener("click", exportCompleteBackup);
   elements.exportAnalysis.addEventListener("click", exportAnalysisData);
+  elements.openRestoreSettings.addEventListener("click", () => openSettingsView("restore"));
+  elements.openFoodSettings.addEventListener("click", () => openSettingsView("foods"));
+  elements.openWeeklySettings.addEventListener("click", () => openSettingsView("weekly"));
+  elements.openAppSettings.addEventListener("click", () => openSettingsView("app"));
   elements.importFile.addEventListener("change", handleImportFile);
   elements.confirmImport.addEventListener("click", confirmImport);
   elements.installApp.addEventListener("click", installApp);
@@ -493,7 +516,14 @@ function bindEvents() {
     event.preventDefault();
     closeGuidedWorkout();
   });
-  bindGuardedDialog(elements.dataDialog, requestCloseDataDialog);
+  elements.dataDialog.addEventListener("click", (event) => {
+    if (event.target === elements.dataDialog) requestSettingsDismiss();
+  });
+  elements.dataDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    requestSettingsDismiss();
+  });
+  elements.dataDialog.addEventListener("close", resetSettingsDialog);
   bindGuardedDialog(elements.foodDialog, closeFoodForm);
   window.visualViewport?.addEventListener("resize", syncFoodDialogViewport);
   window.visualViewport?.addEventListener("scroll", syncFoodDialogViewport);
@@ -2036,7 +2066,7 @@ function confirmFoodDeletion() {
 function openFoodSettingsFromMeal() {
   const open = () => {
     elements.dialog.close();
-    openDataDialog();
+    openDataDialog("foods");
     openFoodForm();
   };
   if (getFormSignature() === formBaseline) open();
@@ -2419,16 +2449,42 @@ function requestDiscardConfirmation(action) {
   if (!elements.discardDialog.open) elements.discardDialog.showModal();
 }
 
+function isWeeklyPlanDirty() {
+  return weeklyPlanBaseline !== null
+    && formSignature(elements.weeklyPlanForm) !== weeklyPlanBaseline;
+}
+
+function discardWeeklyPlanChanges(action) {
+  requestDiscardConfirmation(() => {
+    renderWeeklyPlanForm();
+    action();
+  });
+}
+
+function requestSettingsBack() {
+  if (settingsView === "home") {
+    requestCloseDataDialog();
+    return;
+  }
+  const returnHome = () => openSettingsView("home");
+  if (settingsView === "weekly" && isWeeklyPlanDirty()) {
+    discardWeeklyPlanChanges(returnHome);
+    return;
+  }
+  returnHome();
+}
+
+function requestSettingsDismiss() {
+  if (settingsView === "home") requestCloseDataDialog();
+  else requestSettingsBack();
+}
+
 function requestCloseDataDialog() {
-  const weeklyDirty = formSignature(elements.weeklyPlanForm) !== weeklyPlanBaseline;
-  if (!weeklyDirty) {
+  if (!isWeeklyPlanDirty()) {
     elements.dataDialog.close();
     return;
   }
-  requestDiscardConfirmation(() => {
-    weeklyPlanBaseline = null;
-    elements.dataDialog.close();
-  });
+  discardWeeklyPlanChanges(() => elements.dataDialog.close());
 }
 
 function bindGuardedDialog(dialog, close) {
@@ -2622,7 +2678,41 @@ function downloadCorruptData() {
   downloadText(storageState.raw, `${prefix}-${localDateString(new Date())}.json`);
 }
 
-function openDataDialog() {
+function openSettingsView(viewName) {
+  const nextView = Object.hasOwn(SETTINGS_VIEW_CONFIG, viewName) ? viewName : "home";
+  const config = SETTINGS_VIEW_CONFIG[nextView];
+  settingsView = nextView;
+  elements.settingsViews.forEach((view) => {
+    view.hidden = view.dataset.settingsView !== nextView;
+  });
+  elements.settingsKicker.textContent = config.kicker;
+  elements.dataDialogTitle.textContent = config.title;
+  const isHome = nextView === "home";
+  elements.settingsBack.disabled = isHome;
+  elements.settingsBack.setAttribute("aria-hidden", String(isHome));
+  elements.settingsDialogBody.scrollTop = 0;
+  if (nextView === "foods") renderFoodList();
+  if (nextView === "weekly") renderWeeklyPlanForm();
+  requestAnimationFrame(() => elements.dataDialogTitle.focus({ preventScroll: true }));
+}
+
+function resetSettingsDialog() {
+  settingsView = "home";
+  pendingImport = null;
+  elements.importFile.value = "";
+  elements.importPreview.hidden = true;
+  setImportError("");
+  weeklyPlanBaseline = null;
+  elements.settingsViews.forEach((view) => {
+    view.hidden = view.dataset.settingsView !== "home";
+  });
+  elements.settingsKicker.textContent = SETTINGS_VIEW_CONFIG.home.kicker;
+  elements.dataDialogTitle.textContent = SETTINGS_VIEW_CONFIG.home.title;
+  elements.settingsBack.disabled = true;
+  elements.settingsBack.setAttribute("aria-hidden", "true");
+}
+
+function openDataDialog(initialView = "home") {
   pendingImport = null;
   elements.importFile.value = "";
   elements.importPreview.hidden = true;
@@ -2631,8 +2721,8 @@ function openDataDialog() {
   resetFoodForm();
   renderFoodList();
   renderWeeklyPlanForm();
-  elements.dataDialog.showModal();
-  elements.closeDataDialog.focus();
+  if (!elements.dataDialog.open) elements.dataDialog.showModal();
+  openSettingsView(initialView);
 }
 
 function exportCompleteBackup() {
@@ -2708,6 +2798,7 @@ function renderImportPreview() {
 function confirmImport() {
   if (!pendingImport) return;
   const now = new Date().toISOString();
+  const restoredRecordCount = pendingImport.summary.totalRecords;
   try {
     const defaults = createEmptyData();
     const hasSettingsChanges = data && (
@@ -2738,11 +2829,11 @@ function confirmImport() {
     } catch {
       backupMetadata = null;
     }
-    elements.dataDialog.close();
     renderStorageState();
     renderAll();
-    showToast(`已恢复 ${pendingImport.summary.totalRecords} 条记录`);
+    showToast(`已恢复 ${restoredRecordCount} 条记录`);
     pendingImport = null;
+    elements.dataDialog.close();
   } catch (error) {
     setImportError(error.message || "恢复失败，当前数据未改变");
   }
