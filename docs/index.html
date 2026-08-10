@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=28">
+    <link rel="manifest" href="./manifest.webmanifest?v=29">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=28">
+    <link rel="stylesheet" href="./styles.css?v=29">
   </head>
   <body>
     <header class="app-header">
@@ -418,6 +418,34 @@
       </div>
     </dialog>
 
+    <dialog id="food-history-dialog" aria-labelledby="food-history-dialog-title">
+      <div class="confirm-dialog-body food-history-dialog-body">
+        <h2 id="food-history-dialog-title">如何处理历史估算？</h2>
+        <p id="food-history-dialog-message"></p>
+        <dl class="food-history-impact">
+          <div><dt>历史范围</dt><dd id="food-history-range"></dd></div>
+          <div><dt>估算变化</dt><dd id="food-history-estimate"></dd></div>
+        </dl>
+        <fieldset class="food-history-choice">
+          <legend>选择本次保存方式</legend>
+          <label>
+            <input name="foodHistoryMode" type="radio" value="future" checked>
+            <span><strong>仅影响以后记录</strong><small>保留所有历史快照不变</small></span>
+          </label>
+          <label id="food-history-sync-option">
+            <input id="food-history-sync" name="foodHistoryMode" type="radio" value="history">
+            <span><strong>同步修正历史估算</strong><small id="food-history-sync-summary"></small></span>
+          </label>
+        </fieldset>
+        <p id="food-history-warning" class="food-history-warning" hidden></p>
+        <p id="food-history-error" class="form-error inline-error" role="alert" hidden></p>
+        <div>
+          <button id="cancel-food-history" class="secondary-neutral-button" type="button">返回修改</button>
+          <button id="confirm-food-history" class="primary-button" type="button">确认保存</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog id="data-dialog" aria-labelledby="data-dialog-title">
       <div class="dialog-header">
         <div>
@@ -529,6 +557,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=28"></script>
+    <script type="module" src="./app.js?v=29"></script>
   </body>
 </html>

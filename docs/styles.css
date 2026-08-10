@@ -400,6 +400,21 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .confirm-dialog-body p { margin: 10px 0 20px; color: var(--muted); line-height: 1.55; }
 .confirm-dialog-body > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .secondary-neutral-button { min-height: 46px; border: 1px solid var(--line); border-radius: 13px; background: white; color: var(--ink); font-weight: 750; }
+.food-history-dialog-body { padding: 20px; }
+.food-history-dialog-body > p { margin-bottom: 14px; }
+.food-history-impact { display: grid; gap: 7px; margin: 0 0 14px; border-radius: 13px; background: #f8faf7; padding: 10px 12px; }
+.food-history-impact div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; font-size: 13px; line-height: 1.45; }
+.food-history-impact dt { color: var(--muted); }
+.food-history-impact dd { margin: 0; color: var(--ink); font-weight: 750; }
+.food-history-choice { display: grid; gap: 8px; margin: 0 0 12px; border: 0; padding: 0; }
+.food-history-choice legend { margin-bottom: 7px; color: var(--ink); font-size: 13px; font-weight: 800; }
+.food-history-choice label { display: flex; align-items: center; gap: 10px; min-height: 58px; border: 1px solid var(--line); border-radius: 13px; background: white; padding: 8px 10px; }
+.food-history-choice input { flex: 0 0 auto; width: 22px; min-height: 22px; margin: 0; accent-color: var(--primary); }
+.food-history-choice strong, .food-history-choice small { display: block; }
+.food-history-choice small { margin-top: 3px; color: var(--muted); line-height: 1.4; }
+.food-history-choice label.disabled { opacity: .58; }
+.food-history-warning { border-radius: 11px; background: #fff1d8; color: #654a12 !important; padding: 9px 11px; font-size: 13px; }
+.food-history-dialog-body .form-error { margin: 0 0 12px; }
 
 .guided-workout-dialog { width: min(100%, 560px); height: 100dvh; max-height: 100dvh; border-radius: 0; background: var(--canvas); }
 .guided-workout-shell { min-height: 100%; padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }

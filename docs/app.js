@@ -2,17 +2,19 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=28";
+} from "./model.js?v=29";
 import {
   allRecordsByDate,
   deleteFood,
   deleteRecord,
   findDailyRecord,
+  getFoodProteinHistoryImpact,
   reorderFoods,
   saveFood,
+  saveFoodWithProteinHistory,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=28";
+} from "./data.js?v=29";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -24,22 +26,22 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=28";
+} from "./storage.js?v=29";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=28";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=28";
+} from "./calendar.js?v=29";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=29";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=28";
+} from "./backup.js?v=29";
 import {
   calculatePaceSecondsPerKilometer,
   calculateVisibilityScroll,
@@ -50,8 +52,8 @@ import {
   getDefaultWorkoutScenario,
   getLatestWorkoutForScenario,
   getRestoreLabel,
-} from "./interaction.js?v=28";
-import { serializeAnalysisExport } from "./analysis.js?v=28";
+} from "./interaction.js?v=29";
+import { serializeAnalysisExport } from "./analysis.js?v=29";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -69,12 +71,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=28";
+} from "./guided-workout.js?v=29";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=28";
+} from "./training-insights.js?v=29";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -84,7 +86,7 @@ import {
   foodFromMealSnapshot,
   formatFoodAmount,
   formatProteinGrams,
-} from "./nutrition.js?v=28";
+} from "./nutrition.js?v=29";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -173,6 +175,7 @@ let foodDialogViewportBaseline = null;
 let foodVisibilityFrame = null;
 let mealSelections = [];
 let pendingFoodDeletion = null;
+let pendingFoodSave = null;
 let workoutDraftState = loadWorkoutDraft();
 let workoutDraft = workoutDraftState.draft;
 let workoutUndoState = loadWorkoutUndoHistory(workoutDraft);
@@ -299,6 +302,17 @@ const elements = {
   deleteFoodDialogMessage: document.querySelector("#delete-food-dialog-message"),
   cancelDeleteFood: document.querySelector("#cancel-delete-food"),
   confirmDeleteFood: document.querySelector("#confirm-delete-food"),
+  foodHistoryDialog: document.querySelector("#food-history-dialog"),
+  foodHistoryDialogMessage: document.querySelector("#food-history-dialog-message"),
+  foodHistoryRange: document.querySelector("#food-history-range"),
+  foodHistoryEstimate: document.querySelector("#food-history-estimate"),
+  foodHistorySyncOption: document.querySelector("#food-history-sync-option"),
+  foodHistorySync: document.querySelector("#food-history-sync"),
+  foodHistorySyncSummary: document.querySelector("#food-history-sync-summary"),
+  foodHistoryWarning: document.querySelector("#food-history-warning"),
+  foodHistoryError: document.querySelector("#food-history-error"),
+  cancelFoodHistory: document.querySelector("#cancel-food-history"),
+  confirmFoodHistory: document.querySelector("#confirm-food-history"),
   guidedWorkoutDialog: document.querySelector("#guided-workout-dialog"),
   guidedWorkoutTitle: document.querySelector("#guided-workout-title"),
   closeGuidedWorkout: document.querySelector("#close-guided-workout"),
@@ -372,7 +386,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=28").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=29").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -425,7 +439,7 @@ function bindEvents() {
     elements.discardDialog.close();
   });
   elements.discardChanges.addEventListener("click", discardFormChanges);
-  elements.undoButton.addEventListener("click", undoDelete);
+  elements.undoButton.addEventListener("click", undoLastChange);
   elements.downloadRaw.addEventListener("click", downloadCorruptData);
   elements.openData.addEventListener("click", openDataDialog);
   elements.openDataReminder.addEventListener("click", openDataDialog);
@@ -450,6 +464,15 @@ function bindEvents() {
   elements.deleteFoodDialog.addEventListener("cancel", (event) => {
     event.preventDefault();
     closeDeleteFoodDialog();
+  });
+  elements.cancelFoodHistory.addEventListener("click", closeFoodHistoryDialog);
+  elements.confirmFoodHistory.addEventListener("click", confirmFoodHistorySave);
+  elements.foodHistoryDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeFoodHistoryDialog();
+  });
+  elements.foodHistoryDialog.addEventListener("click", (event) => {
+    if (event.target === elements.foodHistoryDialog) closeFoodHistoryDialog();
   });
   elements.startGuidedWorkout.addEventListener("click", openGuidedWorkout);
   elements.repeatLastWorkout.addEventListener("click", repeatLastWorkout);
@@ -1828,15 +1851,116 @@ function handleFoodSubmit(event) {
   };
   try {
     const next = saveFood(data, food);
-    saveData(next);
-    data = next;
-    resetFoodForm();
-    renderFoodList();
-    renderAll();
-    showToast(existing ? "常用食材已更新，历史饮食未改变" : "常用食材已添加");
+    const impact = existing === null ? null : getFoodProteinHistoryImpact(data, food);
+    if (impact !== null) {
+      pendingFoodSave = {
+        previousData: data,
+        futureData: next,
+        food,
+        impact,
+      };
+      renderFoodHistoryDialog(impact, food.name);
+      elements.foodHistoryDialog.showModal();
+      return;
+    }
+    persistFoodSave(next, existing ? "常用食材已更新" : "常用食材已添加");
   } catch (error) {
     setInlineError(elements.foodFormError, error.message || "食材保存失败");
   }
+}
+
+function renderFoodHistoryDialog(impact, foodName) {
+  const historyRange = formatDateRange(impact.historyStartDate, impact.historyEndDate);
+  const syncRange = formatDateRange(impact.syncStartDate, impact.syncEndDate);
+  elements.foodHistoryDialogMessage.textContent = `检测到 ${impact.historyMealCount} 餐历史记录使用“${foodName}”。如果这次是在纠正原参考值，可以主动同步；如果食材本身变了，请只影响以后。`;
+  elements.foodHistoryRange.textContent = `${historyRange}，共 ${impact.historyMealCount} 餐`;
+  elements.foodHistoryEstimate.textContent = impact.syncAllowed
+    ? `${formatProteinEstimate(impact.previousEstimatedMealCount, impact.previousProteinMilligrams)} → ${formatProteinEstimate(impact.nextEstimatedMealCount, impact.nextProteinMilligrams)}`
+    : "单位或口径变化，无法安全预览批量结果";
+  elements.foodHistoryDialog.querySelector('[name="foodHistoryMode"][value="future"]').checked = true;
+  elements.foodHistorySync.disabled = !impact.syncAllowed;
+  elements.foodHistorySyncOption.classList.toggle("disabled", !impact.syncAllowed);
+  elements.foodHistorySyncSummary.textContent = impact.syncAllowed
+    ? `修正 ${impact.eligibleMealCount} 餐（${syncRange}）${impact.skippedMealCount ? `，另有 ${impact.skippedMealCount} 餐口径不兼容` : ""}`
+    : "当前变更不能安全批量应用到历史记录";
+  const warning = getFoodHistoryWarning(impact);
+  elements.foodHistoryWarning.textContent = warning;
+  elements.foodHistoryWarning.hidden = !warning;
+  setInlineError(elements.foodHistoryError, "");
+}
+
+function getFoodHistoryWarning(impact) {
+  if (impact.blockedReason === "unitChanged") {
+    return "食材单位发生变化，历史份量不能静默换算。请只影响以后；如果这是另一种食材形式，建议新建食材。";
+  }
+  if (impact.blockedReason === "basisChanged") {
+    return "生重、熟重或其他计算口径发生变化，不能批量回算历史。请只影响以后；如果这是另一种食材形式，建议新建食材。";
+  }
+  if (impact.blockedReason === "incompatibleHistory") {
+    return "已有快照的单位或口径与新参考值不一致，无法批量修正。";
+  }
+  if (impact.skippedMealCount > 0) {
+    return `另有 ${impact.skippedMealCount} 餐历史快照的单位或口径不同，将继续保留原值。`;
+  }
+  return "";
+}
+
+function confirmFoodHistorySave() {
+  if (!pendingFoodSave || !data || !isStorageWritable()) return;
+  const mode = elements.foodHistoryDialog.querySelector('[name="foodHistoryMode"]:checked')?.value;
+  try {
+    if (mode === "history") {
+      if (!pendingFoodSave.impact.syncAllowed) {
+        throw new TypeError("当前单位或口径不能同步修正历史估算");
+      }
+      const result = saveFoodWithProteinHistory(
+        pendingFoodSave.previousData,
+        pendingFoodSave.food,
+      );
+      persistFoodSave(
+        result.data,
+        `常用食材已更新，并修正 ${result.impact.eligibleMealCount} 餐历史估算`,
+        pendingFoodSave.previousData,
+      );
+      return;
+    }
+    persistFoodSave(pendingFoodSave.futureData, "常用食材已更新，历史饮食未改变");
+  } catch (error) {
+    setInlineError(elements.foodHistoryError, error.message || "食材保存失败");
+  }
+}
+
+function persistFoodSave(next, message, previousData = null) {
+  saveData(next);
+  data = next;
+  if (previousData !== null) {
+    undoState = {
+      previousData,
+      successMessage: "已撤销食材和历史估算修改",
+    };
+  }
+  closeFoodHistoryDialog();
+  resetFoodForm();
+  renderFoodList();
+  renderAll();
+  showToast(message, previousData !== null);
+}
+
+function closeFoodHistoryDialog() {
+  if (elements.foodHistoryDialog.open) elements.foodHistoryDialog.close();
+  pendingFoodSave = null;
+  setInlineError(elements.foodHistoryError, "");
+}
+
+function formatProteinEstimate(estimatedMealCount, proteinMilligrams) {
+  return estimatedMealCount === 0
+    ? "未估算"
+    : `${formatProteinGrams(proteinMilligrams)} g`;
+}
+
+function formatDateRange(startDate, endDate) {
+  if (startDate === null || endDate === null) return "无兼容历史记录";
+  return startDate === endDate ? startDate : `${startDate}～${endDate}`;
 }
 
 function closeFoodForm() {
@@ -2450,7 +2574,7 @@ function handleDelete(collectionName, recordId) {
     const result = deleteRecord(data, collectionName, recordId);
     saveData(result.data);
     data = result.data;
-    undoState = { previousData };
+    undoState = { previousData, successMessage: "已撤销删除" };
     renderAll();
     showToast("记录已删除", true);
   } catch (error) {
@@ -2458,14 +2582,16 @@ function handleDelete(collectionName, recordId) {
   }
 }
 
-function undoDelete() {
+function undoLastChange() {
   if (!undoState) return;
   try {
     saveData(undoState.previousData);
     data = undoState.previousData;
+    const message = undoState.successMessage;
     undoState = null;
     renderAll();
-    showToast("已撤销删除");
+    renderFoodList();
+    showToast(message);
   } catch (error) {
     showToast(error.message || "撤销失败");
   }

@@ -149,6 +149,27 @@ test("常用食材表单使用紧凑字段组，并随输入法自动保持当�
   assert.match(app, /elements\.foodFormFields\.scrollTop \+=/);
 });
 
+test("修改蛋白质参考值先预览历史影响，并由用户明确选择是否同步修正", () => {
+  for (const id of [
+    "food-history-dialog",
+    "food-history-range",
+    "food-history-estimate",
+    "food-history-sync",
+    "food-history-sync-summary",
+    "food-history-warning",
+    "cancel-food-history",
+    "confirm-food-history",
+  ]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(html, /name="foodHistoryMode"[^>]*value="future" checked/);
+  assert.match(html, /name="foodHistoryMode"[^>]*value="history"/);
+  assert.match(app, /getFoodProteinHistoryImpact/);
+  assert.match(app, /saveFoodWithProteinHistory/);
+  assert.match(app, /同步修正历史估算/);
+  assert.match(app, /已撤销食材和历史估算修改/);
+  assert.match(app, /function persistFoodSave[\s\S]*?saveData\(next\);\s*data = next;/);
+  assert.match(styles, /\.food-history-choice label[^{]*\{[^}]*min-height:\s*58px/);
+});
+
 test("新建睡眠记录默认 22:30 入睡、06:30 起床", () => {
   assert.match(app, /form\.elements\.sleepTime\.value = "22:30"/);
   assert.match(app, /form\.elements\.wakeTime\.value = "06:30"/);
