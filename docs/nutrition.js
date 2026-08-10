@@ -1,4 +1,4 @@
-import { FOOD_CATEGORIES, FOOD_UNITS } from "./model.js?v=31";
+import { FOOD_CATEGORIES, FOOD_UNITS, MEAL_TYPES } from "./model.js?v=32";
 
 const UNIT_LABELS = Object.freeze({
   grams: "g",
@@ -6,6 +6,41 @@ const UNIT_LABELS = Object.freeze({
   piece: "个",
   serving: "份",
 });
+
+const DEFAULT_MEAL_PROTEIN_TARGETS = Object.freeze({
+  breakfast: Object.freeze({ minimumMilligrams: 30_000, maximumMilligrams: 40_000 }),
+  lunch: Object.freeze({ minimumMilligrams: 35_000, maximumMilligrams: 45_000 }),
+  dinner: Object.freeze({ minimumMilligrams: 35_000, maximumMilligrams: 45_000 }),
+});
+
+const MEAL_PROTEIN_SHARES = Object.freeze({
+  breakfast: 0.3,
+  lunch: 0.35,
+  dinner: 0.35,
+});
+
+export function getMealProteinTarget(mealType, dailyTarget = undefined) {
+  if (!MEAL_TYPES.includes(mealType)) throw new TypeError("mealType 不是有效餐次");
+  if (mealType === "snack") return null;
+  if (dailyTarget === undefined) return { ...DEFAULT_MEAL_PROTEIN_TARGETS[mealType] };
+  if (dailyTarget === null) return null;
+  if (
+    typeof dailyTarget !== "object"
+    || !Number.isInteger(dailyTarget.minimumMilligrams)
+    || !Number.isInteger(dailyTarget.maximumMilligrams)
+    || dailyTarget.minimumMilligrams < 1_000
+    || dailyTarget.maximumMilligrams < dailyTarget.minimumMilligrams
+  ) throw new TypeError("dailyTarget 不是有效蛋白质范围");
+  const share = MEAL_PROTEIN_SHARES[mealType];
+  return {
+    minimumMilligrams: roundMealProteinMilligrams(dailyTarget.minimumMilligrams * share),
+    maximumMilligrams: roundMealProteinMilligrams(dailyTarget.maximumMilligrams * share),
+  };
+}
+
+function roundMealProteinMilligrams(value) {
+  return Math.max(5_000, Math.round(value / 5_000) * 5_000);
+}
 
 export function calculateFoodProteinMilligrams(food, amount, unit = food?.unit) {
   assertFoodShape(food);

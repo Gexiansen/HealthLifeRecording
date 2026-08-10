@@ -7,8 +7,8 @@ import {
   parseDataV10,
   parseDataV11,
   serializeData,
-} from "./model.js?v=31";
-import { COLLECTIONS } from "./data.js?v=31";
+} from "./model.js?v=32";
+import { COLLECTIONS } from "./data.js?v=32";
 
 export const BACKUP_FORMAT = "healthlife-complete-backup";
 export const BACKUP_VERSION = 12;

@@ -8,6 +8,7 @@ import {
   createMealFoodSnapshot,
   foodFromMealSnapshot,
   formatProteinGrams,
+  getMealProteinTarget,
 } from "../docs/nutrition.js";
 import { food, IDS, meal } from "./helpers.js";
 
@@ -47,6 +48,27 @@ test("参考单位不匹配时拒绝换算，不静默混用克数和个数", ()
     () => calculateFoodProteinMilligrams(food(), 1, "piece"),
     /单位不一致/,
   );
+});
+
+test("三餐蛋白质预览使用建议范围，加餐不套用三餐目标", () => {
+  assert.deepEqual(getMealProteinTarget("breakfast"), {
+    minimumMilligrams: 30_000,
+    maximumMilligrams: 40_000,
+  });
+  assert.deepEqual(getMealProteinTarget("lunch"), {
+    minimumMilligrams: 35_000,
+    maximumMilligrams: 45_000,
+  });
+  assert.deepEqual(getMealProteinTarget("dinner", {
+    minimumMilligrams: 90_000,
+    maximumMilligrams: 120_000,
+  }), {
+    minimumMilligrams: 30_000,
+    maximumMilligrams: 40_000,
+  });
+  assert.equal(getMealProteinTarget("dinner", null), null);
+  assert.equal(getMealProteinTarget("snack"), null);
+  assert.throws(() => getMealProteinTarget("invalid"), /有效餐次/);
 });
 
 test("整餐与当日汇总区分已估算、部分估算和未估算", () => {

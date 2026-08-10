@@ -334,6 +334,9 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .meal-selected-item input { min-height: 44px; margin-top: 4px; padding: 8px; }
 .meal-remove-food { min-width: 44px; min-height: 44px; border: 0; border-radius: 11px; background: white; color: var(--danger); padding: 0 6px; font-size: 12px; font-weight: 750; }
 .protein-preview { display: block; margin-top: 12px; border-radius: 11px; background: #fff1d8; color: #654a12; padding: 10px 12px; font-size: 13px; font-weight: 750; line-height: 1.45; }
+.protein-preview[data-status="within"] { background: #e7f1eb; color: var(--primary-dark); }
+.protein-preview[data-status="above"], .protein-preview[data-status="estimated"] { background: #f0f5f2; color: var(--primary-dark); }
+.protein-preview[data-status="partial"], .protein-preview[data-status="below"], .protein-preview[data-status="invalid"] { background: #fff1d8; color: #654a12; }
 .sleep-preview { display: block; margin: -2px 0 14px; border-radius: 11px; background: #edf5f1; color: var(--primary-dark); padding: 10px 12px; font-size: 14px; font-weight: 750; }
 .quick-options { margin-bottom: 14px; }
 .quick-options > span { display: block; margin-bottom: 7px; color: var(--muted); font-size: 13px; font-weight: 700; }

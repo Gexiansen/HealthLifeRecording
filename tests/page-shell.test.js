@@ -106,9 +106,14 @@ test("饮食支持常用食材多选、份量调整、蛋白质预览和自由�
     "food-form",
     "delete-food-dialog",
   ]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(html, /id="meal-protein-preview"[^>]*aria-live="polite"/);
   assert.match(html, /name="freeText"/);
   assert.match(app, /createMealFoodSnapshot/);
   assert.match(app, /buildMealContent/);
+  assert.match(app, /getMealProteinTarget/);
+  assert.match(app, /getActiveProteinGoal/);
+  assert.match(app, /加餐不使用三餐建议/);
+  assert.match(styles, /\.protein-preview\[data-status="within"\]/);
   assert.match(styles, /\.meal-picker-heading > div, \.meal-food-options, \.meal-selected-item > \*[^\{]*\{[^}]*min-width:\s*0/);
   assert.match(styles, /\.meal-food-option[^\{]*\{[^}]*max-width:\s*100%/);
   assert.match(styles, /\.meal-food-option span[^\{]*\{[^}]*overflow-wrap:\s*anywhere/);

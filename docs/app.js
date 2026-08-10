@@ -2,7 +2,7 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=31";
+} from "./model.js?v=32";
 import {
   allRecordsByDate,
   deleteFood,
@@ -14,7 +14,7 @@ import {
   saveFoodWithProteinHistory,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=31";
+} from "./data.js?v=32";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -26,22 +26,22 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=31";
+} from "./storage.js?v=32";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=31";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=31";
+} from "./calendar.js?v=32";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=32";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=31";
+} from "./backup.js?v=32";
 import {
   calculatePaceSecondsPerKilometer,
   calculateVisibilityScroll,
@@ -52,8 +52,8 @@ import {
   getDefaultWorkoutScenario,
   getLatestWorkoutForScenario,
   getRestoreLabel,
-} from "./interaction.js?v=31";
-import { serializeAnalysisExport } from "./analysis.js?v=31";
+} from "./interaction.js?v=32";
+import { serializeAnalysisExport } from "./analysis.js?v=32";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -71,12 +71,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=31";
+} from "./guided-workout.js?v=32";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=31";
+} from "./training-insights.js?v=32";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -86,7 +86,8 @@ import {
   foodFromMealSnapshot,
   formatFoodAmount,
   formatProteinGrams,
-} from "./nutrition.js?v=31";
+  getMealProteinTarget,
+} from "./nutrition.js?v=32";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -404,7 +405,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=31").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=32").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -2251,6 +2252,13 @@ function renderMealSelections() {
 }
 
 function renderMealProteinPreview() {
+  const mealType = activeForm?.elements.mealType.value ?? null;
+  const target = mealType
+    ? getMealProteinTarget(mealType, getActiveProteinGoal(selectedDate))
+    : null;
+  const targetText = target
+    ? `；建议 ${formatProteinGrams(target.minimumMilligrams)}～${formatProteinGrams(target.maximumMilligrams)} g`
+    : mealType === "snack" ? "；加餐不使用三餐建议" : "";
   let estimatedProteinMilligrams = 0;
   let estimatedItemCount = 0;
   let unestimatedItemCount = 0;
@@ -2268,20 +2276,49 @@ function renderMealProteinPreview() {
       }
     }
   } catch {
-    elements.mealProteinPreview.textContent = "请填写有效的整数份量后再保存";
+    elements.mealProteinPreview.textContent = `请填写有效的整数份量后再保存${targetText}`;
+    elements.mealProteinPreview.dataset.status = "invalid";
     return;
   }
   const hasFreeText = editing?.type === "meal"
     && Boolean(activeForm?.elements.freeText.value.trim());
   if (!estimatedItemCount) {
-    elements.mealProteinPreview.textContent = mealSelections.length || hasFreeText
+    elements.mealProteinPreview.textContent = `${mealSelections.length || hasFreeText
       ? "当前已填内容暂无蛋白质估算"
-      : "尚未选择可估算蛋白质的食材";
+      : "尚未选择可估算蛋白质的食材"}${targetText}`;
+    elements.mealProteinPreview.dataset.status = "unestimated";
     return;
   }
-  elements.mealProteinPreview.textContent = `本餐已估算蛋白质 ${formatProteinGrams(estimatedProteinMilligrams)} g${
-    unestimatedItemCount || hasFreeText ? "，另有食材或文字未估算" : ""
-  }`;
+  const incomplete = unestimatedItemCount || hasFreeText;
+  let guidance = "";
+  let status = "partial";
+  if (incomplete) {
+    guidance = "，另有食材或文字未估算";
+  } else if (target) {
+    if (estimatedProteinMilligrams < target.minimumMilligrams) {
+      guidance = `，距离建议下限还差约 ${formatProteinGrams(target.minimumMilligrams - estimatedProteinMilligrams)} g`;
+      status = "below";
+    } else if (estimatedProteinMilligrams > target.maximumMilligrams) {
+      guidance = `，高于建议范围约 ${formatProteinGrams(estimatedProteinMilligrams - target.maximumMilligrams)} g，可按实际情况调整`;
+      status = "above";
+    } else {
+      guidance = "，处于建议范围内";
+      status = "within";
+    }
+  } else {
+    status = "estimated";
+  }
+  elements.mealProteinPreview.textContent = `本餐已估算蛋白质 ${formatProteinGrams(estimatedProteinMilligrams)} g${targetText}${guidance}`;
+  elements.mealProteinPreview.dataset.status = status;
+}
+
+function getActiveProteinGoal(date) {
+  const stage = data?.healthStages.find((item) => (
+    item.status === "active"
+    && date >= item.startDate
+    && date <= item.endDate
+  ));
+  return stage ? stage.goals.protein : undefined;
 }
 
 function handleFormInput(event) {

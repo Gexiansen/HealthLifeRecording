@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=31">
+    <link rel="manifest" href="./manifest.webmanifest?v=32">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=31">
+    <link rel="stylesheet" href="./styles.css?v=32">
   </head>
   <body>
     <header class="app-header">
@@ -254,7 +254,7 @@
           <p id="meal-food-empty" class="field-help" hidden>还没有常用食材，可以先用下方文字记录，或前往设置添加。</p>
           <div id="meal-food-options" class="meal-food-options"></div>
           <div id="meal-selected-foods" class="meal-selected-foods" hidden></div>
-          <output id="meal-protein-preview" class="protein-preview">尚未选择可估算蛋白质的食材</output>
+          <output id="meal-protein-preview" class="protein-preview" aria-live="polite" aria-atomic="true">尚未选择可估算蛋白质的食材</output>
         </section>
         <label class="field"><span>补充说明（可选）</span><textarea name="freeText" maxlength="2000" rows="4" placeholder="外卖、堂食或临时食物可以直接写在这里，例如：牛肉面一碗，份量不详。" data-primary-input></textarea></label>
         <p class="field-help">蛋白质仅根据已选择食材的参考值估算；文字补充不会被自动换算。</p>
@@ -601,6 +601,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=31"></script>
+    <script type="module" src="./app.js?v=32"></script>
   </body>
 </html>
