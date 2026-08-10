@@ -1,5 +1,6 @@
-export const SCHEMA_VERSION = 11;
-export const PREVIOUS_SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 12;
+export const PREVIOUS_SCHEMA_VERSION = 11;
+export const LEGACY_SCHEMA_VERSION = 10;
 
 export const WORKOUT_TYPES = Object.freeze([
   "strength",
@@ -19,6 +20,7 @@ export const MEAL_TYPES = Object.freeze([
 ]);
 
 export const RECORD_SOURCES = Object.freeze(["manual", "appleWatch"]);
+export const WORKOUT_SCENARIOS = Object.freeze(["keep", "running", "other", "guided"]);
 export const TRAINING_PLAN_TYPES = Object.freeze([
   "strengthA",
   "strengthB",
@@ -183,11 +185,11 @@ export function assertValidData(data) {
 export function assertValidDataV10(data) {
   assertPlainObject(data, "data");
   assertExactKeys(data, V10_ROOT_KEYS, "data");
-  if (data.schemaVersion !== PREVIOUS_SCHEMA_VERSION) {
+  if (data.schemaVersion !== LEGACY_SCHEMA_VERSION) {
     throw new TypeError(`不支持的 schemaVersion：${String(data.schemaVersion)}`);
   }
   validateWeeklyTraining(data.weeklyTraining);
-  validateRecordArray(data.workouts, "workouts", validateWorkout);
+  validateRecordArray(data.workouts, "workouts", validateWorkoutV11);
   validateRecordArray(data.meals, "meals", validateMealV10);
   validateRecordArray(data.sleepRecords, "sleepRecords", validateSleep);
   validateRecordArray(data.weights, "weights", validateWeight);
@@ -197,10 +199,50 @@ export function assertValidDataV10(data) {
   return true;
 }
 
+export function assertValidDataV11(data) {
+  assertPlainObject(data, "data");
+  assertExactKeys(data, ROOT_KEYS, "data");
+  if (data.schemaVersion !== PREVIOUS_SCHEMA_VERSION) {
+    throw new TypeError(`不支持的 schemaVersion：${String(data.schemaVersion)}`);
+  }
+  validateWeeklyTraining(data.weeklyTraining);
+  validateRecordArray(data.foods, "foods", validateFood);
+  validateRecordArray(data.healthStages, "healthStages", validateHealthStage);
+  validateRecordArray(data.workouts, "workouts", validateWorkoutV11);
+  validateRecordArray(data.meals, "meals", validateMeal);
+  validateRecordArray(data.sleepRecords, "sleepRecords", validateSleep);
+  validateRecordArray(data.weights, "weights", validateWeight);
+  assertGlobalUniqueIds(data);
+  assertUniqueFoodNames(data.foods);
+  assertSingleActiveHealthStage(data.healthStages);
+  assertUniqueDates(data.sleepRecords, "sleepRecords");
+  assertUniqueDates(data.weights, "weights");
+  return true;
+}
+
+export function migrateDataV11(data) {
+  assertValidDataV11(data);
+  const migrated = {
+    ...structuredClone(data),
+    schemaVersion: SCHEMA_VERSION,
+    workouts: data.workouts.map((record) => ({
+      ...structuredClone(record),
+      scenario: record.guidedSession !== null
+        ? "guided"
+        : record.type === "running"
+          ? "running"
+          : "other",
+      keepDetails: null,
+    })),
+  };
+  assertValidData(migrated);
+  return migrated;
+}
+
 export function migrateDataV10(data) {
   assertValidDataV10(data);
-  const migrated = {
-    schemaVersion: SCHEMA_VERSION,
+  const v11 = {
+    schemaVersion: PREVIOUS_SCHEMA_VERSION,
     weeklyTraining: structuredClone(data.weeklyTraining),
     foods: [],
     healthStages: [],
@@ -213,8 +255,8 @@ export function migrateDataV10(data) {
     sleepRecords: structuredClone(data.sleepRecords),
     weights: structuredClone(data.weights),
   };
-  assertValidData(migrated);
-  return migrated;
+  assertValidDataV11(v11);
+  return migrateDataV11(v11);
 }
 
 export function serializeData(data) {
@@ -249,6 +291,20 @@ export function parseDataV10(text) {
     throw new TypeError("备份内容不是有效 JSON");
   }
   assertValidDataV10(data);
+  return data;
+}
+
+export function parseDataV11(text) {
+  if (typeof text !== "string") {
+    throw new TypeError("备份内容必须是字符串");
+  }
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new TypeError("备份内容不是有效 JSON");
+  }
+  assertValidDataV11(data);
   return data;
 }
 
@@ -377,6 +433,49 @@ function validateWorkout(record, path) {
     record,
     [
       ...BASE_RECORD_KEYS,
+      "scenario",
+      "type",
+      "durationMinutes",
+      "intensity",
+      "source",
+      "averageHeartRateBpm",
+      "distanceMeters",
+      "keepDetails",
+      "guidedSession",
+      "note",
+    ],
+    path,
+  );
+  assertEnum(record.scenario, WORKOUT_SCENARIOS, `${path}.scenario`);
+  validateWorkoutCommon(record, path);
+  validateKeepDetails(record.keepDetails, `${path}.keepDetails`);
+  validateGuidedSession(record.guidedSession, `${path}.guidedSession`);
+  if (record.scenario === "keep") {
+    if (record.keepDetails === null) throw new TypeError(`${path}.keepDetails Keep 场景不能为空`);
+    if (record.guidedSession !== null) throw new TypeError(`${path}.guidedSession Keep 场景必须为 null`);
+    if (record.type === "running") throw new TypeError(`${path}.type Keep 场景不能使用跑步类型`);
+    if (record.distanceMeters !== null) throw new TypeError(`${path}.distanceMeters Keep 场景必须为 null`);
+  } else if (record.scenario === "running") {
+    if (record.type !== "running") throw new TypeError(`${path}.type 跑步场景必须为 running`);
+    if (record.keepDetails !== null || record.guidedSession !== null) {
+      throw new TypeError(`${path} 跑步场景不能包含 Keep 或引导训练详情`);
+    }
+  } else if (record.scenario === "other") {
+    if (record.type === "running") throw new TypeError(`${path}.type 其他运动场景不能使用 running`);
+    if (record.keepDetails !== null || record.guidedSession !== null) {
+      throw new TypeError(`${path} 其他运动场景不能包含 Keep 或引导训练详情`);
+    }
+  } else {
+    if (record.guidedSession === null) throw new TypeError(`${path}.guidedSession 引导场景不能为空`);
+    if (record.keepDetails !== null) throw new TypeError(`${path}.keepDetails 引导场景必须为 null`);
+  }
+}
+
+function validateWorkoutV11(record, path) {
+  validateBaseRecord(
+    record,
+    [
+      ...BASE_RECORD_KEYS,
       "type",
       "durationMinutes",
       "intensity",
@@ -388,6 +487,11 @@ function validateWorkout(record, path) {
     ],
     path,
   );
+  validateWorkoutCommon(record, path);
+  validateGuidedSession(record.guidedSession, `${path}.guidedSession`);
+}
+
+function validateWorkoutCommon(record, path) {
   assertEnum(record.type, WORKOUT_TYPES, `${path}.type`);
   assertIntegerInRange(record.durationMinutes, 1, 1_440, `${path}.durationMinutes`);
   assertIntegerInRange(record.intensity, 1, 3, `${path}.intensity`);
@@ -405,8 +509,36 @@ function validateWorkout(record, path) {
   ) {
     throw new TypeError(`${path}.distanceMeters 只适用于跑步、步行或有氧`);
   }
-  validateGuidedSession(record.guidedSession, `${path}.guidedSession`);
   assertStringLength(record.note, 0, 500, `${path}.note`);
+}
+
+function validateKeepDetails(details, path) {
+  if (details === null) return;
+  assertPlainObject(details, path);
+  assertExactKeys(details, [
+    "courseName",
+    "completed",
+    "equipmentWeightGrams",
+    "feedbackRecorded",
+    "discomfort",
+  ], path);
+  assertNonBlankString(details.courseName, 1, 120, `${path}.courseName`);
+  if (typeof details.completed !== "boolean") {
+    throw new TypeError(`${path}.completed 必须是布尔值`);
+  }
+  assertNullableIntegerInRange(
+    details.equipmentWeightGrams,
+    100,
+    200_000,
+    `${path}.equipmentWeightGrams`,
+  );
+  if (typeof details.feedbackRecorded !== "boolean") {
+    throw new TypeError(`${path}.feedbackRecorded 必须是布尔值`);
+  }
+  if (!details.feedbackRecorded && details.discomfort !== null) {
+    throw new TypeError(`${path}.discomfort 未反馈时必须为 null`);
+  }
+  validateExerciseDiscomfort(details.discomfort, `${path}.discomfort`);
 }
 
 function validateGuidedSession(session, path) {

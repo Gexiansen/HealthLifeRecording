@@ -1,5 +1,5 @@
-import { assertValidData } from "./model.js?v=25";
-import { calculateMealProteinSummary } from "./nutrition.js?v=25";
+import { assertValidData } from "./model.js?v=26";
+import { calculateMealProteinSummary } from "./nutrition.js?v=26";
 
 const CARDIO_WORKOUT_TYPES = Object.freeze(["running", "cardio", "walking", "ballSports"]);
 

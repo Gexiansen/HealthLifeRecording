@@ -15,18 +15,45 @@ export function workout(overrides = {}) {
   return {
     id: IDS.workout,
     date: "2026-07-31",
+    scenario: "running",
     type: "running",
     durationMinutes: 30,
     intensity: 2,
     source: "appleWatch",
     averageHeartRateBpm: 130,
     distanceMeters: 4_000,
+    keepDetails: null,
     guidedSession: null,
     note: "",
     createdAt: TIME,
     updatedAt: TIME,
     ...overrides,
   };
+}
+
+export function keepWorkout(overrides = {}) {
+  return workout({
+    scenario: "keep",
+    type: "strength",
+    source: "manual",
+    averageHeartRateBpm: null,
+    distanceMeters: null,
+    keepDetails: {
+      courseName: "虚构全身力量课程",
+      completed: true,
+      equipmentWeightGrams: 8_000,
+      feedbackRecorded: false,
+      discomfort: null,
+    },
+    ...overrides,
+  });
+}
+
+export function v11Workout(overrides = {}) {
+  const previous = workout(overrides);
+  delete previous.scenario;
+  delete previous.keepDetails;
+  return previous;
 }
 
 export function meal(overrides = {}) {

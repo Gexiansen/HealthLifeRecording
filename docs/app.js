@@ -2,7 +2,7 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=25";
+} from "./model.js?v=26";
 import {
   allRecordsByDate,
   deleteFood,
@@ -12,7 +12,7 @@ import {
   saveFood,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=25";
+} from "./data.js?v=26";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -24,30 +24,33 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=25";
+} from "./storage.js?v=26";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=25";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=25";
+} from "./calendar.js?v=26";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=26";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=25";
+} from "./backup.js?v=26";
 import {
   calculatePaceSecondsPerKilometer,
+  createWorkoutRepeatValues,
   filterRecordItems,
   getDateContext,
   getDefaultMealType,
+  getDefaultWorkoutScenario,
+  getLatestWorkoutForScenario,
   getRestoreLabel,
-} from "./interaction.js?v=25";
-import { serializeAnalysisExport } from "./analysis.js?v=25";
+} from "./interaction.js?v=26";
+import { serializeAnalysisExport } from "./analysis.js?v=26";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -65,12 +68,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=25";
+} from "./guided-workout.js?v=26";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=25";
+} from "./training-insights.js?v=26";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -80,7 +83,7 @@ import {
   foodFromMealSnapshot,
   formatFoodAmount,
   formatProteinGrams,
-} from "./nutrition.js?v=25";
+} from "./nutrition.js?v=26";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -101,6 +104,13 @@ const WORKOUT_LABELS = Object.freeze({
   stretching: "拉伸",
   ballSports: "球类",
   other: "其他",
+});
+
+const WORKOUT_SCENARIO_LABELS = Object.freeze({
+  keep: "Keep 跟练",
+  running: "跑步",
+  other: "其他运动",
+  guided: "备用文字训练",
 });
 
 const MEAL_LABELS = Object.freeze({
@@ -191,6 +201,7 @@ const elements = {
   toggleCalendar: document.querySelector("#toggle-calendar"),
   planHeadline: document.querySelector("#plan-headline"),
   planDetail: document.querySelector("#plan-detail"),
+  recordPlannedWorkout: document.querySelector("#record-planned-workout"),
   startGuidedWorkout: document.querySelector("#start-guided-workout"),
   workoutSummary: document.querySelector("#workout-summary"),
   mealSummary: document.querySelector("#meal-summary"),
@@ -232,9 +243,17 @@ const elements = {
   closeDialog: document.querySelector("#close-dialog"),
   recordDate: document.querySelector("#record-date"),
   sleepDurationPreview: document.querySelector("#sleep-duration-preview"),
-  workoutWatchFields: document.querySelector("#workout-watch-fields"),
+  workoutGuidedEditNote: document.querySelector("#workout-guided-edit-note"),
+  workoutScenarioPicker: document.querySelector("#workout-scenario-picker"),
+  repeatLastWorkout: document.querySelector("#repeat-last-workout"),
+  repeatLastWorkoutMeta: document.querySelector("#repeat-last-workout-meta"),
+  workoutKeepFields: document.querySelector("#workout-keep-fields"),
+  workoutRunningFields: document.querySelector("#workout-running-fields"),
+  workoutOtherFields: document.querySelector("#workout-other-fields"),
+  workoutSourceField: document.querySelector("#workout-source-field"),
+  workoutAverageHeartRateField: document.querySelector("#workout-average-heart-rate-field"),
+  keepDiscomfortFields: document.querySelector("#keep-discomfort-fields"),
   workoutPacePreview: document.querySelector("#workout-pace-preview"),
-  workoutDistanceField: document.querySelector("#workout-distance-field"),
   formError: document.querySelector("#form-error"),
   discardDialog: document.querySelector("#discard-dialog"),
   continueEditing: document.querySelector("#continue-editing"),
@@ -333,8 +352,8 @@ function initialize() {
   renderAll();
   reconcileWorkoutDraft();
   registerServiceWorker();
-  if (storageState.migratedFromVersion === 10 && storageState.status === "ready") {
-    showToast("现有 v10 数据已安全升级，原数据仍保留");
+  if (storageState.migratedFromVersion !== null && storageState.status === "ready") {
+    showToast(`现有 v${storageState.migratedFromVersion} 数据已安全升级，原数据仍保留`);
   }
 }
 
@@ -345,7 +364,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=25").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=26").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -422,6 +441,7 @@ function bindEvents() {
     closeDeleteFoodDialog();
   });
   elements.startGuidedWorkout.addEventListener("click", openGuidedWorkout);
+  elements.repeatLastWorkout.addEventListener("click", repeatLastWorkout);
   elements.closeGuidedWorkout.addEventListener("click", closeGuidedWorkout);
   elements.undoWorkoutAction.addEventListener("click", undoWorkoutAction);
   elements.abandonWorkout.addEventListener("click", requestAbandonWorkout);
@@ -458,8 +478,8 @@ function renderStorageState() {
     elements.storageAlertMessage.textContent = "原始内容仍保留在浏览器中。请先下载保存，再处理或恢复数据。";
     elements.downloadRaw.hidden = false;
   } else if (storageState.status === "migrationFailed") {
-    elements.storageAlertTitle.textContent = "v10 数据升级写入失败，当前为只读";
-    elements.storageAlertMessage.textContent = "原 v10 数据仍完整保留。请先下载原始内容并检查浏览器可用空间，再刷新重试。";
+    elements.storageAlertTitle.textContent = `v${storageState.migratedFromVersion} 数据升级写入失败，当前为只读`;
+    elements.storageAlertMessage.textContent = `原 v${storageState.migratedFromVersion} 数据仍完整保留。请先下载原始内容并检查浏览器可用空间，再刷新重试。`;
     elements.downloadRaw.hidden = false;
   } else {
     elements.storageAlertTitle.textContent = "浏览器本地存储不可用";
@@ -577,21 +597,29 @@ function renderTrainingRecommendation() {
     elements.selectedTrainingLabel.dataset.planType = "unavailable";
     elements.planHeadline.textContent = "无法读取训练模板";
     elements.planDetail.textContent = "";
-    elements.startGuidedWorkout.textContent = "训练不可用";
+    elements.recordPlannedWorkout.textContent = "记录不可用";
+    elements.startGuidedWorkout.textContent = "备用文字训练不可用";
     elements.startGuidedWorkout.disabled = true;
     return;
   }
-  const dayIndex = (new Date(`${selectedDate}T00:00:00Z`).getUTCDay() + 6) % 7;
-  const plannedType = data.weeklyTraining[dayIndex];
+  const plannedType = getTrainingPlanForDate(selectedDate);
   elements.selectedTrainingLabel.textContent = TRAINING_PLAN_LABELS[plannedType];
   elements.selectedTrainingLabel.dataset.planType = plannedType === "rest" ? "rest" : "training";
   elements.planHeadline.textContent = TRAINING_PLAN_LABELS[plannedType];
   elements.planDetail.textContent = plannedType === "rest"
-    ? "今天按模板休息；如身体状态良好，也可以手动选择轻量训练。"
-    : "这是每周模板推荐；也可以选择其他训练或暂时跳过。";
+    ? "今天按模板休息；实际有运动时仍可照常记录。"
+    : "完成后按实际情况记录；课程视频继续由 Keep 提供。";
+  elements.recordPlannedWorkout.textContent = plannedType === "rest"
+    ? "记录实际运动"
+    : "记录实际训练";
   elements.startGuidedWorkout.textContent = workoutDraft
-    ? `继续${GUIDED_TEMPLATES[workoutDraft.templateId].name}`
-    : "选择训练";
+    ? `继续备用文字训练：${GUIDED_TEMPLATES[workoutDraft.templateId].name}`
+    : "备用文字训练";
+}
+
+function getTrainingPlanForDate(date) {
+  const dayIndex = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
+  return data.weeklyTraining[dayIndex];
 }
 
 function reconcileWorkoutDraft() {
@@ -1073,12 +1101,14 @@ function confirmGuidedWorkout() {
     const workout = {
       id: createId(),
       date: workoutDraft.date,
+      scenario: "guided",
       type: workoutType,
       durationMinutes: estimateWorkoutDurationMinutes(workoutDraft, completedAt),
       intensity: perceivedEffort,
       source: "manual",
       averageHeartRateBpm: null,
       distanceMeters: null,
+      keepDetails: null,
       guidedSession,
       note: "",
       createdAt: completedAt,
@@ -1460,9 +1490,29 @@ function createRecordCard(collectionName, record) {
 function describeRecord(collectionName, record) {
   let detail;
   if (collectionName === "workouts") {
+    const keepDetail = record.keepDetails === null
+      ? null
+      : [
+        record.keepDetails.courseName,
+        record.keepDetails.completed ? "完整完成" : "缩短完成",
+        record.keepDetails.equipmentWeightGrams === null
+          ? null
+          : `器械 ${formatDecimal(record.keepDetails.equipmentWeightGrams / 1_000, 1)} kg`,
+        record.keepDetails.feedbackRecorded && record.keepDetails.discomfort === null
+          ? "没有不适"
+          : record.keepDetails.discomfort === null
+            ? null
+            : `${DISCOMFORT_BODY_PART_LABELS[record.keepDetails.discomfort.bodyPart]}不适 ${record.keepDetails.discomfort.severity}/3`,
+      ].filter(Boolean).join(" · ");
     const metrics = [
-      `${WORKOUT_LABELS[record.type]} · ${record.durationMinutes} 分钟 · 强度 ${record.intensity}/3`,
-      record.source === "appleWatch" ? "Apple Watch" : "手动",
+      WORKOUT_SCENARIO_LABELS[record.scenario],
+      keepDetail,
+      record.scenario === "running"
+        ? `${record.durationMinutes} 分钟 · 强度 ${record.intensity}/3`
+        : `${WORKOUT_LABELS[record.type]} · ${record.durationMinutes} 分钟 · 强度 ${record.intensity}/3`,
+      ["keep", "running"].includes(record.scenario)
+        ? record.source === "appleWatch" ? "Apple Watch" : "手动"
+        : null,
       record.averageHeartRateBpm === null ? null : `平均心率 ${record.averageHeartRateBpm}`,
       record.distanceMeters === null ? null : formatDistance(record.distanceMeters),
       record.distanceMeters === null
@@ -1817,9 +1867,16 @@ function openForm(type, explicitRecord = null) {
   updateWorkoutPacePreview();
   formBaseline = getFormSignature();
   elements.dialog.showModal();
-  const initialFocusTarget = type === "meal"
-    ? form.querySelector("[data-food-select]") ?? form.querySelector("[data-primary-input]")
-    : form.querySelector("[data-primary-input]");
+  let initialFocusTarget;
+  if (type === "meal") {
+    initialFocusTarget = form.querySelector("[data-food-select]") ?? form.querySelector("[data-primary-input]");
+  } else if (type === "workout") {
+    initialFocusTarget = record?.scenario === "guided"
+      ? form.elements.durationMinutes
+      : form.querySelector("[name=workoutScenario]:checked");
+  } else {
+    initialFocusTarget = form.querySelector("[data-primary-input]");
+  }
   (initialFocusTarget ?? elements.dialogTitle).focus({ preventScroll: true });
 }
 
@@ -1831,6 +1888,7 @@ function fillForm(type, form, record) {
     } else if (type === "meal") {
       form.elements.mealType.value = getDefaultMealType(new Date().getHours());
     } else if (type === "workout") {
+      form.elements.workoutScenario.value = getDefaultWorkoutScenario(getTrainingPlanForDate(selectedDate));
       form.elements.source.value = "manual";
     }
     return;
@@ -1846,6 +1904,22 @@ function fillForm(type, form, record) {
       : formatBodyFat(record.bodyFatBasisPoints);
   }
   if (type === "workout") {
+    if (record.scenario !== "guided") form.elements.workoutScenario.value = record.scenario;
+    form.elements.keepType.value = record.type === "running" ? "strength" : record.type;
+    form.elements.otherType.value = record.type === "running" ? "other" : record.type;
+    form.elements.keepCourseName.value = record.keepDetails?.courseName ?? "";
+    form.elements.keepCompleted.value = String(record.keepDetails?.completed ?? true);
+    form.elements.keepEquipmentWeightKg.value = record.keepDetails?.equipmentWeightGrams === null
+      || record.keepDetails === null
+      ? ""
+      : formatDecimal(record.keepDetails.equipmentWeightGrams / 1_000, 1);
+    form.elements.keepFeedback.value = !record.keepDetails?.feedbackRecorded
+      ? "unrecorded"
+      : record.keepDetails.discomfort === null ? "none" : "discomfort";
+    if (record.keepDetails?.discomfort) {
+      form.elements.keepDiscomfortBodyPart.value = record.keepDetails.discomfort.bodyPart;
+      form.elements.keepDiscomfortSeverity.value = String(record.keepDetails.discomfort.severity);
+    }
     form.elements.distanceKm.value = record.distanceMeters === null
       ? ""
       : formatDecimal(record.distanceMeters / 1_000, 3);
@@ -1979,7 +2053,7 @@ function renderMealProteinPreview() {
 }
 
 function handleFormInput(event) {
-  if (editing?.type === "workout" && ["type", "source"].includes(event?.target?.name)) {
+  if (editing?.type === "workout" && ["workoutScenario", "source", "keepFeedback"].includes(event?.target?.name)) {
     updateWorkoutFieldState(true);
   }
   if (editing?.type === "meal") renderMealProteinPreview();
@@ -2004,6 +2078,10 @@ function updateSleepDurationPreview() {
 
 function updateWorkoutPacePreview() {
   if (editing?.type !== "workout" || !activeForm) return;
+  if (getSelectedWorkoutScenario() !== "running") {
+    elements.workoutPacePreview.textContent = "填写时长和距离后显示平均配速";
+    return;
+  }
   const durationMinutes = Number(activeForm.elements.durationMinutes.value);
   const distanceKm = Number(activeForm.elements.distanceKm.value);
   if (!durationMinutes || !distanceKm) {
@@ -2019,19 +2097,78 @@ function updateWorkoutPacePreview() {
 
 function updateWorkoutFieldState(clearUnsupported) {
   if (editing?.type !== "workout" || !activeForm) return;
-  const hasWatchDetails = activeForm.elements.source.value === "appleWatch";
-  const supportsDistance = hasWatchDetails && ["running", "walking", "cardio"].includes(
-    activeForm.elements.type.value,
-  );
-  elements.workoutWatchFields.hidden = !hasWatchDetails;
-  elements.workoutDistanceField.hidden = !supportsDistance;
-  elements.workoutPacePreview.hidden = !supportsDistance;
+  const scenario = getSelectedWorkoutScenario();
+  const isGuided = scenario === "guided";
+  const hasSource = scenario === "keep" || scenario === "running";
+  const hasWatchDetails = hasSource && activeForm.elements.source.value === "appleWatch";
+  elements.workoutScenarioPicker.hidden = isGuided;
+  elements.workoutGuidedEditNote.hidden = !isGuided;
+  elements.workoutKeepFields.hidden = scenario !== "keep";
+  elements.workoutRunningFields.hidden = scenario !== "running";
+  elements.workoutOtherFields.hidden = scenario !== "other";
+  elements.workoutSourceField.hidden = !hasSource;
+  elements.workoutAverageHeartRateField.hidden = !hasWatchDetails;
+  elements.keepDiscomfortFields.hidden = scenario !== "keep"
+    || activeForm.elements.keepFeedback.value !== "discomfort";
+  activeForm.elements.keepCourseName.required = scenario === "keep";
+  activeForm.elements.keepType.required = scenario === "keep";
+  activeForm.elements.otherType.required = scenario === "other";
+  activeForm.elements.source.required = hasSource;
+  elements.repeatLastWorkout.hidden = isGuided || Boolean(editing?.record);
+  elements.repeatLastWorkoutMeta.hidden = isGuided || Boolean(editing?.record);
   if (!hasWatchDetails && clearUnsupported) {
     activeForm.elements.averageHeartRateBpm.value = "";
   }
-  if (!supportsDistance && clearUnsupported) {
-    activeForm.elements.distanceKm.value = "";
+  renderRepeatLastWorkoutState(scenario);
+}
+
+function getSelectedWorkoutScenario() {
+  if (editing?.record?.scenario === "guided") return "guided";
+  return activeForm.elements.workoutScenario.value;
+}
+
+function renderRepeatLastWorkoutState(scenario) {
+  if (!["keep", "running", "other"].includes(scenario) || editing?.record) return;
+  const latest = getLatestWorkoutForScenario(data.workouts, scenario);
+  elements.repeatLastWorkout.disabled = latest === null;
+  if (latest === null) {
+    elements.repeatLastWorkoutMeta.textContent = `还没有可复用的${WORKOUT_SCENARIO_LABELS[scenario]}记录。`;
+    return;
   }
+  const detail = scenario === "keep"
+    ? latest.keepDetails.courseName
+    : WORKOUT_LABELS[latest.type];
+  elements.repeatLastWorkoutMeta.textContent = `上次：${latest.date} · ${detail} · ${latest.durationMinutes} 分钟`;
+}
+
+function repeatLastWorkout() {
+  if (editing?.type !== "workout" || editing.record || !activeForm) return;
+  const scenario = getSelectedWorkoutScenario();
+  const latest = getLatestWorkoutForScenario(data.workouts, scenario);
+  if (!latest) return;
+  const values = createWorkoutRepeatValues(latest);
+  activeForm.elements.durationMinutes.value = String(values.durationMinutes);
+  activeForm.elements.intensity.value = String(values.intensity);
+  activeForm.elements.source.value = values.source;
+  activeForm.elements.averageHeartRateBpm.value = "";
+  activeForm.elements.distanceKm.value = values.distanceMeters === null
+    ? ""
+    : formatDecimal(values.distanceMeters / 1_000, 3);
+  activeForm.elements.note.value = "";
+  if (scenario === "keep") {
+    activeForm.elements.keepType.value = values.type;
+    activeForm.elements.keepCourseName.value = values.keepDetails.courseName;
+    activeForm.elements.keepCompleted.value = "true";
+    activeForm.elements.keepEquipmentWeightKg.value = values.keepDetails.equipmentWeightGrams === null
+      ? ""
+      : formatDecimal(values.keepDetails.equipmentWeightGrams / 1_000, 1);
+    activeForm.elements.keepFeedback.value = "unrecorded";
+  } else if (scenario === "other") {
+    activeForm.elements.otherType.value = values.type;
+  }
+  updateWorkoutFieldState(false);
+  updateWorkoutPacePreview();
+  showToast("已填入上次同类训练，可继续修改后保存");
 }
 
 function setQuickDuration(minutes) {
@@ -2049,7 +2186,7 @@ function getFormSignature() {
   if (!activeForm) return "";
   const fields = [elements.recordDate, ...activeForm.querySelectorAll("input, select, textarea")];
   const value = fields.map((field) => `${field.name || field.id}:${
-    field.type === "checkbox" ? field.checked : field.value
+    ["checkbox", "radio"].includes(field.type) ? field.checked : field.value
   }`).join("|");
   return value;
 }
@@ -2071,7 +2208,7 @@ function discardFormChanges() {
 
 function formSignature(form) {
   return Array.from(form.querySelectorAll("input, select, textarea"))
-    .map((field) => `${field.name || field.id}:${field.type === "checkbox" ? field.checked : field.value}`)
+    .map((field) => `${field.name || field.id}:${["checkbox", "radio"].includes(field.type) ? field.checked : field.value}`)
     .join("|");
 }
 
@@ -2135,17 +2272,61 @@ function handleFormSubmit(event) {
 
 function buildRecord(type, form, base) {
   if (type === "workout") {
+    const existing = editing?.record ?? null;
+    const scenario = getSelectedWorkoutScenario();
+    if (scenario === "guided") {
+      return {
+        ...existing,
+        ...base,
+        durationMinutes: Number(form.elements.durationMinutes.value),
+        intensity: Number(form.elements.intensity.value),
+        note: form.elements.note.value.trim(),
+      };
+    }
+    const workoutType = scenario === "running"
+      ? "running"
+      : scenario === "keep" ? form.elements.keepType.value : form.elements.otherType.value;
+    const source = scenario === "other"
+      ? existing?.source ?? "manual"
+      : form.elements.source.value;
+    const averageHeartRateBpm = scenario === "other"
+      ? existing?.averageHeartRateBpm ?? null
+      : source === "appleWatch" ? nullableInteger(form.elements.averageHeartRateBpm.value) : null;
+    const distanceMeters = scenario === "running"
+      ? form.elements.distanceKm.value === ""
+        ? null
+        : Math.round(Number(form.elements.distanceKm.value) * 1_000)
+      : scenario === "other" && ["walking", "cardio"].includes(workoutType)
+        ? existing?.distanceMeters ?? null
+        : null;
+    const feedback = form.elements.keepFeedback.value;
+    const keepDetails = scenario === "keep"
+      ? {
+        courseName: form.elements.keepCourseName.value.trim(),
+        completed: form.elements.keepCompleted.value === "true",
+        equipmentWeightGrams: form.elements.keepEquipmentWeightKg.value === ""
+          ? null
+          : Math.round(Number(form.elements.keepEquipmentWeightKg.value) * 1_000),
+        feedbackRecorded: feedback !== "unrecorded",
+        discomfort: feedback === "discomfort"
+          ? {
+            bodyPart: form.elements.keepDiscomfortBodyPart.value,
+            severity: Number(form.elements.keepDiscomfortSeverity.value),
+          }
+          : null,
+      }
+      : null;
     return {
       ...base,
-      type: form.elements.type.value,
+      scenario,
+      type: workoutType,
       durationMinutes: Number(form.elements.durationMinutes.value),
       intensity: Number(form.elements.intensity.value),
-      source: form.elements.source.value,
-      averageHeartRateBpm: nullableInteger(form.elements.averageHeartRateBpm.value),
-      distanceMeters: form.elements.distanceKm.value === ""
-        ? null
-        : Math.round(Number(form.elements.distanceKm.value) * 1_000),
-      guidedSession: editing?.record?.guidedSession ?? null,
+      source,
+      averageHeartRateBpm,
+      distanceMeters,
+      keepDetails,
+      guidedSession: null,
       note: form.elements.note.value.trim(),
     };
   }
@@ -2235,7 +2416,7 @@ function setFormError(message) {
 function downloadCorruptData() {
   if (!storageState.raw) return;
   const prefix = storageState.status === "migrationFailed"
-    ? "healthlife-v10-before-migration"
+    ? `healthlife-v${storageState.migratedFromVersion}-before-migration`
     : "healthlife-corrupt";
   downloadText(storageState.raw, `${prefix}-${localDateString(new Date())}.json`);
 }

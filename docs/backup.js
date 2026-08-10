@@ -2,15 +2,18 @@ import {
   assertValidData,
   createEmptyData,
   migrateDataV10,
+  migrateDataV11,
   parseData,
   parseDataV10,
+  parseDataV11,
   serializeData,
-} from "./model.js?v=25";
-import { COLLECTIONS } from "./data.js?v=25";
+} from "./model.js?v=26";
+import { COLLECTIONS } from "./data.js?v=26";
 
 export const BACKUP_FORMAT = "healthlife-complete-backup";
-export const BACKUP_VERSION = 11;
-export const PREVIOUS_BACKUP_VERSION = 10;
+export const BACKUP_VERSION = 12;
+export const PREVIOUS_BACKUP_VERSION = 11;
+export const LEGACY_BACKUP_VERSION = 10;
 
 export function createCompleteBackup(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);
@@ -37,14 +40,20 @@ export function parseCompleteBackup(text) {
   }
   assertExactKeys(backup, ["format", "backupVersion", "exportedAt", "data"], "backup");
   if (backup.format !== BACKUP_FORMAT) throw new TypeError("不是 HealthLife 完整备份");
-  if (![PREVIOUS_BACKUP_VERSION, BACKUP_VERSION].includes(backup.backupVersion)) {
+  if (![LEGACY_BACKUP_VERSION, PREVIOUS_BACKUP_VERSION, BACKUP_VERSION].includes(backup.backupVersion)) {
     throw new TypeError(`不支持的 backupVersion：${String(backup.backupVersion)}`);
   }
   assertIsoTimestamp(backup.exportedAt, "backup.exportedAt");
   const sourceBackupVersion = backup.backupVersion;
-  const data = sourceBackupVersion === BACKUP_VERSION
-    ? parseData(JSON.stringify(backup.data))
-    : migrateDataV10(parseDataV10(JSON.stringify(backup.data)));
+  const serializedData = JSON.stringify(backup.data);
+  let data;
+  if (sourceBackupVersion === BACKUP_VERSION) {
+    data = parseData(serializedData);
+  } else if (sourceBackupVersion === PREVIOUS_BACKUP_VERSION) {
+    data = migrateDataV11(parseDataV11(serializedData));
+  } else {
+    data = migrateDataV10(parseDataV10(serializedData));
+  }
   return {
     backup: { ...backup, backupVersion: BACKUP_VERSION, data },
     sourceBackupVersion,

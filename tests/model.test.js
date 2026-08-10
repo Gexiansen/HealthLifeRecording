@@ -6,15 +6,49 @@ import {
   calculateWeightMovingAverage,
   createEmptyData,
   migrateDataV10,
+  migrateDataV11,
   parseData,
   SCHEMA_VERSION,
   serializeData,
 } from "../docs/model.js";
-import { food, healthStage, IDS, meal, sleep, v10Meal, weight, workout } from "./helpers.js";
+import {
+  completeWorkoutSet,
+  createGuidedSessionSnapshot,
+  createWorkoutDraft,
+} from "../docs/guided-workout.js";
+import {
+  food,
+  healthStage,
+  IDS,
+  keepWorkout,
+  meal,
+  sleep,
+  v10Meal,
+  v11Workout,
+  weight,
+  workout,
+} from "./helpers.js";
 
-test("schema v11 增加个人食材与健康阶段，同时保留四类健康记录", () => {
+function guidedSessionSnapshot() {
+  let draft = createWorkoutDraft({
+    templateId: "squatAdaptation",
+    date: "2026-07-31",
+    id: "99999999-9999-4999-8999-999999999999",
+    now: "2026-07-31T00:00:00.000Z",
+  });
+  for (let index = 1; index <= 3; index += 1) {
+    draft = completeWorkoutSet(draft, {
+      completedValue: 8,
+      weightGrams: 8_000,
+      now: `2026-07-31T00:0${index}:00.000Z`,
+    });
+  }
+  return createGuidedSessionSnapshot(draft, 2, "2026-07-31T00:05:00.000Z");
+}
+
+test("schema v12 增加运动场景，同时保留个人食材、健康阶段和四类记录", () => {
   const data = createEmptyData();
-  assert.equal(SCHEMA_VERSION, 11);
+  assert.equal(SCHEMA_VERSION, 12);
   assert.deepEqual(Object.keys(data), [
     "schemaVersion", "weeklyTraining", "foods", "healthStages",
     "workouts", "meals", "sleepRecords", "weights",
@@ -29,8 +63,8 @@ test("schema v11 增加个人食材与健康阶段，同时保留四类健康记
   assert.deepEqual(parseData(serializeData(data)), data);
 });
 
-test("schema v1 至 v10 不由 v11 解析器直接读取，未知字段仍被拒绝", () => {
-  for (let version = 1; version <= 10; version += 1) {
+test("schema v1 至 v11 不由 v12 解析器直接读取，未知字段仍被拒绝", () => {
+  for (let version = 1; version <= 11; version += 1) {
     const data = createEmptyData();
     data.schemaVersion = version;
     assert.throws(() => assertValidData(data), /schemaVersion/);
@@ -43,33 +77,94 @@ test("schema v1 至 v10 不由 v11 解析器直接读取，未知字段仍被拒
   assert.throws(() => assertValidData(unknownFoodFields), /未知字段/);
 });
 
-test("有效 v10 数据迁移到 v11，保留原记录并把旧饮食标为未估算", () => {
+test("有效 v11 数据迁移到 v12，并按既有记录事实映射运动场景", () => {
+  const v11 = createEmptyData();
+  v11.schemaVersion = 11;
+  v11.workouts = [
+    v11Workout(),
+    v11Workout({
+      id: IDS.second,
+      type: "strength",
+      source: "manual",
+      averageHeartRateBpm: null,
+      distanceMeters: null,
+    }),
+    v11Workout({
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      type: "strength",
+      source: "manual",
+      averageHeartRateBpm: null,
+      distanceMeters: null,
+      guidedSession: guidedSessionSnapshot(),
+    }),
+  ];
+  const migrated = migrateDataV11(v11);
+  assert.equal(migrated.schemaVersion, 12);
+  assert.equal(migrated.workouts[0].scenario, "running");
+  assert.equal(migrated.workouts[1].scenario, "other");
+  assert.equal(migrated.workouts[2].scenario, "guided");
+  assert.deepEqual(migrated.workouts.map((record) => record.keepDetails), [null, null, null]);
+  assert.deepEqual(v11.workouts[0], v11Workout());
+  assert.equal(assertValidData(migrated), true);
+});
+
+test("有效 v10 数据链式迁移到 v12，保留旧饮食并不猜测 Keep", () => {
   const v10 = {
     schemaVersion: 10,
     weeklyTraining: [...createEmptyData().weeklyTraining],
-    workouts: [workout()],
+    workouts: [v11Workout()],
     meals: [v10Meal()],
     sleepRecords: [sleep()],
     weights: [weight()],
   };
   const migrated = migrateDataV10(v10);
-  assert.equal(migrated.schemaVersion, 11);
+  assert.equal(migrated.schemaVersion, 12);
   assert.deepEqual(migrated.foods, []);
   assert.deepEqual(migrated.healthStages, []);
   assert.deepEqual(migrated.meals[0].foodItems, []);
   assert.equal(migrated.meals[0].freeText, v10.meals[0].content);
   assert.equal(migrated.meals[0].content, v10.meals[0].content);
+  assert.equal(migrated.workouts[0].scenario, "running");
+  assert.equal(migrated.workouts[0].keepDetails, null);
   assert.deepEqual(v10.meals[0], v10Meal());
   assert.equal(assertValidData(migrated), true);
 });
 
-test("运动只接受可选平均心率与适用类型的距离", () => {
+test("运动严格校验 Keep、跑步、其他和引导场景的专属字段", () => {
+  const keep = createEmptyData();
+  keep.workouts.push(keepWorkout());
+  assert.equal(assertValidData(keep), true);
+
+  const invalidKeep = createEmptyData();
+  invalidKeep.workouts.push(keepWorkout({ keepDetails: null }));
+  assert.throws(() => assertValidData(invalidKeep), /keepDetails/);
+
+  const invalidRunning = createEmptyData();
+  invalidRunning.workouts.push(workout({ type: "strength", distanceMeters: null }));
+  assert.throws(() => assertValidData(invalidRunning), /跑步场景/);
+
   const invalid = createEmptyData();
   invalid.workouts.push(workout({ averageHeartRateBpm: 250 }));
   assert.throws(() => assertValidData(invalid), /averageHeartRateBpm/);
   const invalidDistance = createEmptyData();
-  invalidDistance.workouts.push(workout({ type: "strength" }));
+  invalidDistance.workouts.push(workout({
+    scenario: "other",
+    type: "strength",
+  }));
   assert.throws(() => assertValidData(invalidDistance), /distanceMeters/);
+
+  const guided = createEmptyData();
+  guided.workouts.push(workout({
+    scenario: "guided",
+    type: "strength",
+    source: "manual",
+    averageHeartRateBpm: null,
+    distanceMeters: null,
+    guidedSession: guidedSessionSnapshot(),
+  }));
+  assert.equal(assertValidData(guided), true);
+  guided.workouts[0].guidedSession = null;
+  assert.throws(() => assertValidData(guided), /引导场景/);
 });
 
 test("饮食保留原文并严格校验食材和蛋白质历史快照", () => {

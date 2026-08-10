@@ -5,6 +5,8 @@ const COLLECTIONS = new Set([
   "weights",
 ]);
 
+const REPEATABLE_WORKOUT_SCENARIOS = new Set(["keep", "running", "other"]);
+
 export function getDateContext(selectedDate, today) {
   assertDateString(selectedDate, "selectedDate");
   assertDateString(today, "today");
@@ -27,6 +29,50 @@ export function getDefaultMealType(hour) {
   if (hour < 15) return "lunch";
   if (hour < 21) return "dinner";
   return "snack";
+}
+
+export function getDefaultWorkoutScenario(planType) {
+  if (planType === "strengthA" || planType === "strengthB") return "keep";
+  if (planType === "runWalk") return "running";
+  return "other";
+}
+
+export function getLatestWorkoutForScenario(workouts, scenario) {
+  if (!Array.isArray(workouts)) throw new TypeError("workouts 必须是数组");
+  if (!REPEATABLE_WORKOUT_SCENARIOS.has(scenario)) {
+    throw new TypeError("scenario 不支持重复记录");
+  }
+  return workouts
+    .filter((workout) => workout?.scenario === scenario)
+    .sort((left, right) => {
+      const dateOrder = right.date.localeCompare(left.date);
+      return dateOrder || right.createdAt.localeCompare(left.createdAt);
+    })[0] ?? null;
+}
+
+export function createWorkoutRepeatValues(workout) {
+  if (!workout || !REPEATABLE_WORKOUT_SCENARIOS.has(workout.scenario)) {
+    throw new TypeError("workout 必须是可重复的运动记录");
+  }
+  return {
+    scenario: workout.scenario,
+    type: workout.type,
+    durationMinutes: workout.durationMinutes,
+    intensity: workout.intensity,
+    source: workout.source,
+    averageHeartRateBpm: null,
+    distanceMeters: workout.scenario === "running" ? workout.distanceMeters : null,
+    keepDetails: workout.scenario === "keep"
+      ? {
+          courseName: workout.keepDetails.courseName,
+          completed: true,
+          equipmentWeightGrams: workout.keepDetails.equipmentWeightGrams,
+          feedbackRecorded: false,
+          discomfort: null,
+        }
+      : null,
+    note: "",
+  };
 }
 
 export function calculatePaceSecondsPerKilometer(durationMinutes, distanceMeters) {

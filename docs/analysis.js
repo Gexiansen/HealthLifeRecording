@@ -1,8 +1,8 @@
-import { assertValidData, calculateSleepMinutes } from "./model.js?v=25";
-import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=25";
+import { assertValidData, calculateSleepMinutes } from "./model.js?v=26";
+import { calculatePaceSecondsPerKilometer } from "./interaction.js?v=26";
 
 export const ANALYSIS_FORMAT = "healthlife-analysis-export";
-export const ANALYSIS_VERSION = 8;
+export const ANALYSIS_VERSION = 9;
 
 export function createAnalysisExport(data, exportedAt = new Date().toISOString()) {
   assertValidData(data);
@@ -46,6 +46,7 @@ function createDay(data, date) {
       }
       : null,
     workouts: workouts.map((record) => ({
+      scenario: record.scenario,
       type: record.type,
       durationMinutes: record.durationMinutes,
       intensity: record.intensity,
@@ -58,6 +59,9 @@ function createDay(data, date) {
       guidedSession: record.guidedSession === null
         ? null
         : structuredClone(record.guidedSession),
+      keepDetails: record.keepDetails === null
+        ? null
+        : structuredClone(record.keepDetails),
       note: record.note,
     })),
     meals: meals.map((record) => ({

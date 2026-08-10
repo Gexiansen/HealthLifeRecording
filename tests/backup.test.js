@@ -9,16 +9,16 @@ import {
   serializeCompleteBackup,
   summarizeData,
 } from "../docs/backup.js";
-import { food, v10Meal, weight } from "./helpers.js";
+import { food, v10Meal, v11Workout, weight } from "./helpers.js";
 
 const NOW = "2026-07-31T00:00:00.000Z";
 
-test("v11 完整备份严格往返并汇总记录和个人配置", () => {
+test("v12 完整备份严格往返并汇总记录和个人配置", () => {
   const data = createEmptyData();
   data.weights.push(weight());
   data.foods.push(food());
   const result = parseCompleteBackup(serializeCompleteBackup(data, NOW));
-  assert.equal(BACKUP_VERSION, 11);
+  assert.equal(BACKUP_VERSION, 12);
   assert.deepEqual(result.backup.data, data);
   assert.deepEqual(result.summary.counts, {
     workouts: 0, meals: 0, sleepRecords: 0, weights: 1,
@@ -37,7 +37,23 @@ test("备份拒绝 v1 至 v9，并拒绝未知字段", () => {
   assert.throws(() => parseCompleteBackup(JSON.stringify(valid)), /未知字段/);
 });
 
-test("有效 v10 完整备份整体迁移为 v11，旧饮食不生成蛋白质估算", () => {
+test("有效 v11 完整备份整体迁移为 v12，并映射运动场景", () => {
+  const v11Data = createEmptyData();
+  v11Data.schemaVersion = 11;
+  v11Data.workouts = [v11Workout()];
+  const result = parseCompleteBackup(JSON.stringify({
+    format: "healthlife-complete-backup",
+    backupVersion: 11,
+    exportedAt: NOW,
+    data: v11Data,
+  }));
+  assert.equal(result.sourceBackupVersion, 11);
+  assert.equal(result.backup.backupVersion, 12);
+  assert.equal(result.backup.data.schemaVersion, 12);
+  assert.equal(result.backup.data.workouts[0].scenario, "running");
+});
+
+test("有效 v10 完整备份整体迁移为 v12，旧饮食不生成蛋白质估算", () => {
   const v10Data = {
     schemaVersion: 10,
     weeklyTraining: [...createEmptyData().weeklyTraining],
@@ -53,8 +69,8 @@ test("有效 v10 完整备份整体迁移为 v11，旧饮食不生成蛋白质�
     data: v10Data,
   }));
   assert.equal(result.sourceBackupVersion, 10);
-  assert.equal(result.backup.backupVersion, 11);
-  assert.equal(result.backup.data.schemaVersion, 11);
+  assert.equal(result.backup.backupVersion, 12);
+  assert.equal(result.backup.data.schemaVersion, 12);
   assert.deepEqual(result.backup.data.meals[0].foodItems, []);
   assert.equal(result.backup.data.meals[0].freeText, v10Data.meals[0].content);
 });

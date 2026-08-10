@@ -1,20 +1,23 @@
 import {
   createEmptyData,
   migrateDataV10,
+  migrateDataV11,
   parseData,
   parseDataV10,
+  parseDataV11,
   serializeData,
-} from "./model.js?v=25";
-import { parseBackupMetadata } from "./backup.js?v=25";
+} from "./model.js?v=26";
+import { parseBackupMetadata } from "./backup.js?v=26";
 import {
   assertValidWorkoutUndoHistory,
   assertValidWorkoutDraft,
   migrateWorkoutDraftV1,
-} from "./guided-workout.js?v=25";
+} from "./guided-workout.js?v=26";
 
-export const STORAGE_KEY = "healthlife:data:v11";
-export const PREVIOUS_STORAGE_KEY = "healthlife:data:v10";
-export const BACKUP_META_KEY = "healthlife:backup-meta:v11";
+export const STORAGE_KEY = "healthlife:data:v12";
+export const PREVIOUS_STORAGE_KEY = "healthlife:data:v11";
+export const LEGACY_STORAGE_KEY = "healthlife:data:v10";
+export const BACKUP_META_KEY = "healthlife:backup-meta:v12";
 export const WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v2";
 export const PREVIOUS_WORKOUT_DRAFT_KEY = "healthlife:workout-draft:v1";
 export const WORKOUT_UNDO_KEY = "healthlife:workout-undo:v1";
@@ -66,6 +69,15 @@ export function loadData(storage = globalThis.localStorage) {
   } catch (error) {
     return { status: "unavailable", data: null, raw: null, error };
   }
+  let sourceVersion = 11;
+  if (previousRaw === null) {
+    try {
+      previousRaw = storage.getItem(LEGACY_STORAGE_KEY);
+    } catch (error) {
+      return { status: "unavailable", data: null, raw: null, error };
+    }
+    sourceVersion = 10;
+  }
   if (previousRaw === null) {
     return {
       status: "empty",
@@ -78,7 +90,9 @@ export function loadData(storage = globalThis.localStorage) {
 
   let migrated;
   try {
-    migrated = migrateDataV10(parseDataV10(previousRaw));
+    migrated = sourceVersion === 11
+      ? migrateDataV11(parseDataV11(previousRaw))
+      : migrateDataV10(parseDataV10(previousRaw));
   } catch (error) {
     return {
       status: "corrupt",
@@ -97,7 +111,7 @@ export function loadData(storage = globalThis.localStorage) {
       data: migrated,
       raw: previousRaw,
       error,
-      migratedFromVersion: 10,
+      migratedFromVersion: sourceVersion,
     };
   }
   return {
@@ -105,7 +119,7 @@ export function loadData(storage = globalThis.localStorage) {
     data: migrated,
     raw: serialized,
     error: null,
-    migratedFromVersion: 10,
+    migratedFromVersion: sourceVersion,
   };
 }
 

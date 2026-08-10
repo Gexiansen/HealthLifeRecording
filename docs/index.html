@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=25">
+    <link rel="manifest" href="./manifest.webmanifest?v=26">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=25">
+    <link rel="stylesheet" href="./styles.css?v=26">
   </head>
   <body>
     <header class="app-header">
@@ -95,7 +95,10 @@
           </div>
           <strong id="plan-headline" class="plan-headline">正在读取每周训练模板</strong>
           <p id="plan-detail" class="plan-detail"></p>
-          <button id="start-guided-workout" class="plan-start-button" type="button">开始训练</button>
+          <div class="plan-actions">
+            <button id="record-planned-workout" class="plan-start-button" type="button" data-open-form="workout">记录实际训练</button>
+            <button id="start-guided-workout" class="text-button" type="button">备用文字训练</button>
+          </div>
         </article>
       </section>
 
@@ -189,27 +192,54 @@
       <p id="form-error" class="form-error" role="alert" hidden></p>
 
       <form id="workout-form" data-record-form="workout" hidden>
-        <div class="field-row">
-          <label class="field"><span>运动类型</span><select name="type" required><option value="strength">力量</option><option value="running">跑步</option><option value="cardio">其他有氧</option><option value="walking">步行</option><option value="stretching">拉伸</option><option value="ballSports">球类</option><option value="other">其他</option></select></label>
-          <label class="field"><span>数据来源</span><select name="source" required><option value="manual">手动记录</option><option value="appleWatch">Apple Watch</option></select></label>
-        </div>
+        <p id="workout-guided-edit-note" class="field-help" hidden>这是一条备用文字训练记录，只能修改整体时长、强度和备注。</p>
+        <fieldset id="workout-scenario-picker" class="scenario-picker">
+          <legend>这次怎么练</legend>
+          <div>
+            <label><input type="radio" name="workoutScenario" value="keep" checked><span>Keep 跟练</span></label>
+            <label><input type="radio" name="workoutScenario" value="running"><span>跑步</span></label>
+            <label><input type="radio" name="workoutScenario" value="other"><span>其他运动</span></label>
+          </div>
+        </fieldset>
+        <button id="repeat-last-workout" class="secondary-neutral-button repeat-workout-button" type="button">复用上次同类训练</button>
+        <p id="repeat-last-workout-meta" class="field-help repeat-workout-meta"></p>
+
+        <fieldset id="workout-keep-fields" class="scenario-fields">
+          <legend>Keep 跟练内容</legend>
+          <label class="field"><span>课程名称</span><input name="keepCourseName" type="text" maxlength="100" placeholder="例如：全身燃脂力量入门"></label>
+          <div class="field-row">
+            <label class="field"><span>训练类型</span><select name="keepType"><option value="strength">力量</option><option value="cardio">有氧</option><option value="stretching">拉伸</option><option value="other">其他</option></select></label>
+            <label class="field"><span>完成情况</span><select name="keepCompleted"><option value="true">完整完成</option><option value="false">缩短完成</option></select></label>
+          </div>
+          <label class="field"><span>主要器械重量（kg，可选）</span><input name="keepEquipmentWeightKg" type="number" min="0.1" max="200" step="0.1" inputmode="decimal"></label>
+          <label class="field"><span>训练后反馈（可选）</span><select name="keepFeedback"><option value="unrecorded">未记录</option><option value="none">没有不适</option><option value="discomfort">有不适</option></select></label>
+          <div id="keep-discomfort-fields" class="field-row" hidden>
+            <label class="field"><span>不适部位</span><select name="keepDiscomfortBodyPart"><option value="knee">膝部</option><option value="lowerBack">下背部</option><option value="shoulder">肩部</option><option value="wrist">手腕</option><option value="ankle">脚踝</option><option value="other">其他</option></select></label>
+            <label class="field"><span>程度</span><select name="keepDiscomfortSeverity"><option value="1">1/3 · 轻微</option><option value="2">2/3 · 明显</option><option value="3">3/3 · 严重</option></select></label>
+          </div>
+        </fieldset>
+
+        <fieldset id="workout-running-fields" class="scenario-fields" hidden>
+          <legend>跑步数据</legend>
+          <label class="field"><span>距离（km，可选）</span><input name="distanceKm" type="number" min="0.001" max="1000" step="0.001" inputmode="decimal"></label>
+          <output id="workout-pace-preview" class="sleep-preview">填写时长和距离后显示平均配速</output>
+        </fieldset>
+
+        <fieldset id="workout-other-fields" class="scenario-fields" hidden>
+          <legend>其他运动</legend>
+          <label class="field"><span>运动类型</span><select name="otherType"><option value="strength">力量</option><option value="cardio">其他有氧</option><option value="walking">步行</option><option value="stretching">拉伸</option><option value="ballSports">球类</option><option value="other">其他</option></select></label>
+        </fieldset>
+
         <div class="quick-options" aria-label="快捷选择运动时长">
           <span>快捷时长</span>
           <div><button type="button" data-quick-duration="15">15 分</button><button type="button" data-quick-duration="30">30 分</button><button type="button" data-quick-duration="45">45 分</button><button type="button" data-quick-duration="60">60 分</button></div>
         </div>
         <div class="field-row">
-          <label class="field"><span>时长（分钟）</span><input name="durationMinutes" type="number" min="1" max="1440" inputmode="numeric" data-primary-input required></label>
+          <label class="field"><span>时长（分钟）</span><input name="durationMinutes" type="number" min="1" max="1440" inputmode="numeric" required></label>
           <label class="field"><span>强度</span><select name="intensity" required><option value="1">低</option><option value="2" selected>中</option><option value="3">高</option></select></label>
         </div>
-        <fieldset id="workout-watch-fields" class="watch-fields" hidden>
-          <legend>Apple Watch 详情（可选）</legend>
-          <p class="field-help">只在方便时填写平均心率和距离。</p>
-          <div class="metric-fields">
-            <label class="field"><span>平均心率（bpm）</span><input name="averageHeartRateBpm" type="number" min="30" max="240" step="1" inputmode="numeric"></label>
-            <label id="workout-distance-field" class="field"><span>距离（km）</span><input name="distanceKm" type="number" min="0.001" max="1000" step="0.001" inputmode="decimal"></label>
-          </div>
-          <output id="workout-pace-preview" class="sleep-preview">填写时长和距离后显示平均配速</output>
-        </fieldset>
+        <label id="workout-source-field" class="field"><span>数据来源</span><select name="source"><option value="manual">手动记录</option><option value="appleWatch">Apple Watch</option></select></label>
+        <label id="workout-average-heart-rate-field" class="field" hidden><span>平均心率（bpm，可选）</span><input name="averageHeartRateBpm" type="number" min="30" max="240" step="1" inputmode="numeric"></label>
         <label class="field"><span>备注</span><textarea name="note" maxlength="500" rows="3"></textarea></label>
         <button class="primary-button" type="submit">保存运动</button>
       </form>
@@ -486,6 +516,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=25"></script>
+    <script type="module" src="./app.js?v=26"></script>
   </body>
 </html>

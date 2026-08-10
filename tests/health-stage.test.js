@@ -21,7 +21,7 @@ test("健康阶段只按正式记录汇总蛋白质覆盖、力量和有氧次�
     }),
   );
   data.workouts.push(
-    workout({ type: "strength", source: "manual", averageHeartRateBpm: null, distanceMeters: null }),
+    workout({ scenario: "other", type: "strength", source: "manual", averageHeartRateBpm: null, distanceMeters: null }),
     workout({ id: "99999999-9999-4999-8999-999999999999", date: "2026-07-30", type: "running" }),
   );
   assert.deepEqual(calculateHealthStageProgress(data, IDS.stage, "2026-07-31"), {

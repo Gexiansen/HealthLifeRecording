@@ -13,9 +13,11 @@ test("页面保留三个一级导航和四类记录表单", () => {
   assert.doesNotMatch(html, /data-record-form="(?:activity|hydration)"/);
 });
 
-test("首页只保留四类核心卡片和简单今日训练推荐", () => {
+test("首页保留四类核心卡片，今日训练以普通记录为主、文字引导为备用", () => {
   assert.match(html, /id="health-plan-title">今日训练/);
+  assert.match(html, /id="record-planned-workout"/);
   assert.match(html, /id="start-guided-workout"/);
+  assert.match(html, /备用文字训练/);
   assert.doesNotMatch(html, /id="daily-progress"|id="streak-badge"|id="edit-daily-plan"/);
 });
 
@@ -36,20 +38,33 @@ test("日历标题展示所选日期训练类型和所选月份运动天数", ()
   assert.doesNotMatch(html, /执行率/);
 });
 
-test("运动表单只在 Apple Watch 来源下展示设备详情", () => {
-  assert.match(html, /id="workout-watch-fields" class="watch-fields" hidden/);
-  assert.match(app, /workoutWatchFields: document\.querySelector\("#workout-watch-fields"\)/);
-  assert.match(app, /\["type", "source"\]\.includes\(event\?\.target\?\.name\)/);
-  assert.match(app, /elements\.workoutWatchFields\.hidden = !hasWatchDetails/);
+test("运动表单按 Keep、跑步和其他运动分流，不混用场景字段", () => {
+  for (const id of [
+    "workout-scenario-picker",
+    "repeat-last-workout",
+    "workout-keep-fields",
+    "workout-running-fields",
+    "workout-other-fields",
+    "workout-source-field",
+    "workout-average-heart-rate-field",
+  ]) assert.match(html, new RegExp(`id="${id}"`));
+  for (const scenario of ["keep", "running", "other"]) {
+    assert.match(html, new RegExp(`name="workoutScenario"[^>]*value="${scenario}"`));
+  }
+  assert.match(app, /getLatestWorkoutForScenario/);
+  assert.match(app, /createWorkoutRepeatValues/);
+  assert.match(app, /elements\.workoutKeepFields\.hidden = scenario !== "keep"/);
+  assert.match(app, /elements\.workoutRunningFields\.hidden = scenario !== "running"/);
+  assert.match(app, /elements\.workoutOtherFields\.hidden = scenario !== "other"/);
 });
 
-test("记录表单将焦点放到高频输入，睡眠表单避免主动唤起时间控件", () => {
-  assert.equal(html.match(/data-primary-input/g)?.length, 3);
-  assert.match(html, /name="durationMinutes"[^>]*data-primary-input/);
+test("记录表单优先聚焦场景或高频输入，睡眠表单避免主动唤起时间控件", () => {
+  assert.equal(html.match(/data-primary-input/g)?.length, 2);
   assert.match(html, /name="freeText"[^>]*data-primary-input/);
   assert.match(html, /name="weightKg"[^>]*data-primary-input/);
   assert.match(html, /id="dialog-title" tabindex="-1"/);
   assert.match(app, /form\.querySelector\("\[data-food-select\]"\) \?\? form\.querySelector\("\[data-primary-input\]"\)/);
+  assert.match(app, /form\.querySelector\("\[name=workoutScenario\]:checked"\)/);
   assert.match(app, /\(initialFocusTarget \?\? elements\.dialogTitle\)\.focus/);
 });
 
@@ -64,6 +79,19 @@ test("每周模板只展示当前可执行的四类推荐", () => {
 
 test("跑走引导完成后按跑步类型保存，爬楼梯仍按有氧保存", () => {
   assert.match(app, /guidedSession\.templateId === "stairBeginner"\s*\n?\s*\? "cardio"\s*\n?\s*:\s*guidedSession\.templateId === "runWalk"\s*\n?\s*\? "running"/);
+});
+
+test("Keep 表单包含课程、完成情况、器械重量和可选不适反馈", () => {
+  for (const name of [
+    "keepCourseName",
+    "keepCompleted",
+    "keepEquipmentWeightKg",
+    "keepFeedback",
+    "keepDiscomfortBodyPart",
+    "keepDiscomfortSeverity",
+  ]) assert.match(html, new RegExp(`name="${name}"`));
+  assert.match(app, /feedbackRecorded/);
+  assert.match(app, /equipmentWeightGrams/);
 });
 
 test("饮食支持常用食材多选、份量调整、蛋白质预览和自由文字兜底", () => {
