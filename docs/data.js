@@ -1,5 +1,5 @@
-import { assertValidData, serializeData } from "./model.js?v=30";
-import { calculateFoodProteinMilligrams } from "./nutrition.js?v=30";
+import { assertValidData, serializeData } from "./model.js?v=31";
+import { calculateFoodProteinMilligrams } from "./nutrition.js?v=31";
 
 export const COLLECTIONS = Object.freeze([
   "workouts",

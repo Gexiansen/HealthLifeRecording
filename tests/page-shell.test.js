@@ -109,6 +109,10 @@ test("饮食支持常用食材多选、份量调整、蛋白质预览和自由�
   assert.match(html, /name="freeText"/);
   assert.match(app, /createMealFoodSnapshot/);
   assert.match(app, /buildMealContent/);
+  assert.match(styles, /\.meal-picker-heading > div, \.meal-food-options, \.meal-selected-item > \*[^\{]*\{[^}]*min-width:\s*0/);
+  assert.match(styles, /\.meal-food-option[^\{]*\{[^}]*max-width:\s*100%/);
+  assert.match(styles, /\.meal-food-option span[^\{]*\{[^}]*overflow-wrap:\s*anywhere/);
+  assert.match(styles, /\.meal-selected-item strong, \.meal-selected-item span[^\{]*\{[^}]*overflow-wrap:\s*anywhere/);
   assert.doesNotMatch(app, /window\.confirm/);
   assert.doesNotMatch(html, /name="trackingMode"|name="confidence"|name="fullnessScore"|meal-food-select|open-custom-food|open-recipe/);
   assert.doesNotMatch(html, /onclick=/);

@@ -6,13 +6,13 @@ import {
   parseDataV10,
   parseDataV11,
   serializeData,
-} from "./model.js?v=30";
-import { parseBackupMetadata } from "./backup.js?v=30";
+} from "./model.js?v=31";
+import { parseBackupMetadata } from "./backup.js?v=31";
 import {
   assertValidWorkoutUndoHistory,
   assertValidWorkoutDraft,
   migrateWorkoutDraftV1,
-} from "./guided-workout.js?v=30";
+} from "./guided-workout.js?v=31";
 
 export const STORAGE_KEY = "healthlife:data:v12";
 export const PREVIOUS_STORAGE_KEY = "healthlife:data:v11";
