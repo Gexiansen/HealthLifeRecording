@@ -115,7 +115,14 @@ test("饮食支持常用食材多选、份量调整、蛋白质预览和自由�
 });
 
 test("常用食材新增和编辑使用独立二级弹窗，不再展开在设置列表底部", () => {
-  for (const id of ["food-dialog", "close-food-dialog", "food-form"]) {
+  for (const id of [
+    "food-dialog",
+    "close-food-dialog",
+    "food-form",
+    "food-form-fields",
+    "food-protein-unit",
+    "food-source-details",
+  ]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   const settingsSection = html.slice(
@@ -125,9 +132,21 @@ test("常用食材新增和编辑使用独立二级弹窗，不再展开在设�
   assert.doesNotMatch(settingsSection, /id="food-form"/);
   assert.match(app, /elements\.foodDialog\.showModal\(\)/);
   assert.match(app, /bindGuardedDialog\(elements\.foodDialog, closeFoodForm\)/);
-  assert.match(styles, /\.food-dialog[^{]*\{[^}]*overflow-y:\s*auto/);
+  assert.match(styles, /\.food-form-fields[^{]*\{[^}]*overflow-y:\s*auto/);
   assert.match(styles, /\.food-form-actions[^{]*\{[^}]*position:\s*sticky/);
   assert.match(styles, /@media \(max-width:\s*559px\)[\s\S]*\.food-dialog[^{]*\{[^}]*height:\s*100dvh/);
+});
+
+test("常用食材表单使用紧凑字段组，并随输入法自动保持当前输入可见", () => {
+  assert.match(html, /class="food-basics-grid"/);
+  assert.match(html, /class="food-protein-reference"/);
+  assert.match(html, /补充来源说明（可选）/);
+  assert.match(styles, /\.food-basics-grid[^{]*\{[^}]*grid-template-columns:/);
+  assert.match(styles, /\.food-protein-reference[^{]*\{[^}]*grid-template-columns:/);
+  assert.doesNotMatch(styles, /\.food-dialog \.field-row\s*\{[^}]*grid-template-columns:\s*1fr/);
+  assert.match(app, /window\.visualViewport/);
+  assert.match(app, /elements\.foodForm\.addEventListener\("focusin", handleFoodFormFocus\)/);
+  assert.match(app, /elements\.foodFormFields\.scrollTop \+=/);
 });
 
 test("新建睡眠记录默认 22:30 入睡、06:30 起床", () => {

@@ -85,6 +85,12 @@ export function calculatePaceSecondsPerKilometer(durationMinutes, distanceMeters
   return Math.round(durationMinutes * 60_000 / distanceMeters);
 }
 
+export function calculateVisibilityScroll(viewportTop, viewportBottom, targetTop, targetBottom, gap = 8) {
+  if (targetBottom > viewportBottom - gap) return targetBottom - viewportBottom + gap;
+  if (targetTop < viewportTop + gap) return targetTop - viewportTop - gap;
+  return 0;
+}
+
 export function filterRecordItems(items, collectionName = "all", month = "") {
   if (!Array.isArray(items)) throw new TypeError("items 必须是数组");
   if (collectionName !== "all" && !COLLECTIONS.has(collectionName)) {

@@ -359,13 +359,32 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .food-list-actions { display: flex; gap: 4px; }
 .food-list-actions button { min-width: 44px; min-height: 44px; border: 0; border-radius: 11px; background: white; color: var(--primary-dark); font-weight: 750; }
 .food-list-actions .delete-food { color: var(--danger); }
-.food-dialog { overflow-y: auto; background: white; }
-.food-dialog > .food-form { margin: 0; padding: 6px 18px 0; }
+.food-dialog { overflow: hidden; background: white; }
+.food-dialog[open] { display: flex; flex-direction: column; }
+.food-dialog-header { flex: 0 0 auto; padding: 14px 18px 10px; }
+.food-dialog-header h2 { font-size: 22px; }
+.food-dialog > .food-form { display: flex; flex: 1; flex-direction: column; min-height: 0; margin: 0; padding: 0; }
+.food-form-fields { min-height: 0; overflow-y: auto; padding: 4px 18px 0; scroll-padding-block: 8px; }
+.food-form .field { gap: 4px; margin-bottom: 10px; }
+.food-dialog input, .food-dialog select { min-height: 44px; }
+.food-basics-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(86px, 1fr) minmax(76px, .8fr); gap: 8px; }
+.food-basics-grid .field { min-width: 0; }
+.food-basics-grid input, .food-basics-grid select { padding: 8px; }
 .checkbox-field { display: flex; align-items: center; gap: 9px; min-height: 44px; margin-bottom: 12px; color: var(--ink); font-size: 13px; font-weight: 750; }
 .checkbox-field input { width: 22px; min-height: 22px; margin: 0; accent-color: var(--primary); }
-.food-protein-fields { margin: 0 0 12px; border: 1px solid var(--line); border-radius: 14px; background: #f8faf7; padding: 12px; }
+.food-form .checkbox-field { margin-bottom: 8px; }
+.food-protein-fields { margin: 0 0 8px; border: 1px solid var(--line); border-radius: 14px; background: #f8faf7; padding: 8px 10px; }
 .food-protein-fields legend { color: var(--ink); font-size: 13px; font-weight: 800; padding: 0 4px; }
-.food-form-actions { position: sticky; z-index: 2; bottom: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; border-top: 1px solid var(--line); background: white; padding: 10px 0 max(12px, env(safe-area-inset-bottom, 0px)); box-shadow: 0 -10px 20px rgba(255,255,255,.96); }
+.food-protein-reference { display: grid; grid-template-columns: auto minmax(54px, .8fr) auto auto minmax(64px, 1fr) auto; align-items: center; gap: 5px; margin-bottom: 8px; color: var(--muted); font-size: 13px; }
+.food-protein-reference input { min-width: 0; padding: 6px 7px; text-align: center; }
+.food-protein-reference strong, .food-protein-reference span:last-child { color: var(--ink); white-space: nowrap; }
+.food-protein-meta { gap: 8px; }
+.food-protein-meta .field { margin-bottom: 0; }
+.food-source-details { margin-top: 4px; border-top: 1px solid var(--line); }
+.food-source-details summary { display: flex; align-items: center; min-height: 44px; color: var(--primary); font-size: 13px; font-weight: 750; cursor: pointer; }
+.food-source-details[open] summary { margin-bottom: 2px; }
+.food-source-details .field { margin-bottom: 2px; }
+.food-form-actions { position: sticky; z-index: 2; bottom: 0; display: grid; flex: 0 0 auto; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; border-top: 1px solid var(--line); background: white; padding: 8px 18px max(10px, env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 18px rgba(24,48,43,.08); }
 .food-form-actions .primary-button { position: static; margin-top: 0; box-shadow: none; }
 .weekly-plan-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
 .weekly-plan-form .primary-button, .weekly-plan-form .form-error { grid-column: 1 / -1; }
@@ -442,9 +461,13 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (max-width: 559px) {
-  .food-dialog { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
-  .food-dialog .dialog-header { padding-top: max(18px, env(safe-area-inset-top, 0px)); }
-  .food-dialog .field-row { grid-template-columns: 1fr; gap: 0; }
+  .food-dialog { position: fixed; top: var(--food-dialog-top, 0px); right: 0; bottom: auto; left: 0; width: 100%; height: 100dvh; height: var(--food-dialog-height, 100dvh); max-height: var(--food-dialog-height, 100dvh); margin: 0; border-radius: 0; }
+  .food-dialog-header { padding: max(10px, env(safe-area-inset-top, 0px)) 14px 8px; }
+  .food-dialog-header h2 { font-size: 20px; }
+  .food-form-fields { padding: 4px 14px 0; }
+  .food-form-actions { padding: 7px 14px max(8px, env(safe-area-inset-bottom, 0px)); }
+  .food-dialog.keyboard-open .food-dialog-header { padding-top: max(6px, env(safe-area-inset-top, 0px)); padding-bottom: 6px; }
+  .food-dialog.keyboard-open .food-form-actions { padding-top: 6px; padding-bottom: 6px; }
 }
 
 @media (max-width: 390px) {

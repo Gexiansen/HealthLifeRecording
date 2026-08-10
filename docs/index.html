@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=27">
+    <link rel="manifest" href="./manifest.webmanifest?v=28">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=27">
+    <link rel="stylesheet" href="./styles.css?v=28">
   </head>
   <body>
     <header class="app-header">
@@ -482,37 +482,41 @@
     </dialog>
 
     <dialog id="food-dialog" class="food-dialog" aria-labelledby="food-form-title">
-      <div class="dialog-header">
-        <div>
-          <p class="eyebrow">我的常用食材</p>
-          <h2 id="food-form-title">添加常用食材</h2>
-        </div>
+      <div class="dialog-header food-dialog-header">
+        <h2 id="food-form-title">添加常用食材</h2>
         <button id="close-food-dialog" class="icon-button" type="button" aria-label="关闭食材编辑">×</button>
       </div>
       <form id="food-form" class="food-form">
-        <input name="id" type="hidden">
-        <div class="field-row">
-          <label class="field"><span>名称</span><input name="name" maxlength="80" required></label>
-          <label class="field"><span>分类</span><select name="category" required><option value="protein">肉蛋豆类</option><option value="staple">主食</option><option value="vegetable">蔬菜</option><option value="fruit">水果</option><option value="dairy">奶类</option><option value="drink">饮品</option><option value="other">其他</option></select></label>
-        </div>
-        <div class="field-row">
-          <label class="field"><span>默认份量</span><input name="defaultAmount" type="number" min="1" max="100000" step="1" inputmode="numeric" required></label>
-          <label class="field"><span>单位</span><select name="unit" required><option value="grams">克（g）</option><option value="milliliters">毫升（ml）</option><option value="piece">个</option><option value="serving">份</option></select></label>
-        </div>
-        <label class="checkbox-field"><input name="proteinEnabled" type="checkbox"><span>为这个食材启用蛋白质估算</span></label>
-        <fieldset id="food-protein-fields" class="food-protein-fields" hidden>
-          <legend>蛋白质参考值</legend>
-          <div class="field-row">
-            <label class="field"><span>参考份量（同上单位）</span><input name="referenceAmount" type="number" min="1" max="100000" step="1" inputmode="numeric"></label>
-            <label class="field"><span>蛋白质（g）</span><input name="proteinGrams" type="number" min="0" max="1000" step="0.1" inputmode="decimal"></label>
+        <div id="food-form-fields" class="food-form-fields">
+          <input name="id" type="hidden">
+          <label class="field food-name-field"><span>名称</span><input name="name" maxlength="80" required></label>
+          <div class="food-basics-grid">
+            <label class="field"><span>分类</span><select name="category" required><option value="protein">肉蛋豆类</option><option value="staple">主食</option><option value="vegetable">蔬菜</option><option value="fruit">水果</option><option value="dairy">奶类</option><option value="drink">饮品</option><option value="other">其他</option></select></label>
+            <label class="field"><span>默认份量</span><input name="defaultAmount" type="number" min="1" max="100000" step="1" inputmode="numeric" required></label>
+            <label class="field"><span>单位</span><select name="unit" required><option value="grams">克（g）</option><option value="milliliters">毫升（ml）</option><option value="piece">个</option><option value="serving">份</option></select></label>
           </div>
-          <div class="field-row">
-            <label class="field"><span>口径</span><select name="basis"><option value="raw">生重</option><option value="cooked">熟重</option><option value="edible">可食部分</option><option value="packaged">包装份量</option></select></label>
-            <label class="field"><span>来源</span><select name="source"><option value="packageLabel">包装营养标签</option><option value="publicReference">公共参考值</option><option value="other">其他</option></select></label>
-          </div>
-          <label class="field"><span>来源说明（可选）</span><input name="sourceNote" maxlength="300" placeholder="例如：包装每 100 ml 标示"></label>
-        </fieldset>
-        <p id="food-form-error" class="form-error inline-error" role="alert" hidden></p>
+          <label class="checkbox-field"><input name="proteinEnabled" type="checkbox"><span>启用蛋白质估算</span></label>
+          <fieldset id="food-protein-fields" class="food-protein-fields" hidden>
+            <legend>蛋白质估算</legend>
+            <div class="food-protein-reference">
+              <span>每</span>
+              <input name="referenceAmount" type="number" min="1" max="100000" step="1" inputmode="numeric" aria-label="蛋白质参考份量">
+              <strong id="food-protein-unit">克</strong>
+              <span>含</span>
+              <input name="proteinGrams" type="number" min="0" max="1000" step="0.1" inputmode="decimal" aria-label="参考份量中的蛋白质克数">
+              <span>g 蛋白质</span>
+            </div>
+            <div class="food-protein-meta field-row">
+              <label class="field"><span>口径</span><select name="basis"><option value="raw">生重</option><option value="cooked">熟重</option><option value="edible">可食部分</option><option value="packaged">包装份量</option></select></label>
+              <label class="field"><span>来源</span><select name="source"><option value="packageLabel">包装营养标签</option><option value="publicReference">公共参考值</option><option value="other">其他</option></select></label>
+            </div>
+            <details id="food-source-details" class="food-source-details">
+              <summary>补充来源说明（可选）</summary>
+              <label class="field"><span>来源说明</span><input name="sourceNote" maxlength="300" placeholder="例如：包装每 100 ml 标示"></label>
+            </details>
+          </fieldset>
+          <p id="food-form-error" class="form-error inline-error" role="alert" hidden></p>
+        </div>
         <div class="food-form-actions">
           <button id="cancel-food-edit" class="secondary-neutral-button" type="button">取消</button>
           <button class="primary-button" type="submit">保存食材</button>
@@ -525,6 +529,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=27"></script>
+    <script type="module" src="./app.js?v=28"></script>
   </body>
 </html>

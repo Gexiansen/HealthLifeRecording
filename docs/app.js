@@ -2,7 +2,7 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=27";
+} from "./model.js?v=28";
 import {
   allRecordsByDate,
   deleteFood,
@@ -12,7 +12,7 @@ import {
   saveFood,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=27";
+} from "./data.js?v=28";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -24,24 +24,25 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=27";
+} from "./storage.js?v=28";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=27";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=27";
+} from "./calendar.js?v=28";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=28";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=27";
+} from "./backup.js?v=28";
 import {
   calculatePaceSecondsPerKilometer,
+  calculateVisibilityScroll,
   createWorkoutRepeatValues,
   filterRecordItems,
   getDateContext,
@@ -49,8 +50,8 @@ import {
   getDefaultWorkoutScenario,
   getLatestWorkoutForScenario,
   getRestoreLabel,
-} from "./interaction.js?v=27";
-import { serializeAnalysisExport } from "./analysis.js?v=27";
+} from "./interaction.js?v=28";
+import { serializeAnalysisExport } from "./analysis.js?v=28";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -68,12 +69,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=27";
+} from "./guided-workout.js?v=28";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=27";
+} from "./training-insights.js?v=28";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -83,7 +84,7 @@ import {
   foodFromMealSnapshot,
   formatFoodAmount,
   formatProteinGrams,
-} from "./nutrition.js?v=27";
+} from "./nutrition.js?v=28";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -168,6 +169,8 @@ let installPromptEvent = null;
 let pendingDiscardAction = null;
 let weeklyPlanBaseline = null;
 let foodFormBaseline = null;
+let foodDialogViewportBaseline = null;
+let foodVisibilityFrame = null;
 let mealSelections = [];
 let pendingFoodDeletion = null;
 let workoutDraftState = loadWorkoutDraft();
@@ -285,8 +288,11 @@ const elements = {
   foodDialog: document.querySelector("#food-dialog"),
   closeFoodDialog: document.querySelector("#close-food-dialog"),
   foodForm: document.querySelector("#food-form"),
+  foodFormFields: document.querySelector("#food-form-fields"),
   foodFormTitle: document.querySelector("#food-form-title"),
   foodProteinFields: document.querySelector("#food-protein-fields"),
+  foodProteinUnit: document.querySelector("#food-protein-unit"),
+  foodSourceDetails: document.querySelector("#food-source-details"),
   foodFormError: document.querySelector("#food-form-error"),
   cancelFoodEdit: document.querySelector("#cancel-food-edit"),
   deleteFoodDialog: document.querySelector("#delete-food-dialog"),
@@ -366,7 +372,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=27").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=28").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -433,7 +439,9 @@ function bindEvents() {
   elements.weeklyPlanForm.addEventListener("submit", handleWeeklyPlanSubmit);
   elements.addFood.addEventListener("click", () => openFoodForm());
   elements.foodForm.addEventListener("submit", handleFoodSubmit);
+  elements.foodForm.addEventListener("focusin", handleFoodFormFocus);
   elements.foodForm.elements.proteinEnabled.addEventListener("change", updateFoodProteinFields);
+  elements.foodForm.elements.unit.addEventListener("change", updateFoodProteinUnit);
   elements.closeFoodDialog.addEventListener("click", closeFoodForm);
   elements.cancelFoodEdit.addEventListener("click", closeFoodForm);
   elements.manageFoodsFromMeal.addEventListener("click", openFoodSettingsFromMeal);
@@ -464,6 +472,9 @@ function bindEvents() {
   });
   bindGuardedDialog(elements.dataDialog, requestCloseDataDialog);
   bindGuardedDialog(elements.foodDialog, closeFoodForm);
+  window.visualViewport?.addEventListener("resize", syncFoodDialogViewport);
+  window.visualViewport?.addEventListener("scroll", syncFoodDialogViewport);
+  window.addEventListener("resize", syncFoodDialogViewport);
   window.addEventListener("beforeinstallprompt", handleInstallPrompt);
 }
 
@@ -1713,10 +1724,14 @@ function openFoodForm(food = null) {
   elements.foodForm.elements.basis.value = food?.proteinReference?.basis ?? "cooked";
   elements.foodForm.elements.source.value = food?.proteinReference?.source ?? "packageLabel";
   elements.foodForm.elements.sourceNote.value = food?.proteinReference?.sourceNote ?? "";
+  elements.foodSourceDetails.open = Boolean(food?.proteinReference?.sourceNote);
   elements.foodFormTitle.textContent = food ? "编辑常用食材" : "添加常用食材";
   setInlineError(elements.foodFormError, "");
   updateFoodProteinFields();
+  updateFoodProteinUnit();
   if (!elements.foodDialog.open) elements.foodDialog.showModal();
+  foodDialogViewportBaseline = window.visualViewport?.height ?? window.innerHeight;
+  syncFoodDialogViewport();
   foodFormBaseline = formSignature(elements.foodForm);
   elements.foodForm.elements.name.focus({ preventScroll: true });
 }
@@ -1727,6 +1742,58 @@ function updateFoodProteinFields() {
   for (const name of ["referenceAmount", "proteinGrams", "basis", "source"]) {
     elements.foodForm.elements[name].required = enabled;
   }
+  if (enabled) queueFoodControlVisibility(elements.foodForm.elements.referenceAmount);
+}
+
+function updateFoodProteinUnit() {
+  elements.foodProteinUnit.textContent = FOOD_UNIT_LABELS[elements.foodForm.elements.unit.value] ?? "单位";
+}
+
+function handleFoodFormFocus(event) {
+  if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement)) return;
+  queueFoodControlVisibility(event.target);
+}
+
+function syncFoodDialogViewport() {
+  if (!elements.foodDialog.open) return;
+  const viewport = window.visualViewport;
+  if (!viewport || !window.matchMedia("(max-width: 559px)").matches) {
+    resetFoodDialogViewport();
+    return;
+  }
+  elements.foodDialog.style.setProperty("--food-dialog-height", `${Math.round(viewport.height)}px`);
+  elements.foodDialog.style.setProperty("--food-dialog-top", `${Math.round(viewport.offsetTop)}px`);
+  const baseline = foodDialogViewportBaseline ?? viewport.height;
+  elements.foodDialog.classList.toggle("keyboard-open", baseline - viewport.height > 120);
+  queueFoodControlVisibility(document.activeElement);
+}
+
+function queueFoodControlVisibility(control) {
+  if (!elements.foodDialog.open || !elements.foodForm.contains(control)) return;
+  if (foodVisibilityFrame !== null) window.cancelAnimationFrame(foodVisibilityFrame);
+  foodVisibilityFrame = window.requestAnimationFrame(() => {
+    foodVisibilityFrame = null;
+    ensureFoodControlVisible(control);
+  });
+}
+
+function ensureFoodControlVisible(control) {
+  const target = control.closest(".field, .food-protein-reference, .checkbox-field") ?? control;
+  const viewportRect = elements.foodFormFields.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const adjustment = calculateVisibilityScroll(
+    viewportRect.top,
+    viewportRect.bottom,
+    targetRect.top,
+    targetRect.bottom,
+  );
+  if (adjustment !== 0) elements.foodFormFields.scrollTop += adjustment;
+}
+
+function resetFoodDialogViewport() {
+  elements.foodDialog.classList.remove("keyboard-open");
+  elements.foodDialog.style.removeProperty("--food-dialog-height");
+  elements.foodDialog.style.removeProperty("--food-dialog-top");
 }
 
 function handleFoodSubmit(event) {
@@ -1783,6 +1850,12 @@ function closeFoodForm() {
 
 function resetFoodForm() {
   if (elements.foodDialog.open) elements.foodDialog.close();
+  resetFoodDialogViewport();
+  foodDialogViewportBaseline = null;
+  if (foodVisibilityFrame !== null) window.cancelAnimationFrame(foodVisibilityFrame);
+  foodVisibilityFrame = null;
+  elements.foodFormFields.scrollTop = 0;
+  elements.foodSourceDetails.open = false;
   elements.foodForm.reset();
   setInlineError(elements.foodFormError, "");
   foodFormBaseline = null;

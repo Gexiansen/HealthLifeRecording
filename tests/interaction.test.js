@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   calculatePaceSecondsPerKilometer,
+  calculateVisibilityScroll,
   filterRecordItems,
   getDateContext,
   getDefaultMealType,
@@ -25,6 +26,12 @@ test("默认餐次、配速、筛选和恢复文案保持有效", () => {
   assert.equal(filterRecordItems(items, "workouts", "2026-07").length, 1);
   assert.throws(() => filterRecordItems(items, "plans"), /不受支持/);
   assert.match(getRestoreLabel(2, 3).summary, /完整替换/);
+});
+
+test("输入区域被遮挡时计算最小滚动距离，已可见时不移动", () => {
+  assert.equal(calculateVisibilityScroll(100, 400, 140, 184), 0);
+  assert.equal(calculateVisibilityScroll(100, 400, 380, 428), 36);
+  assert.equal(calculateVisibilityScroll(100, 400, 72, 116), -36);
 });
 
 test("每周模板映射默认运动场景，同场景最近记录按日期和创建时间选择", () => {

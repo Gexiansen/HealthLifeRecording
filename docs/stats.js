@@ -2,7 +2,7 @@ import {
   assertValidData,
   calculateSleepMinutes,
   calculateWeightMovingAverage,
-} from "./model.js?v=27";
+} from "./model.js?v=28";
 
 export function calculateTrendSummary(data, endDate, days) {
   assertValidData(data);
