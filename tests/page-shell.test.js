@@ -106,12 +106,19 @@ test("饮食支持常用食材多选、份量调整、蛋白质预览和自由�
     "food-form",
     "delete-food-dialog",
   ]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(html, /id="record-context-row"/);
+  assert.match(html, /id="meal-type-field"[^>]*hidden/);
+  assert.match(html, /id="meal-type" name="mealType" form="meal-form"/);
   assert.match(html, /id="meal-protein-preview"[^>]*aria-live="polite"/);
   assert.match(html, /name="freeText"/);
   assert.match(app, /createMealFoodSnapshot/);
   assert.match(app, /buildMealContent/);
   assert.match(app, /getMealProteinTarget/);
   assert.match(app, /getActiveProteinGoal/);
+  assert.match(app, /getFormControls/);
+  assert.match(app, /record-dialog-meal/);
+  assert.match(app, /elements\.mealType\.value/);
+  assert.match(app, /if \(type === "meal"\) elements\.mealType\.value = record\.mealType/);
   assert.match(app, /FOOD_CATEGORY_GROUPS/);
   assert.match(app, /categories: Object\.freeze\(\["dairy", "drink"\]\)/);
   assert.match(app, /本份蛋白质约/);
@@ -120,6 +127,7 @@ test("饮食支持常用食材多选、份量调整、蛋白质预览和自由�
   assert.match(styles, /\.protein-preview\[data-status="within"\]/);
   assert.match(styles, /\.meal-food-group-options/);
   assert.match(styles, /\.meal-food-option small/);
+  assert.match(styles, /#record-dialog\.record-dialog-meal/);
   assert.match(styles, /\.meal-picker-heading > div, \.meal-food-options, \.meal-food-group-options, \.meal-selected-item > \*[^\{]*\{[^}]*min-width:\s*0/);
   assert.match(styles, /\.meal-food-option[^\{]*\{[^}]*max-width:\s*100%/);
   assert.match(styles, /\.meal-food-option span[^\{]*\{[^}]*overflow-wrap:\s*anywhere/);

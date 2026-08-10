@@ -297,10 +297,13 @@ dialog { width: min(100% - 24px, 520px); max-height: calc(100dvh - 24px - env(sa
 dialog::backdrop { background: rgba(12, 26, 22, 0.62); }
 .dialog-header { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 12px; background: white; }
 .dialog-header .eyebrow { color: var(--muted); }
-dialog > .field, dialog > form { margin-right: 18px; margin-left: 18px; }
+dialog > .field, dialog > form, dialog > .record-context-row { margin-right: 18px; margin-left: 18px; }
 dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .record-form .primary-button, dialog > form .primary-button { position: sticky; z-index: 2; bottom: 0; box-shadow: 0 -10px 20px white; }
 .field { display: grid; gap: 7px; margin-bottom: 14px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.record-context-row, dialog > form { min-width: 0; }
+.record-context-row > * { min-width: 0; }
+.record-context-row .field { margin-bottom: 14px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .field-help { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
 .scenario-picker, .scenario-fields { margin: 0 0 14px; border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
@@ -507,6 +510,22 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (max-width: 559px) {
+  #record-dialog.record-dialog-meal .dialog-header { padding: 12px 14px 8px; }
+  #record-dialog.record-dialog-meal > .record-context-row,
+  #record-dialog.record-dialog-meal > form { margin-right: 14px; margin-left: 14px; }
+  #record-dialog.record-dialog-meal > .record-context-row { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 8px; }
+  #record-dialog.record-dialog-meal .record-context-row .field,
+  #record-dialog.record-dialog-meal .field { gap: 5px; margin-bottom: 10px; }
+  #record-dialog.record-dialog-meal > form { padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+  #record-dialog.record-dialog-meal .meal-food-picker { margin-bottom: 10px; padding: 10px; }
+  #record-dialog.record-dialog-meal .meal-food-options { gap: 8px; margin-top: 8px; }
+  #record-dialog.record-dialog-meal .meal-food-group { gap: 4px; }
+  #record-dialog.record-dialog-meal .meal-food-group-options { gap: 5px; }
+  #record-dialog.record-dialog-meal .meal-food-option span { min-height: 50px; padding: 6px 9px; }
+  #record-dialog.record-dialog-meal .meal-selected-foods { gap: 6px; margin-top: 8px; }
+  #record-dialog.record-dialog-meal .meal-selected-item { grid-template-columns: minmax(0, 1fr) 84px 44px; gap: 6px; padding-top: 7px; }
+  #record-dialog.record-dialog-meal .protein-preview { margin-top: 8px; padding: 8px 10px; }
+  #record-dialog.record-dialog-meal .field-help { margin-bottom: 8px; }
   .settings-dialog { position: fixed; inset: 0; width: 100%; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
   .settings-dialog-header { padding: max(10px, env(safe-area-inset-top, 0px)) 14px 8px; }
   .settings-dialog-body { padding: 8px 12px max(12px, env(safe-area-inset-bottom, 0px)); }

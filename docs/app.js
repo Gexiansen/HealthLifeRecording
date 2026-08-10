@@ -2,7 +2,7 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=33";
+} from "./model.js?v=34";
 import {
   allRecordsByDate,
   deleteFood,
@@ -14,7 +14,7 @@ import {
   saveFoodWithProteinHistory,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=33";
+} from "./data.js?v=34";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -26,22 +26,22 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=33";
+} from "./storage.js?v=34";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=33";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=33";
+} from "./calendar.js?v=34";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=34";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=33";
+} from "./backup.js?v=34";
 import {
   calculatePaceSecondsPerKilometer,
   calculateVisibilityScroll,
@@ -52,8 +52,8 @@ import {
   getDefaultWorkoutScenario,
   getLatestWorkoutForScenario,
   getRestoreLabel,
-} from "./interaction.js?v=33";
-import { serializeAnalysisExport } from "./analysis.js?v=33";
+} from "./interaction.js?v=34";
+import { serializeAnalysisExport } from "./analysis.js?v=34";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -71,12 +71,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=33";
+} from "./guided-workout.js?v=34";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=33";
+} from "./training-insights.js?v=34";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -87,7 +87,7 @@ import {
   formatFoodAmount,
   formatProteinGrams,
   getMealProteinTarget,
-} from "./nutrition.js?v=33";
+} from "./nutrition.js?v=34";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -267,6 +267,8 @@ const elements = {
   dialogTitle: document.querySelector("#dialog-title"),
   closeDialog: document.querySelector("#close-dialog"),
   recordDate: document.querySelector("#record-date"),
+  mealTypeField: document.querySelector("#meal-type-field"),
+  mealType: document.querySelector("#meal-type"),
   sleepDurationPreview: document.querySelector("#sleep-duration-preview"),
   workoutGuidedEditNote: document.querySelector("#workout-guided-edit-note"),
   workoutScenarioPicker: document.querySelector("#workout-scenario-picker"),
@@ -414,7 +416,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=33").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=34").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -432,6 +434,7 @@ function bindEvents() {
     form.addEventListener("input", handleFormInput);
     form.addEventListener("change", handleFormInput);
   });
+  elements.mealType.addEventListener("change", handleFormInput);
   elements.previousPeriod.addEventListener("click", () => changeCalendarPeriod(-1));
   elements.nextPeriod.addEventListener("click", () => changeCalendarPeriod(1));
   elements.toggleCalendar.addEventListener("click", toggleCalendarMode);
@@ -460,6 +463,8 @@ function bindEvents() {
     editing = null;
     activeForm = null;
     formBaseline = null;
+    elements.dialog.classList.remove("record-dialog-meal");
+    elements.mealTypeField.hidden = true;
     setFormError("");
   });
   elements.continueEditing.addEventListener("click", () => {
@@ -2099,6 +2104,8 @@ function openForm(type, explicitRecord = null) {
   const form = document.querySelector(`[data-record-form="${type}"]`);
   activeForm = form;
   mealSelections = [];
+  elements.dialog.classList.toggle("record-dialog-meal", type === "meal");
+  elements.mealTypeField.hidden = type !== "meal";
   elements.recordDate.value = record?.date ?? selectedDate;
   elements.dialogTitle.textContent = `${record ? "编辑" : "新增"}${config.label}`;
   setFormError("");
@@ -2128,7 +2135,7 @@ function fillForm(type, form, record) {
       form.elements.sleepTime.value = "22:30";
       form.elements.wakeTime.value = "06:30";
     } else if (type === "meal") {
-      form.elements.mealType.value = getDefaultMealType(new Date().getHours());
+      elements.mealType.value = getDefaultMealType(new Date().getHours());
     } else if (type === "workout") {
       form.elements.workoutScenario.value = getDefaultWorkoutScenario(getTrainingPlanForDate(selectedDate));
       form.elements.source.value = "manual";
@@ -2139,6 +2146,7 @@ function fillForm(type, form, record) {
   for (const [key, value] of Object.entries(record)) {
     if (form.elements[key]) form.elements[key].value = value;
   }
+  if (type === "meal") elements.mealType.value = record.mealType;
   if (type === "weight") {
     form.elements.weightKg.value = formatWeight(record.weightGrams);
     form.elements.bodyFatPercent.value = record.bodyFatBasisPoints === null
@@ -2291,7 +2299,7 @@ function renderMealSelections() {
 }
 
 function renderMealProteinPreview() {
-  const mealType = activeForm?.elements.mealType.value ?? null;
+  const mealType = activeForm?.dataset.recordForm === "meal" ? elements.mealType.value : null;
   const target = mealType
     ? getMealProteinTarget(mealType, getActiveProteinGoal(selectedDate))
     : null;
@@ -2492,11 +2500,15 @@ function setInlineError(element, message) {
 
 function getFormSignature() {
   if (!activeForm) return "";
-  const fields = [elements.recordDate, ...activeForm.querySelectorAll("input, select, textarea")];
+  const fields = [elements.recordDate, ...getFormControls(activeForm)];
   const value = fields.map((field) => `${field.name || field.id}:${
     ["checkbox", "radio"].includes(field.type) ? field.checked : field.value
   }`).join("|");
   return value;
+}
+
+function getFormControls(form) {
+  return Array.from(form.elements).filter((field) => ["INPUT", "SELECT", "TEXTAREA"].includes(field.tagName));
 }
 
 function requestCloseRecordDialog() {
@@ -2671,7 +2683,7 @@ function buildRecord(type, form, base) {
     const content = buildMealContent(foodItems, freeText);
     return {
       ...base,
-      mealType: form.elements.mealType.value,
+      mealType: elements.mealType.value,
       content,
       freeText,
       foodItems,

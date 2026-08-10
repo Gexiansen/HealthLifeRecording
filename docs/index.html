@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=33">
+    <link rel="manifest" href="./manifest.webmanifest?v=34">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=33">
+    <link rel="stylesheet" href="./styles.css?v=34">
   </head>
   <body>
     <header class="app-header">
@@ -185,10 +185,16 @@
         </div>
         <button id="close-dialog" class="icon-button" type="button" aria-label="关闭">×</button>
       </div>
-      <label class="field">
-        <span>记录日期</span>
-        <input id="record-date" type="date" required>
-      </label>
+      <div id="record-context-row" class="record-context-row">
+        <label id="record-date-field" class="field">
+          <span>记录日期</span>
+          <input id="record-date" type="date" required>
+        </label>
+        <label id="meal-type-field" class="field" hidden>
+          <span>餐次</span>
+          <select id="meal-type" name="mealType" form="meal-form" required><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select>
+        </label>
+      </div>
       <p id="form-error" class="form-error" role="alert" hidden></p>
 
       <form id="workout-form" data-record-form="workout" hidden>
@@ -245,7 +251,6 @@
       </form>
 
       <form id="meal-form" data-record-form="meal" hidden>
-        <label class="field"><span>餐次</span><select name="mealType" required><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="snack">加餐</option></select></label>
         <section class="meal-food-picker" aria-labelledby="meal-food-picker-title">
           <div class="meal-picker-heading">
             <div><strong id="meal-food-picker-title">常用食材</strong><span>选择后使用默认份量</span></div>
@@ -256,7 +261,7 @@
           <div id="meal-selected-foods" class="meal-selected-foods" hidden></div>
           <output id="meal-protein-preview" class="protein-preview" aria-live="polite" aria-atomic="true">尚未选择可估算蛋白质的食材</output>
         </section>
-        <label class="field"><span>补充说明（可选）</span><textarea name="freeText" maxlength="2000" rows="4" placeholder="外卖、堂食或临时食物可以直接写在这里，例如：牛肉面一碗，份量不详。" data-primary-input></textarea></label>
+        <label class="field"><span>补充说明（可选）</span><textarea name="freeText" maxlength="2000" rows="3" placeholder="外卖、堂食或临时食物可以直接写在这里，例如：牛肉面一碗，份量不详。" data-primary-input></textarea></label>
         <p class="field-help">蛋白质仅根据已选择食材的参考值估算；文字补充不会被自动换算。</p>
         <button class="primary-button" type="submit">保存饮食</button>
       </form>
@@ -601,6 +606,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=33"></script>
+    <script type="module" src="./app.js?v=34"></script>
   </body>
 </html>
