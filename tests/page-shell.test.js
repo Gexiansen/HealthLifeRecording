@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const html = await readFile(new URL("../docs/index.html", import.meta.url), "utf8");
 const app = await readFile(new URL("../docs/app.js", import.meta.url), "utf8");
+const styles = await readFile(new URL("../docs/styles.css", import.meta.url), "utf8");
 
 test("页面保留三个一级导航和四类记录表单", () => {
   for (const view of ["today", "trends", "records"]) assert.match(html, new RegExp(`data-view="${view}"`));
@@ -111,6 +112,22 @@ test("饮食支持常用食材多选、份量调整、蛋白质预览和自由�
   assert.doesNotMatch(app, /window\.confirm/);
   assert.doesNotMatch(html, /name="trackingMode"|name="confidence"|name="fullnessScore"|meal-food-select|open-custom-food|open-recipe/);
   assert.doesNotMatch(html, /onclick=/);
+});
+
+test("常用食材新增和编辑使用独立二级弹窗，不再展开在设置列表底部", () => {
+  for (const id of ["food-dialog", "close-food-dialog", "food-form"]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  const settingsSection = html.slice(
+    html.indexOf('id="data-dialog"'),
+    html.indexOf('id="food-dialog"'),
+  );
+  assert.doesNotMatch(settingsSection, /id="food-form"/);
+  assert.match(app, /elements\.foodDialog\.showModal\(\)/);
+  assert.match(app, /bindGuardedDialog\(elements\.foodDialog, closeFoodForm\)/);
+  assert.match(styles, /\.food-dialog[^{]*\{[^}]*overflow-y:\s*auto/);
+  assert.match(styles, /\.food-form-actions[^{]*\{[^}]*position:\s*sticky/);
+  assert.match(styles, /@media \(max-width:\s*559px\)[\s\S]*\.food-dialog[^{]*\{[^}]*height:\s*100dvh/);
 });
 
 test("新建睡眠记录默认 22:30 入睡、06:30 起床", () => {

@@ -1,4 +1,4 @@
-import { FOOD_CATEGORIES, FOOD_UNITS } from "./model.js?v=26";
+import { FOOD_CATEGORIES, FOOD_UNITS } from "./model.js?v=27";
 
 const UNIT_LABELS = Object.freeze({
   grams: "g",

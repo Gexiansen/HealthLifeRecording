@@ -2,7 +2,7 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=26";
+} from "./model.js?v=27";
 import {
   allRecordsByDate,
   deleteFood,
@@ -12,7 +12,7 @@ import {
   saveFood,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=26";
+} from "./data.js?v=27";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -24,22 +24,22 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=26";
+} from "./storage.js?v=27";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=26";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=26";
+} from "./calendar.js?v=27";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=27";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=26";
+} from "./backup.js?v=27";
 import {
   calculatePaceSecondsPerKilometer,
   createWorkoutRepeatValues,
@@ -49,8 +49,8 @@ import {
   getDefaultWorkoutScenario,
   getLatestWorkoutForScenario,
   getRestoreLabel,
-} from "./interaction.js?v=26";
-import { serializeAnalysisExport } from "./analysis.js?v=26";
+} from "./interaction.js?v=27";
+import { serializeAnalysisExport } from "./analysis.js?v=27";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -68,12 +68,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=26";
+} from "./guided-workout.js?v=27";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=26";
+} from "./training-insights.js?v=27";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -83,7 +83,7 @@ import {
   foodFromMealSnapshot,
   formatFoodAmount,
   formatProteinGrams,
-} from "./nutrition.js?v=26";
+} from "./nutrition.js?v=27";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -282,6 +282,8 @@ const elements = {
   foodList: document.querySelector("#food-list"),
   foodListEmpty: document.querySelector("#food-list-empty"),
   addFood: document.querySelector("#add-food"),
+  foodDialog: document.querySelector("#food-dialog"),
+  closeFoodDialog: document.querySelector("#close-food-dialog"),
   foodForm: document.querySelector("#food-form"),
   foodFormTitle: document.querySelector("#food-form-title"),
   foodProteinFields: document.querySelector("#food-protein-fields"),
@@ -364,7 +366,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=26").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=27").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -432,6 +434,7 @@ function bindEvents() {
   elements.addFood.addEventListener("click", () => openFoodForm());
   elements.foodForm.addEventListener("submit", handleFoodSubmit);
   elements.foodForm.elements.proteinEnabled.addEventListener("change", updateFoodProteinFields);
+  elements.closeFoodDialog.addEventListener("click", closeFoodForm);
   elements.cancelFoodEdit.addEventListener("click", closeFoodForm);
   elements.manageFoodsFromMeal.addEventListener("click", openFoodSettingsFromMeal);
   elements.cancelDeleteFood.addEventListener("click", closeDeleteFoodDialog);
@@ -460,6 +463,7 @@ function bindEvents() {
     closeGuidedWorkout();
   });
   bindGuardedDialog(elements.dataDialog, requestCloseDataDialog);
+  bindGuardedDialog(elements.foodDialog, closeFoodForm);
   window.addEventListener("beforeinstallprompt", handleInstallPrompt);
 }
 
@@ -1686,7 +1690,7 @@ function createFoodAction(text, label, action) {
 function openFoodForm(food = null) {
   if (!data || !isStorageWritable()) return;
   if (
-    !elements.foodForm.hidden
+    elements.foodDialog.open
     && formSignature(elements.foodForm) !== foodFormBaseline
   ) {
     requestDiscardConfirmation(() => {
@@ -1712,7 +1716,7 @@ function openFoodForm(food = null) {
   elements.foodFormTitle.textContent = food ? "编辑常用食材" : "添加常用食材";
   setInlineError(elements.foodFormError, "");
   updateFoodProteinFields();
-  elements.foodForm.hidden = false;
+  if (!elements.foodDialog.open) elements.foodDialog.showModal();
   foodFormBaseline = formSignature(elements.foodForm);
   elements.foodForm.elements.name.focus({ preventScroll: true });
 }
@@ -1769,6 +1773,7 @@ function handleFoodSubmit(event) {
 }
 
 function closeFoodForm() {
+  if (!elements.foodDialog.open) return;
   if (formSignature(elements.foodForm) === foodFormBaseline) {
     resetFoodForm();
     return;
@@ -1777,7 +1782,7 @@ function closeFoodForm() {
 }
 
 function resetFoodForm() {
-  elements.foodForm.hidden = true;
+  if (elements.foodDialog.open) elements.foodDialog.close();
   elements.foodForm.reset();
   setInlineError(elements.foodFormError, "");
   foodFormBaseline = null;
@@ -2219,15 +2224,12 @@ function requestDiscardConfirmation(action) {
 
 function requestCloseDataDialog() {
   const weeklyDirty = formSignature(elements.weeklyPlanForm) !== weeklyPlanBaseline;
-  const foodDirty = !elements.foodForm.hidden
-    && formSignature(elements.foodForm) !== foodFormBaseline;
-  if (!weeklyDirty && !foodDirty) {
+  if (!weeklyDirty) {
     elements.dataDialog.close();
     return;
   }
   requestDiscardConfirmation(() => {
     weeklyPlanBaseline = null;
-    resetFoodForm();
     elements.dataDialog.close();
   });
 }
