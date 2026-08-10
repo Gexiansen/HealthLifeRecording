@@ -2,7 +2,7 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=32";
+} from "./model.js?v=33";
 import {
   allRecordsByDate,
   deleteFood,
@@ -14,7 +14,7 @@ import {
   saveFoodWithProteinHistory,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=32";
+} from "./data.js?v=33";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -26,22 +26,22 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=32";
+} from "./storage.js?v=33";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=32";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=32";
+} from "./calendar.js?v=33";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=33";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=32";
+} from "./backup.js?v=33";
 import {
   calculatePaceSecondsPerKilometer,
   calculateVisibilityScroll,
@@ -52,8 +52,8 @@ import {
   getDefaultWorkoutScenario,
   getLatestWorkoutForScenario,
   getRestoreLabel,
-} from "./interaction.js?v=32";
-import { serializeAnalysisExport } from "./analysis.js?v=32";
+} from "./interaction.js?v=33";
+import { serializeAnalysisExport } from "./analysis.js?v=33";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -71,12 +71,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=32";
+} from "./guided-workout.js?v=33";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=32";
+} from "./training-insights.js?v=33";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -87,7 +87,7 @@ import {
   formatFoodAmount,
   formatProteinGrams,
   getMealProteinTarget,
-} from "./nutrition.js?v=32";
+} from "./nutrition.js?v=33";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -140,6 +140,15 @@ const FOOD_CATEGORY_LABELS = Object.freeze({
   drink: "饮品",
   other: "其他",
 });
+
+const FOOD_CATEGORY_GROUPS = Object.freeze([
+  Object.freeze({ key: "protein", label: "肉蛋豆类", categories: Object.freeze(["protein"]) }),
+  Object.freeze({ key: "staple", label: "主食", categories: Object.freeze(["staple"]) }),
+  Object.freeze({ key: "dairy-drink", label: "奶类与饮品", categories: Object.freeze(["dairy", "drink"]) }),
+  Object.freeze({ key: "vegetable", label: "蔬菜", categories: Object.freeze(["vegetable"]) }),
+  Object.freeze({ key: "fruit", label: "水果", categories: Object.freeze(["fruit"]) }),
+  Object.freeze({ key: "other", label: "其他", categories: Object.freeze(["other"]) }),
+]);
 
 const FOOD_UNIT_LABELS = Object.freeze({
   grams: "克",
@@ -405,7 +414,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=32").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=33").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -2168,21 +2177,51 @@ function renderMealFoodPicker(record) {
   }));
   elements.mealFoodOptions.replaceChildren();
   elements.mealFoodEmpty.hidden = data.foods.length > 0;
-  for (const food of data.foods) {
-    const label = document.createElement("label");
-    label.className = "meal-food-option";
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.value = food.id;
-    input.dataset.foodSelect = food.id;
-    input.checked = mealSelections.some((item) => item.sourceFoodId === food.id);
-    const text = document.createElement("span");
-    text.textContent = `${food.name} · ${formatFoodAmount(food.defaultAmount, food.unit)}`;
-    input.addEventListener("change", () => toggleMealFood(food, input.checked));
-    label.append(input, text);
-    elements.mealFoodOptions.append(label);
+  for (const group of FOOD_CATEGORY_GROUPS) {
+    const foods = data.foods.filter((food) => group.categories.includes(food.category));
+    if (!foods.length) continue;
+    const section = document.createElement("section");
+    section.className = "meal-food-group";
+    const heading = document.createElement("h4");
+    heading.className = "meal-food-group-heading";
+    heading.id = `meal-food-group-${group.key}`;
+    heading.textContent = group.label;
+    section.setAttribute("aria-labelledby", heading.id);
+    const options = document.createElement("div");
+    options.className = "meal-food-group-options";
+    for (const food of foods) {
+      options.append(createMealFoodOption(food));
+    }
+    section.append(heading, options);
+    elements.mealFoodOptions.append(section);
   }
   renderMealSelections();
+}
+
+function createMealFoodOption(food) {
+  const label = document.createElement("label");
+  label.className = "meal-food-option";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.value = food.id;
+  input.dataset.foodSelect = food.id;
+  input.checked = mealSelections.some((item) => item.sourceFoodId === food.id);
+  const text = document.createElement("span");
+  text.className = "meal-food-option-content";
+  const title = document.createElement("strong");
+  title.textContent = `${food.name} · 默认 ${formatFoodAmount(food.defaultAmount, food.unit)}`;
+  const protein = document.createElement("small");
+  protein.textContent = getMealFoodProteinLabel(food);
+  text.append(title, protein);
+  input.addEventListener("change", () => toggleMealFood(food, input.checked));
+  label.append(input, text);
+  return label;
+}
+
+function getMealFoodProteinLabel(food) {
+  if (food.proteinReference === null) return "本份蛋白质未设置";
+  const proteinMilligrams = calculateFoodProteinMilligrams(food, food.defaultAmount, food.unit);
+  return `本份蛋白质约 ${formatProteinGrams(proteinMilligrams)} g（${FOOD_BASIS_LABELS[food.proteinReference.basis]}）`;
 }
 
 function toggleMealFood(food, selected) {

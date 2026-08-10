@@ -112,9 +112,15 @@ test("饮食支持常用食材多选、份量调整、蛋白质预览和自由�
   assert.match(app, /buildMealContent/);
   assert.match(app, /getMealProteinTarget/);
   assert.match(app, /getActiveProteinGoal/);
+  assert.match(app, /FOOD_CATEGORY_GROUPS/);
+  assert.match(app, /categories: Object\.freeze\(\["dairy", "drink"\]\)/);
+  assert.match(app, /本份蛋白质约/);
+  assert.match(app, /本份蛋白质未设置/);
   assert.match(app, /加餐不使用三餐建议/);
   assert.match(styles, /\.protein-preview\[data-status="within"\]/);
-  assert.match(styles, /\.meal-picker-heading > div, \.meal-food-options, \.meal-selected-item > \*[^\{]*\{[^}]*min-width:\s*0/);
+  assert.match(styles, /\.meal-food-group-options/);
+  assert.match(styles, /\.meal-food-option small/);
+  assert.match(styles, /\.meal-picker-heading > div, \.meal-food-options, \.meal-food-group-options, \.meal-selected-item > \*[^\{]*\{[^}]*min-width:\s*0/);
   assert.match(styles, /\.meal-food-option[^\{]*\{[^}]*max-width:\s*100%/);
   assert.match(styles, /\.meal-food-option span[^\{]*\{[^}]*overflow-wrap:\s*anywhere/);
   assert.match(styles, /\.meal-selected-item strong, \.meal-selected-item span[^\{]*\{[^}]*overflow-wrap:\s*anywhere/);
