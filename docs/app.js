@@ -2,7 +2,7 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=35";
+} from "./model.js?v=36";
 import {
   allRecordsByDate,
   deleteFood,
@@ -14,7 +14,7 @@ import {
   saveFoodWithProteinHistory,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=35";
+} from "./data.js?v=36";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -26,34 +26,36 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=35";
+} from "./storage.js?v=36";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=35";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=35";
+} from "./calendar.js?v=36";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=36";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=35";
+} from "./backup.js?v=36";
 import {
   calculatePaceSecondsPerKilometer,
   calculateVisibilityScroll,
   createWorkoutRepeatValues,
   filterRecordItems,
+  findMealConflict,
   getDateContext,
   getDefaultMealType,
   getDefaultWorkoutScenario,
   getLatestWorkoutForScenario,
+  getMealsForDate,
   getRestoreLabel,
-} from "./interaction.js?v=35";
-import { serializeAnalysisExport } from "./analysis.js?v=35";
+} from "./interaction.js?v=36";
+import { serializeAnalysisExport } from "./analysis.js?v=36";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -71,12 +73,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=35";
+} from "./guided-workout.js?v=36";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=35";
+} from "./training-insights.js?v=36";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -87,7 +89,7 @@ import {
   formatFoodAmount,
   formatProteinGrams,
   getMealProteinTarget,
-} from "./nutrition.js?v=35";
+} from "./nutrition.js?v=36";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -193,6 +195,7 @@ let foodFormBaseline = null;
 let foodDialogViewportBaseline = null;
 let foodVisibilityFrame = null;
 let mealSelections = [];
+let pendingDuplicateMeal = null;
 let pendingFoodDeletion = null;
 let pendingFoodSave = null;
 let workoutDraftState = loadWorkoutDraft();
@@ -230,11 +233,15 @@ const elements = {
   startGuidedWorkout: document.querySelector("#start-guided-workout"),
   workoutSummary: document.querySelector("#workout-summary"),
   mealSummary: document.querySelector("#meal-summary"),
+  mealAction: document.querySelector("#meal-action"),
+  mealExistingRecords: document.querySelector("#meal-existing-records"),
+  mealExistingOptions: document.querySelector("#meal-existing-options"),
   mealFoodEmpty: document.querySelector("#meal-food-empty"),
   mealFoodOptions: document.querySelector("#meal-food-options"),
   mealSelectedFoods: document.querySelector("#meal-selected-foods"),
   mealProteinPreview: document.querySelector("#meal-protein-preview"),
   manageFoodsFromMeal: document.querySelector("#manage-foods-from-meal"),
+  mealSubmit: document.querySelector("#meal-submit"),
   sleepSummary: document.querySelector("#sleep-summary"),
   weightSummary: document.querySelector("#weight-summary"),
   sleepAction: document.querySelector("#sleep-action"),
@@ -287,6 +294,12 @@ const elements = {
   discardDialog: document.querySelector("#discard-dialog"),
   continueEditing: document.querySelector("#continue-editing"),
   discardChanges: document.querySelector("#discard-changes"),
+  mealDuplicateDialog: document.querySelector("#meal-duplicate-dialog"),
+  mealDuplicateDialogTitle: document.querySelector("#meal-duplicate-dialog-title"),
+  mealDuplicateDialogMessage: document.querySelector("#meal-duplicate-dialog-message"),
+  supplementExistingMeal: document.querySelector("#supplement-existing-meal"),
+  cancelDuplicateMeal: document.querySelector("#cancel-duplicate-meal"),
+  confirmDuplicateMeal: document.querySelector("#confirm-duplicate-meal"),
   toast: document.querySelector("#toast"),
   toastMessage: document.querySelector("#toast-message"),
   undoButton: document.querySelector("#undo-button"),
@@ -418,7 +431,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=35").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=36").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -465,10 +478,13 @@ function bindEvents() {
     editing = null;
     activeForm = null;
     formBaseline = null;
+    pendingDuplicateMeal = null;
     elements.dialog.classList.remove("record-dialog-meal");
     elements.recordDateField.hidden = false;
     elements.recordDialogDate.hidden = true;
     elements.mealTypeField.hidden = true;
+    elements.mealExistingRecords.hidden = true;
+    elements.mealExistingOptions.replaceChildren();
     setFormError("");
   });
   elements.continueEditing.addEventListener("click", () => {
@@ -476,6 +492,9 @@ function bindEvents() {
     elements.discardDialog.close();
   });
   elements.discardChanges.addEventListener("click", discardFormChanges);
+  elements.supplementExistingMeal.addEventListener("click", supplementExistingMeal);
+  elements.cancelDuplicateMeal.addEventListener("click", closeDuplicateMealDialog);
+  elements.confirmDuplicateMeal.addEventListener("click", confirmDuplicateMealSave);
   elements.undoButton.addEventListener("click", undoLastChange);
   elements.downloadRaw.addEventListener("click", downloadCorruptData);
   elements.openData.addEventListener("click", () => openDataDialog("home"));
@@ -544,6 +563,7 @@ function bindEvents() {
   });
   elements.dataDialog.addEventListener("close", resetSettingsDialog);
   bindGuardedDialog(elements.foodDialog, closeFoodForm);
+  bindGuardedDialog(elements.mealDuplicateDialog, closeDuplicateMealDialog);
   window.visualViewport?.addEventListener("resize", syncFoodDialogViewport);
   window.visualViewport?.addEventListener("scroll", syncFoodDialogViewport);
   window.addEventListener("resize", syncFoodDialogViewport);
@@ -662,6 +682,7 @@ function renderToday() {
       incompleteMeals ? ` · ${incompleteMeals} 餐未完整估算` : ""
     }`;
   }
+  elements.mealAction.textContent = meals.length ? "记录／补充饮食" : "记录饮食";
   elements.sleepSummary.textContent = sleep
     ? `${formatMinutes(calculateSleepMinutes(sleep.sleepTime, sleep.wakeTime))}，质量 ${sleep.qualityScore}/5`
     : "尚未记录";
@@ -2117,10 +2138,16 @@ function openForm(type, explicitRecord = null) {
   elements.recordDialogDate.textContent = formatDisplayDate(recordDate);
   elements.mealTypeField.hidden = !isMeal;
   elements.recordDate.value = recordDate;
-  elements.dialogTitle.textContent = `${record ? "编辑" : "新增"}${config.label}`;
+  elements.dialogTitle.textContent = type === "meal" && record
+    ? `补充${MEAL_LABELS[record.mealType]}`
+    : `${record ? "编辑" : "新增"}${config.label}`;
   setFormError("");
   fillForm(type, form, record);
-  if (type === "meal") renderMealFoodPicker(record);
+  if (type === "meal") {
+    elements.mealSubmit.textContent = record ? `保存${MEAL_LABELS[record.mealType]}补充` : "保存饮食";
+    renderMealExistingRecords(record);
+    renderMealFoodPicker(record);
+  }
   updateSleepDurationPreview();
   updateWorkoutFieldState(false);
   updateWorkoutPacePreview();
@@ -2128,7 +2155,9 @@ function openForm(type, explicitRecord = null) {
   elements.dialog.showModal();
   let initialFocusTarget;
   if (type === "meal") {
-    initialFocusTarget = form.querySelector("[data-food-select]") ?? form.querySelector("[data-primary-input]");
+    initialFocusTarget = elements.mealExistingOptions.querySelector("button")
+      ?? form.querySelector("[data-food-select]")
+      ?? form.querySelector("[data-primary-input]");
   } else if (type === "workout") {
     initialFocusTarget = record?.scenario === "guided"
       ? form.elements.durationMinutes
@@ -2184,6 +2213,64 @@ function fillForm(type, form, record) {
       ? ""
       : formatDecimal(record.distanceMeters / 1_000, 3);
   }
+}
+
+function renderMealExistingRecords(activeRecord) {
+  elements.mealExistingOptions.replaceChildren();
+  if (!data || activeRecord) {
+    elements.mealExistingRecords.hidden = true;
+    return;
+  }
+
+  const meals = getMealsForDate(data.meals, elements.recordDate.value);
+  elements.mealExistingRecords.hidden = meals.length === 0;
+  if (!meals.length) return;
+
+  const totals = meals.reduce((result, meal) => {
+    result[meal.mealType] = (result[meal.mealType] ?? 0) + 1;
+    return result;
+  }, {});
+  const positions = {};
+  for (const meal of meals) {
+    positions[meal.mealType] = (positions[meal.mealType] ?? 0) + 1;
+    const label = MEAL_LABELS[meal.mealType];
+    const suffix = totals[meal.mealType] > 1 ? ` ${positions[meal.mealType]}` : "";
+    const protein = calculateMealProteinSummary(meal.foodItems, meal.freeText);
+    const estimate = protein.estimatedProteinMilligrams > 0
+      ? `约 ${formatProteinGrams(protein.estimatedProteinMilligrams)} g`
+      : "未估算";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.mealRecordId = meal.id;
+    button.textContent = `${label}${suffix} · ${estimate}`;
+    button.setAttribute("aria-label", `补充${label}${suffix}`);
+    button.addEventListener("click", () => requestMealSupplement(meal));
+    elements.mealExistingOptions.append(button);
+  }
+}
+
+function requestMealSupplement(record) {
+  const load = () => loadMealRecord(record);
+  if (getFormSignature() === formBaseline) load();
+  else requestDiscardConfirmation(load);
+}
+
+function loadMealRecord(record) {
+  if (!activeForm || activeForm.dataset.recordForm !== "meal") return;
+  activeForm.reset();
+  editing = { type: "meal", record };
+  mealSelections = [];
+  elements.recordDate.value = record.date;
+  elements.recordDialogDate.dateTime = record.date;
+  elements.recordDialogDate.textContent = formatDisplayDate(record.date);
+  elements.dialogTitle.textContent = `补充${MEAL_LABELS[record.mealType]}`;
+  elements.mealSubmit.textContent = `保存${MEAL_LABELS[record.mealType]}补充`;
+  setFormError("");
+  fillForm("meal", activeForm, record);
+  renderMealExistingRecords(record);
+  renderMealFoodPicker(record);
+  formBaseline = getFormSignature();
+  elements.dialogTitle.focus({ preventScroll: true });
 }
 
 function renderMealFoodPicker(record) {
@@ -2382,7 +2469,14 @@ function handleFormInput(event) {
   if (editing?.type === "workout" && ["workoutScenario", "source", "keepFeedback"].includes(event?.target?.name)) {
     updateWorkoutFieldState(true);
   }
-  if (editing?.type === "meal") renderMealProteinPreview();
+  if (editing?.type === "meal") {
+    renderMealProteinPreview();
+    if (editing.record && event?.target === elements.mealType) {
+      const label = MEAL_LABELS[elements.mealType.value];
+      elements.dialogTitle.textContent = `补充${label}`;
+      elements.mealSubmit.textContent = `保存${label}补充`;
+    }
+  }
   updateSleepDurationPreview();
   updateWorkoutPacePreview();
 }
@@ -2610,14 +2704,63 @@ function handleFormSubmit(event) {
 
   try {
     const record = buildRecord(type, form, base);
-    const next = saveRecord(data, TYPE_CONFIG[type].collectionName, record);
-    saveData(next);
-    data = next;
-    elements.dialog.close();
-    selectedDate = record.date;
-    calendarAnchor = record.date;
-    renderAll();
-    showToast(`${TYPE_CONFIG[type].label}已保存`);
+    const conflict = type === "meal" && record.mealType !== "snack"
+      ? findMealConflict(data.meals, record.date, record.mealType, record.id)
+      : null;
+    if (conflict) {
+      requestDuplicateMealDecision(record, conflict);
+      return;
+    }
+    persistRecord(type, record);
+  } catch (error) {
+    setFormError(error.message || "保存失败，请检查输入");
+  }
+}
+
+function persistRecord(type, record) {
+  const collectionName = TYPE_CONFIG[type].collectionName;
+  const updatesExisting = data[collectionName].some((item) => item.id === record.id);
+  const next = saveRecord(data, collectionName, record);
+  saveData(next);
+  data = next;
+  elements.dialog.close();
+  selectedDate = record.date;
+  calendarAnchor = record.date;
+  renderAll();
+  showToast(type === "meal"
+    ? `${MEAL_LABELS[record.mealType]}${updatesExisting ? "已补充" : "已保存"}`
+    : `${TYPE_CONFIG[type].label}已保存`);
+}
+
+function requestDuplicateMealDecision(record, existingRecord) {
+  const label = MEAL_LABELS[record.mealType];
+  pendingDuplicateMeal = { record, existingRecord };
+  elements.mealDuplicateDialogTitle.textContent = `已有${label}记录`;
+  elements.mealDuplicateDialogMessage.textContent = `${formatDisplayDate(record.date)}已经记录过${label}。补充原记录会放弃当前未保存内容并载入已有${label}；仍新增一条会保留当前内容，并在统计中单独计为一餐。`;
+  elements.supplementExistingMeal.textContent = "补充原记录";
+  elements.confirmDuplicateMeal.textContent = "仍新增一条";
+  elements.mealDuplicateDialog.showModal();
+}
+
+function closeDuplicateMealDialog() {
+  pendingDuplicateMeal = null;
+  if (elements.mealDuplicateDialog.open) elements.mealDuplicateDialog.close();
+}
+
+function supplementExistingMeal() {
+  const existingRecord = pendingDuplicateMeal?.existingRecord;
+  pendingDuplicateMeal = null;
+  elements.mealDuplicateDialog.close();
+  if (existingRecord) loadMealRecord(existingRecord);
+}
+
+function confirmDuplicateMealSave() {
+  const record = pendingDuplicateMeal?.record;
+  pendingDuplicateMeal = null;
+  elements.mealDuplicateDialog.close();
+  if (!record) return;
+  try {
+    persistRecord("meal", record);
   } catch (error) {
     setFormError(error.message || "保存失败，请检查输入");
   }

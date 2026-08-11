@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=35">
+    <link rel="manifest" href="./manifest.webmanifest?v=36">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=35">
+    <link rel="stylesheet" href="./styles.css?v=36">
   </head>
   <body>
     <header class="app-header">
@@ -72,7 +72,7 @@
           <article class="summary-card meal-card">
             <div class="card-heading"><span class="card-icon">食</span><h3>饮食</h3></div>
             <p id="meal-summary" class="card-value">尚未记录</p>
-            <button type="button" data-open-form="meal">记录饮食</button>
+            <button id="meal-action" type="button" data-open-form="meal">记录饮食</button>
           </article>
           <article class="summary-card sleep-card">
             <div class="card-heading"><span class="card-icon">眠</span><h3>睡眠</h3></div>
@@ -251,6 +251,10 @@
       </form>
 
       <form id="meal-form" data-record-form="meal" hidden>
+        <section id="meal-existing-records" class="meal-existing-records" aria-label="本日已记录餐次" hidden>
+          <span>本日已记录</span>
+          <div id="meal-existing-options" class="meal-existing-options"></div>
+        </section>
         <section class="meal-food-picker" aria-labelledby="meal-food-picker-title">
           <div class="meal-picker-heading">
             <div><strong id="meal-food-picker-title">常用食材</strong><span>选择后使用默认份量</span></div>
@@ -263,7 +267,7 @@
         </section>
         <label class="field"><span>补充说明（可选）</span><textarea name="freeText" maxlength="2000" rows="3" placeholder="外卖、堂食或临时食物可以直接写在这里，例如：牛肉面一碗，份量不详。" data-primary-input></textarea></label>
         <p class="field-help">蛋白质仅根据已选择食材的参考值估算；文字补充不会被自动换算。</p>
-        <button class="primary-button" type="submit">保存饮食</button>
+        <button id="meal-submit" class="primary-button" type="submit">保存饮食</button>
       </form>
 
       <form id="sleep-form" data-record-form="sleep" hidden>
@@ -299,6 +303,18 @@
         <div>
           <button id="continue-editing" class="secondary-neutral-button" type="button">继续填写</button>
           <button id="discard-changes" class="danger-button" type="button">放弃内容</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="meal-duplicate-dialog" aria-labelledby="meal-duplicate-dialog-title">
+      <div class="confirm-dialog-body meal-duplicate-dialog-body">
+        <h2 id="meal-duplicate-dialog-title">本日已有同餐次记录</h2>
+        <p id="meal-duplicate-dialog-message"></p>
+        <div class="meal-duplicate-actions">
+          <button id="supplement-existing-meal" class="primary-button" type="button">补充原记录</button>
+          <button id="cancel-duplicate-meal" class="secondary-neutral-button" type="button">返回修改</button>
+          <button id="confirm-duplicate-meal" class="secondary-neutral-button" type="button">仍新增一条</button>
         </div>
       </div>
     </dialog>
@@ -606,6 +622,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=35"></script>
+    <script type="module" src="./app.js?v=36"></script>
   </body>
 </html>

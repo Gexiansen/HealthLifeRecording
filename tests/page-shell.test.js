@@ -64,7 +64,9 @@ test("记录表单优先聚焦场景或高频输入，睡眠表单避免主动�
   assert.match(html, /name="freeText"[^>]*data-primary-input/);
   assert.match(html, /name="weightKg"[^>]*data-primary-input/);
   assert.match(html, /id="dialog-title" tabindex="-1"/);
-  assert.match(app, /form\.querySelector\("\[data-food-select\]"\) \?\? form\.querySelector\("\[data-primary-input\]"\)/);
+  assert.match(app, /elements\.mealExistingOptions\.querySelector\("button"\)/);
+  assert.match(app, /form\.querySelector\("\[data-food-select\]"\)/);
+  assert.match(app, /form\.querySelector\("\[data-primary-input\]"\)/);
   assert.match(app, /form\.querySelector\("\[name=workoutScenario\]:checked"\)/);
   assert.match(app, /\(initialFocusTarget \?\? elements\.dialogTitle\)\.focus/);
 });
@@ -98,9 +100,16 @@ test("Keep 表单包含课程、完成情况、器械重量和可选不适反馈
 test("饮食支持常用食材多选、份量调整、蛋白质预览和自由文字兜底", () => {
   assert.doesNotMatch(html, /name="healthScore"|name="activeEnergyKcal"|name="maxHeartRateBpm"/);
   for (const id of [
+    "meal-action",
+    "meal-existing-records",
+    "meal-existing-options",
     "meal-food-options",
     "meal-selected-foods",
     "meal-protein-preview",
+    "meal-submit",
+    "meal-duplicate-dialog",
+    "supplement-existing-meal",
+    "confirm-duplicate-meal",
     "manage-foods-from-meal",
     "food-list",
     "food-form",
@@ -117,6 +126,8 @@ test("饮食支持常用食材多选、份量调整、蛋白质预览和自由�
   assert.match(app, /buildMealContent/);
   assert.match(app, /getMealProteinTarget/);
   assert.match(app, /getActiveProteinGoal/);
+  assert.match(app, /getMealsForDate/);
+  assert.match(app, /findMealConflict/);
   assert.match(app, /getFormControls/);
   assert.match(app, /record-dialog-meal/);
   assert.match(app, /elements\.recordDateField\.hidden = isMeal/);
@@ -128,7 +139,12 @@ test("饮食支持常用食材多选、份量调整、蛋白质预览和自由�
   assert.match(app, /本份蛋白质约/);
   assert.match(app, /本份蛋白质未设置/);
   assert.match(app, /加餐不使用三餐建议/);
+  assert.match(app, /record\.mealType !== "snack"/);
+  assert.match(app, /补充原记录会放弃当前未保存内容/);
+  assert.match(app, /elements\.mealAction\.textContent = meals\.length \? "记录／补充饮食"/);
   assert.match(styles, /\.protein-preview\[data-status="within"\]/);
+  assert.match(styles, /\.meal-existing-records/);
+  assert.match(styles, /\.meal-duplicate-actions/);
   assert.match(styles, /\.meal-food-group-options/);
   assert.match(styles, /\.meal-food-option small/);
   assert.match(styles, /#record-dialog\.record-dialog-meal/);

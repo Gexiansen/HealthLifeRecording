@@ -4,14 +4,16 @@ import {
   calculatePaceSecondsPerKilometer,
   calculateVisibilityScroll,
   filterRecordItems,
+  findMealConflict,
   getDateContext,
   getDefaultMealType,
+  getMealsForDate,
   getDefaultWorkoutScenario,
   getLatestWorkoutForScenario,
   getRestoreLabel,
   createWorkoutRepeatValues,
 } from "../docs/interaction.js";
-import { keepWorkout, workout } from "./helpers.js";
+import { keepWorkout, meal, workout } from "./helpers.js";
 
 test("日期语境只区分今日与历史日期标题", () => {
   assert.deepEqual(getDateContext("2026-07-31", "2026-07-31"), { heading: "今日" });
@@ -26,6 +28,34 @@ test("默认餐次、配速、筛选和恢复文案保持有效", () => {
   assert.equal(filterRecordItems(items, "workouts", "2026-07").length, 1);
   assert.throws(() => filterRecordItems(items, "plans"), /不受支持/);
   assert.match(getRestoreLabel(2, 3).summary, /完整替换/);
+});
+
+test("当天餐食按餐次排列，并在补充时排除当前记录后检查重复", () => {
+  const breakfast = meal();
+  const laterBreakfast = meal({
+    id: "77777777-7777-4777-8777-777777777777",
+    createdAt: "2026-07-31T08:30:00.000Z",
+  });
+  const lunch = meal({
+    id: "88888888-8888-4888-8888-888888888888",
+    mealType: "lunch",
+    createdAt: "2026-07-31T04:30:00.000Z",
+  });
+  const otherDate = meal({
+    id: "99999999-9999-4999-8999-999999999999",
+    date: "2026-07-30",
+  });
+  const meals = [lunch, laterBreakfast, otherDate, breakfast];
+
+  assert.deepEqual(getMealsForDate(meals, "2026-07-31").map((item) => item.id), [
+    breakfast.id,
+    laterBreakfast.id,
+    lunch.id,
+  ]);
+  assert.equal(findMealConflict(meals, "2026-07-31", "breakfast").id, breakfast.id);
+  assert.equal(findMealConflict(meals, "2026-07-31", "breakfast", breakfast.id).id, laterBreakfast.id);
+  assert.equal(findMealConflict([breakfast], "2026-07-31", "breakfast", breakfast.id), null);
+  assert.throws(() => findMealConflict(meals, "2026-07-31", "brunch"), /不受支持/);
 });
 
 test("输入区域被遮挡时计算最小滚动距离，已可见时不移动", () => {

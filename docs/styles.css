@@ -321,6 +321,10 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .scenario-fields > .field:last-child, .scenario-fields > .field-row:last-child { margin-bottom: 0; }
 .repeat-workout-button { width: 100%; margin-bottom: 5px; }
 .repeat-workout-meta { min-height: 18px; line-height: 1.45; }
+.meal-existing-records { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 13px; background: #f0f5f2; padding: 7px 8px; }
+.meal-existing-records > span { flex: 0 0 auto; color: var(--muted); font-size: 12px; font-weight: 800; }
+.meal-existing-options { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.meal-existing-options button { max-width: 100%; min-height: 44px; border: 1px solid #b8d2c7; border-radius: 11px; background: white; color: var(--primary-dark); padding: 7px 10px; font-size: 12px; font-weight: 800; overflow-wrap: anywhere; }
 .meal-food-picker { margin-bottom: 14px; border: 1px solid var(--line); border-radius: 16px; background: #f8faf7; padding: 12px; }
 .meal-picker-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .meal-picker-heading > div, .meal-food-options, .meal-food-group-options, .meal-selected-item > * { min-width: 0; }
@@ -437,6 +441,8 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .confirm-dialog-body p { margin: 10px 0 20px; color: var(--muted); line-height: 1.55; }
 .confirm-dialog-body > div { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .secondary-neutral-button { min-height: 46px; border: 1px solid var(--line); border-radius: 13px; background: white; color: var(--ink); font-weight: 750; }
+.meal-duplicate-actions { grid-template-columns: 1fr 1fr !important; }
+.meal-duplicate-actions .primary-button { grid-column: 1 / -1; margin-top: 0; }
 .food-history-dialog-body { padding: 20px; }
 .food-history-dialog-body > p { margin-bottom: 14px; }
 .food-history-impact { display: grid; gap: 7px; margin: 0 0 14px; border-radius: 13px; background: #f8faf7; padding: 10px 12px; }
@@ -517,6 +523,9 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
   #record-dialog.record-dialog-meal > .record-context-row,
   #record-dialog.record-dialog-meal > form { margin-right: 14px; margin-left: 14px; }
   #record-dialog.record-dialog-meal > .record-context-row { display: block; }
+  #record-dialog.record-dialog-meal .meal-existing-records { display: grid; gap: 5px; }
+  #record-dialog.record-dialog-meal .meal-existing-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #record-dialog.record-dialog-meal .meal-existing-options button { min-width: 0; padding: 6px 8px; }
   #record-dialog.record-dialog-meal .record-context-row .field,
   #record-dialog.record-dialog-meal .field { gap: 5px; margin-bottom: 10px; }
   #record-dialog.record-dialog-meal > form { padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }

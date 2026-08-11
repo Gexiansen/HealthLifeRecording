@@ -6,6 +6,7 @@ const COLLECTIONS = new Set([
 ]);
 
 const REPEATABLE_WORKOUT_SCENARIOS = new Set(["keep", "running", "other"]);
+const MEAL_TYPE_ORDER = Object.freeze({ breakfast: 0, lunch: 1, dinner: 2, snack: 3 });
 
 export function getDateContext(selectedDate, today) {
   assertDateString(selectedDate, "selectedDate");
@@ -29,6 +30,27 @@ export function getDefaultMealType(hour) {
   if (hour < 15) return "lunch";
   if (hour < 21) return "dinner";
   return "snack";
+}
+
+export function getMealsForDate(meals, date) {
+  if (!Array.isArray(meals)) throw new TypeError("meals 必须是数组");
+  assertDateString(date, "date");
+  return meals
+    .filter((meal) => meal?.date === date)
+    .sort((left, right) => {
+      const typeOrder = MEAL_TYPE_ORDER[left.mealType] - MEAL_TYPE_ORDER[right.mealType];
+      return typeOrder || left.createdAt.localeCompare(right.createdAt);
+    });
+}
+
+export function findMealConflict(meals, date, mealType, currentRecordId = null) {
+  if (!(mealType in MEAL_TYPE_ORDER)) throw new TypeError("mealType 不受支持");
+  if (currentRecordId !== null && typeof currentRecordId !== "string") {
+    throw new TypeError("currentRecordId 必须是字符串或 null");
+  }
+  return getMealsForDate(meals, date).find((meal) => (
+    meal.mealType === mealType && meal.id !== currentRecordId
+  )) ?? null;
 }
 
 export function getDefaultWorkoutScenario(planType) {
