@@ -561,3 +561,9 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
   .food-list-item { grid-template-columns: 1fr; }
   .food-list-actions { justify-content: flex-end; }
 }
+
+@media (max-width: 340px) {
+  .workout-card { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 8px; }
+  .workout-card .card-value { grid-column: 1 / -1; grid-row: 2; }
+  .workout-card > button { padding: 0 10px; font-size: 13px; white-space: nowrap; }
+}

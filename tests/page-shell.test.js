@@ -39,6 +39,16 @@ test("日历标题展示所选日期训练类型和所选月份运动天数", ()
   assert.doesNotMatch(html, /执行率/);
 });
 
+test("休息日使用动态记录分母并保留额外运动入口", () => {
+  assert.match(html, /id="workout-action"/);
+  assert.match(app, /status\.completedCount\}\/\$\{status\.expectedCount/);
+  assert.match(app, /status\.plannedRest\s*\?\s*"休·"/);
+  assert.match(app, /plannedType === "rest"\s*\? "按计划休息"/);
+  assert.match(app, /"记录额外运动"/);
+  assert.match(styles, /@media \(max-width: 340px\)/);
+  assert.match(styles, /\.workout-card \.card-value \{ grid-column: 1 \/ -1; grid-row: 2; \}/);
+});
+
 test("运动表单按 Keep、跑步和其他运动分流，不混用场景字段", () => {
   for (const id of [
     "workout-scenario-picker",

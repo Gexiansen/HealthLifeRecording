@@ -2,7 +2,7 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=36";
+} from "./model.js?v=37";
 import {
   allRecordsByDate,
   deleteFood,
@@ -14,7 +14,7 @@ import {
   saveFoodWithProteinHistory,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=36";
+} from "./data.js?v=37";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -26,22 +26,22 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=36";
+} from "./storage.js?v=37";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=36";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=36";
+} from "./calendar.js?v=37";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=37";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=36";
+} from "./backup.js?v=37";
 import {
   calculatePaceSecondsPerKilometer,
   calculateVisibilityScroll,
@@ -54,8 +54,8 @@ import {
   getLatestWorkoutForScenario,
   getMealsForDate,
   getRestoreLabel,
-} from "./interaction.js?v=36";
-import { serializeAnalysisExport } from "./analysis.js?v=36";
+} from "./interaction.js?v=37";
+import { serializeAnalysisExport } from "./analysis.js?v=37";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -73,12 +73,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=36";
+} from "./guided-workout.js?v=37";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=36";
+} from "./training-insights.js?v=37";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -89,7 +89,7 @@ import {
   formatFoodAmount,
   formatProteinGrams,
   getMealProteinTarget,
-} from "./nutrition.js?v=36";
+} from "./nutrition.js?v=37";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -232,6 +232,7 @@ const elements = {
   recordPlannedWorkout: document.querySelector("#record-planned-workout"),
   startGuidedWorkout: document.querySelector("#start-guided-workout"),
   workoutSummary: document.querySelector("#workout-summary"),
+  workoutAction: document.querySelector("#workout-action"),
   mealSummary: document.querySelector("#meal-summary"),
   mealAction: document.querySelector("#meal-action"),
   mealExistingRecords: document.querySelector("#meal-existing-records"),
@@ -431,7 +432,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=36").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=37").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -664,6 +665,7 @@ function renderToday() {
   }
 
   const workouts = data.workouts.filter((record) => record.date === selectedDate);
+  const plannedType = getTrainingPlanForDate(selectedDate);
   const meals = data.meals.filter((record) => record.date === selectedDate);
   const protein = calculateDailyProteinSummary(data.meals, selectedDate);
   const sleep = findDailyRecord(data, "sleepRecords", selectedDate);
@@ -671,7 +673,8 @@ function renderToday() {
 
   elements.workoutSummary.textContent = workouts.length
     ? `${workouts.length} 次，共 ${workouts.reduce((sum, item) => sum + item.durationMinutes, 0)} 分钟`
-    : "尚未记录";
+    : plannedType === "rest" ? "按计划休息" : "尚未记录";
+  elements.workoutAction.textContent = plannedType === "rest" ? "记录额外运动" : "记录运动";
   if (!meals.length) {
     elements.mealSummary.textContent = "尚未记录";
   } else if (protein.estimatedProteinMilligrams === 0) {
@@ -718,7 +721,7 @@ function renderTrainingRecommendation() {
     ? "今天按模板休息；实际有运动时仍可照常记录。"
     : "完成后按实际情况记录；课程视频继续由 Keep 提供。";
   elements.recordPlannedWorkout.textContent = plannedType === "rest"
-    ? "记录实际运动"
+    ? "记录额外运动"
     : "记录实际训练";
   elements.startGuidedWorkout.textContent = workoutDraft
     ? `继续备用文字训练：${GUIDED_TEMPLATES[workoutDraft.templateId].name}`
@@ -1270,7 +1273,9 @@ function renderCalendar() {
   elements.nextPeriod.disabled = false;
 
   for (const entry of entries) {
-    const status = data ? getDailyStatus(data, entry.date) : { completedCount: 0, hasRecord: false };
+    const status = data
+      ? getDailyStatus(data, entry.date)
+      : { completedCount: 0, expectedCount: 4, hasRecord: false, plannedRest: false };
     const button = document.createElement("button");
     button.type = "button";
     button.className = "calendar-day";
@@ -1281,14 +1286,16 @@ function renderCalendar() {
     button.disabled = !data;
     button.setAttribute(
       "aria-label",
-      `${formatDisplayDate(entry.date)}，已完成 ${status.completedCount}/4 类记录`,
+      `${formatDisplayDate(entry.date)}，${status.plannedRest ? "计划休息，" : ""}已记录 ${status.completedCount}/${status.expectedCount} 项`,
     );
     const dayNumber = document.createElement("span");
     dayNumber.className = "day-number";
     dayNumber.textContent = String(Number(entry.date.slice(-2)));
     const dayStatus = document.createElement("span");
     dayStatus.className = "day-status";
-    dayStatus.textContent = status.hasRecord ? `${status.completedCount}/4` : "—";
+    dayStatus.textContent = status.hasRecord
+      ? `${status.plannedRest ? "休·" : ""}${status.completedCount}/${status.expectedCount}`
+      : "—";
     button.append(dayNumber, dayStatus);
     button.addEventListener("click", () => setSelectedDate(entry.date));
     elements.calendarGrid.append(button);

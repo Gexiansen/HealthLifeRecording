@@ -1,14 +1,19 @@
 export function getDailyStatus(data, date) {
+  const dayIndex = (parseDate(date).getUTCDay() + 6) % 7;
+  const plannedRest = data.weeklyTraining[dayIndex] === "rest";
   const categories = {
     workout: data.workouts.some((record) => record.date === date),
     meal: data.meals.some((record) => record.date === date),
     sleep: data.sleepRecords.some((record) => record.date === date),
     weight: data.weights.some((record) => record.date === date),
   };
+  const completedCount = Object.values(categories).filter(Boolean).length;
   return {
     categories,
-    completedCount: Object.values(categories).filter(Boolean).length,
+    completedCount,
+    expectedCount: plannedRest && !categories.workout ? 3 : 4,
     hasRecord: Object.values(categories).some(Boolean),
+    plannedRest,
   };
 }
 
