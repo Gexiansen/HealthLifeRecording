@@ -2,7 +2,7 @@ import {
   calculateSleepMinutes,
   createId,
   createEmptyData,
-} from "./model.js?v=34";
+} from "./model.js?v=35";
 import {
   allRecordsByDate,
   deleteFood,
@@ -14,7 +14,7 @@ import {
   saveFoodWithProteinHistory,
   saveRecord,
   updateWeeklyTraining,
-} from "./data.js?v=34";
+} from "./data.js?v=35";
 import {
   clearWorkoutUndoHistory,
   clearWorkoutDraft,
@@ -26,22 +26,22 @@ import {
   saveData,
   saveWorkoutDraft,
   saveWorkoutUndoHistory,
-} from "./storage.js?v=34";
+} from "./storage.js?v=35";
 import {
   getCalendarLabel,
   getDailyStatus,
   getMonthGrid,
   getWeekDates,
   shiftCalendarAnchor,
-} from "./calendar.js?v=34";
-import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=34";
+} from "./calendar.js?v=35";
+import { calculateTrendComparison, countWorkoutDaysInMonth } from "./stats.js?v=35";
 import {
   createBackupMetadata,
   getBackupReminder,
   parseCompleteBackup,
   serializeCompleteBackup,
   summarizeData,
-} from "./backup.js?v=34";
+} from "./backup.js?v=35";
 import {
   calculatePaceSecondsPerKilometer,
   calculateVisibilityScroll,
@@ -52,8 +52,8 @@ import {
   getDefaultWorkoutScenario,
   getLatestWorkoutForScenario,
   getRestoreLabel,
-} from "./interaction.js?v=34";
-import { serializeAnalysisExport } from "./analysis.js?v=34";
+} from "./interaction.js?v=35";
+import { serializeAnalysisExport } from "./analysis.js?v=35";
 import {
   completeWorkoutSet,
   createWorkoutUndoHistory,
@@ -71,12 +71,12 @@ import {
   replaceWorkoutExercise,
   skipWorkoutExercise,
   workoutDraftProgress,
-} from "./guided-workout.js?v=34";
+} from "./guided-workout.js?v=35";
 import {
   createProgressionAdvice,
   getExerciseHistory,
   summarizeWorkoutDiscomfort,
-} from "./training-insights.js?v=34";
+} from "./training-insights.js?v=35";
 import {
   buildMealContent,
   calculateDailyProteinSummary,
@@ -87,7 +87,7 @@ import {
   formatFoodAmount,
   formatProteinGrams,
   getMealProteinTarget,
-} from "./nutrition.js?v=34";
+} from "./nutrition.js?v=35";
 
 const TYPE_CONFIG = Object.freeze({
   workout: { collectionName: "workouts", label: "运动" },
@@ -266,6 +266,8 @@ const elements = {
   dialog: document.querySelector("#record-dialog"),
   dialogTitle: document.querySelector("#dialog-title"),
   closeDialog: document.querySelector("#close-dialog"),
+  recordDialogDate: document.querySelector("#record-dialog-date"),
+  recordDateField: document.querySelector("#record-date-field"),
   recordDate: document.querySelector("#record-date"),
   mealTypeField: document.querySelector("#meal-type-field"),
   mealType: document.querySelector("#meal-type"),
@@ -416,7 +418,7 @@ function registerServiceWorker() {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (hadController) elements.appUpdate.hidden = false;
     });
-    navigator.serviceWorker.register("./sw.js?v=34").then((registration) => {
+    navigator.serviceWorker.register("./sw.js?v=35").then((registration) => {
       if (registration.waiting && hadController) elements.appUpdate.hidden = false;
     }).catch(() => {});
   });
@@ -464,6 +466,8 @@ function bindEvents() {
     activeForm = null;
     formBaseline = null;
     elements.dialog.classList.remove("record-dialog-meal");
+    elements.recordDateField.hidden = false;
+    elements.recordDialogDate.hidden = true;
     elements.mealTypeField.hidden = true;
     setFormError("");
   });
@@ -2104,9 +2108,15 @@ function openForm(type, explicitRecord = null) {
   const form = document.querySelector(`[data-record-form="${type}"]`);
   activeForm = form;
   mealSelections = [];
-  elements.dialog.classList.toggle("record-dialog-meal", type === "meal");
-  elements.mealTypeField.hidden = type !== "meal";
-  elements.recordDate.value = record?.date ?? selectedDate;
+  const isMeal = type === "meal";
+  const recordDate = record?.date ?? selectedDate;
+  elements.dialog.classList.toggle("record-dialog-meal", isMeal);
+  elements.recordDateField.hidden = isMeal;
+  elements.recordDialogDate.hidden = !isMeal;
+  elements.recordDialogDate.dateTime = recordDate;
+  elements.recordDialogDate.textContent = formatDisplayDate(recordDate);
+  elements.mealTypeField.hidden = !isMeal;
+  elements.recordDate.value = recordDate;
   elements.dialogTitle.textContent = `${record ? "编辑" : "新增"}${config.label}`;
   setFormError("");
   fillForm(type, form, record);

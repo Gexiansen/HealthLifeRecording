@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#163a32">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>HealthLife</title>
-    <link rel="manifest" href="./manifest.webmanifest?v=34">
+    <link rel="manifest" href="./manifest.webmanifest?v=35">
     <link rel="icon" href="./icons/icon-192.png">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./styles.css?v=34">
+    <link rel="stylesheet" href="./styles.css?v=35">
   </head>
   <body>
     <header class="app-header">
@@ -179,9 +179,9 @@
 
     <dialog id="record-dialog" aria-labelledby="dialog-title">
       <div class="dialog-header">
-        <div>
-          <p class="eyebrow">健康记录</p>
+        <div class="record-dialog-title-row">
           <h2 id="dialog-title" tabindex="-1">新增记录</h2>
+          <time id="record-dialog-date" class="record-dialog-date" hidden></time>
         </div>
         <button id="close-dialog" class="icon-button" type="button" aria-label="关闭">×</button>
       </div>
@@ -606,6 +606,6 @@
       <button id="undo-button" type="button" hidden>撤销</button>
     </div>
 
-    <script type="module" src="./app.js?v=34"></script>
+    <script type="module" src="./app.js?v=35"></script>
   </body>
 </html>

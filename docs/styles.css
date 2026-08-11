@@ -297,6 +297,9 @@ dialog { width: min(100% - 24px, 520px); max-height: calc(100dvh - 24px - env(sa
 dialog::backdrop { background: rgba(12, 26, 22, 0.62); }
 .dialog-header { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 12px; background: white; }
 .dialog-header .eyebrow { color: var(--muted); }
+.record-dialog-title-row { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.record-dialog-title-row h2 { min-width: 0; }
+.record-dialog-date { flex: 0 0 auto; color: var(--muted); font-size: 13px; font-weight: 700; white-space: nowrap; }
 dialog > .field, dialog > form, dialog > .record-context-row { margin-right: 18px; margin-left: 18px; }
 dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
 .record-form .primary-button, dialog > form .primary-button { position: sticky; z-index: 2; bottom: 0; box-shadow: 0 -10px 20px white; }
@@ -513,7 +516,7 @@ dialog > form { padding-bottom: max(20px, env(safe-area-inset-bottom, 0px)); }
   #record-dialog.record-dialog-meal .dialog-header { padding: 12px 14px 8px; }
   #record-dialog.record-dialog-meal > .record-context-row,
   #record-dialog.record-dialog-meal > form { margin-right: 14px; margin-left: 14px; }
-  #record-dialog.record-dialog-meal > .record-context-row { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 8px; }
+  #record-dialog.record-dialog-meal > .record-context-row { display: block; }
   #record-dialog.record-dialog-meal .record-context-row .field,
   #record-dialog.record-dialog-meal .field { gap: 5px; margin-bottom: 10px; }
   #record-dialog.record-dialog-meal > form { padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
